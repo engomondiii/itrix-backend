@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# itriX backend — runtime dependencies
+# Python 3.12.  Pinned to ranges that are mutually compatible and stable.
+# Phase 1 only *needs* Django + DRF + JWT + CORS + dotenv + server stack, but the
+# full set is listed so Phases 2–3 install nothing new. Everything here imports
+# cleanly; the AI / vector / email packages are only *used* behind feature flags.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Core framework ---
+Django==5.0.6
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-filter==24.2
+
+# --- Configuration / environment ---
+python-dotenv==1.0.1
+dj-database-url==2.1.0
+
+# --- Database drivers ---
+psycopg[binary]==3.1.19
+
+# --- Static files / WSGI server (production) ---
+whitenoise==6.6.0
+gunicorn==22.0.0
+
+# --- Async / background tasks (used in Phases 2–3, imported lazily) ---
+celery==5.4.0
+redis==5.0.4
+
+# --- AI / RAG stack (used in Phase 2 behind ENABLE_AI_ENGINE) ---
+anthropic==0.49.0
+openai==1.59.6
+pinecone==5.4.2
+
+# --- Email delivery (used in Phase 3 behind ENABLE_EMAIL_DELIVERY) ---
+resend==2.0.0
+
+# --- Document ingestion (used in Phase 2) ---
+python-docx==1.1.2
+pypdf==4.2.0
+
+# --- Cloud storage (used in Phase 2 for s3:// knowledge docs) ---
+boto3==1.34.113
+
+# --- Utilities ---
+requests==2.32.3
+python-slugify==8.0.4

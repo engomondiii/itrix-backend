@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Local development orchestration: Postgres + Redis + Django web.
+# Usage:  docker-compose up --build
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: itrix
+      POSTGRES_PASSWORD: itrix
+      POSTGRES_DB: itrix
+    ports:
+      - "5432:5432"
+    volumes:
+      - itrix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U itrix"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: itrix.settings.development
+      SECRET_KEY: dev-insecure-compose-key
+      DEBUG: "True"
+      DATABASE_URL: postgres://itrix:itrix@db:5432/itrix
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,web
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+      CSRF_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3001
+      ENABLE_AI_ENGINE: "False"
+      ENABLE_EMAIL_DELIVERY: "False"
+      ENABLE_CELERY: "False"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  itrix_pgdata:

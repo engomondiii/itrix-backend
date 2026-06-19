@@ -13,7 +13,7 @@ Enum design (Backend v3) and the dashboard contract:
   12 by adding intermediate operational states; the 8 dashboard values are a subset, so
   the dashboard keeps working and the extra states are available to the backend/pipeline.
 * **SpecialRights (7)** — dashboard's 5 + 2 (v3). Stored as display labels.
-* **LeadActivity types (10)** — dashboard's 9 + ``paid_eval`` companion.
+* **LeadActivity types (11)** — dashboard's 10 (incl. ``meeting``) + ``paid_eval`` companion.
 * **product_route / commercial_path** — stored as canonical codes
   (``alpha_compute`` / ``non_exclusive`` …) and serialized to the dashboard's display
   strings ("ALPHA Compute" / "Non-Exclusive") by the serializer.
@@ -213,8 +213,33 @@ class LeadNote(BaseModel):
         return f"LeadNote({self.lead_id})"
 
 
+class LeadMeeting(BaseModel):
+    """A meeting scheduled with a lead (captured by the Book meeting flow)."""
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="meetings")
+    scheduled_at = models.DateTimeField()
+    duration_mins = models.PositiveIntegerField(default=30)
+    attendee = models.CharField(max_length=200, blank=True, default="")
+    location = models.CharField(max_length=500, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    booked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="booked_meetings",
+    )
+    booked_by_name = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        ordering = ["-scheduled_at"]
+
+    def __str__(self) -> str:
+        return f"LeadMeeting({self.lead_id}, {self.scheduled_at})"
+
+
 class LeadActivity(BaseModel):
-    """A timeline entry for a lead. 10 activity types (Backend v3)."""
+    """A timeline entry for a lead. 11 activity types (Backend v3)."""
 
     class ActivityType(models.TextChoices):
         SUBMISSION = "submission", "Submission"
@@ -227,6 +252,7 @@ class LeadActivity(BaseModel):
         EVALUATION = "evaluation", "Evaluation"
         POC = "poc", "PoC"
         PAID_EVAL = "paid_eval", "Paid evaluation"
+        MEETING = "meeting", "Meeting"
 
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="activities")
     type = models.CharField(max_length=20, choices=ActivityType.choices)

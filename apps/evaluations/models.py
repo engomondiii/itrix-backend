@@ -42,6 +42,10 @@ class Evaluation(BaseModel):
         max_length=12, choices=EvaluationStatus.choices, default=EvaluationStatus.PROPOSED
     )
     kpis = models.JSONField(default=list, blank=True)
+    # Captured when the evaluation is requested (dashboard's optional fields).
+    scope = models.TextField(blank=True, default="")
+    fee = models.CharField(max_length=120, blank=True, default="")
+    timeline = models.CharField(max_length=120, blank=True, default="")
 
     class Meta:
         ordering = ["-created_at"]

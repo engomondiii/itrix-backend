@@ -17,9 +17,14 @@ class EvaluationSerializer(serializers.ModelSerializer):
         model = Evaluation
         fields = [
             "id", "leadId", "leadName", "company", "pkg", "status",
-            "kpis", "createdAt", "updatedAt",
+            "kpis", "scope", "fee", "timeline", "createdAt", "updatedAt",
         ]
         read_only_fields = ["id", "leadId", "createdAt", "updatedAt"]
+        extra_kwargs = {
+            "scope": {"required": False, "allow_blank": True},
+            "fee": {"required": False, "allow_blank": True},
+            "timeline": {"required": False, "allow_blank": True},
+        }
 
 
 class CreateEvaluationSerializer(serializers.Serializer):

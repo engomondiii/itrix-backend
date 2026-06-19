@@ -8,9 +8,9 @@ bottlenecks, response-time) all call this one endpoint and extract the block the
     {
       "overview":            OverviewMetrics,
       "funnel":              FunnelStage[],
-      "response_time":       ResponseTimeMetrics,
-      "bottlenecks":         BottleneckPattern[],
-      "industries":          IndustryBreakdown[],
+      "sla_compliance":      ResponseTimeMetrics,
+      "patterns":            BottleneckPattern[],
+      "industry_breakdown":  IndustryBreakdown[],
       "route_distribution":  Record<ProductRoute, number>,
       "submission_trend":    {date,count}[]
     }
@@ -50,9 +50,9 @@ class AnalyticsView(APIView):
             {
                 "overview": overview(days=days),
                 "funnel": funnel(since=since),
-                "response_time": response_time_metrics(),
-                "bottlenecks": bottleneck_patterns(since=since),
-                "industries": industry_breakdown(since=since),
+                "sla_compliance": response_time_metrics(),
+                "patterns": bottleneck_patterns(since=since),
+                "industry_breakdown": industry_breakdown(since=since),
                 "route_distribution": route_distribution(since=since),
                 "submission_trend": submission_trend(days=days),
             }

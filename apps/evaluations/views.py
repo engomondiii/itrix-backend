@@ -1,19 +1,22 @@
 """
 Evaluation views (JWT — Surface 2).
 
-    GET   /evaluations/            list
-    POST  /evaluations/            create from {lead_id}
-    GET   /evaluations/{id}/       retrieve
-    PATCH /evaluations/{id}/       update status / kpis
+    GET   /evaluations/                       list
+    POST  /evaluations/                       create from {lead_id}
+    GET   /evaluations/{id}/                  retrieve
+    PATCH /evaluations/{id}/                  update status / kpis
+    PATCH /evaluations/{id}/kpis/{kpiId}/     update one KPI row in the kpis JSON list
 """
 
 from __future__ import annotations
 
 from rest_framework import mixins, viewsets
+from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.core.exceptions import ITrixError
 from apps.core.permissions import IsDashboardUser, IsNotViewer
 from apps.evaluations.models import Evaluation
 from apps.evaluations.serializers import CreateEvaluationSerializer, EvaluationSerializer
@@ -48,3 +51,24 @@ class EvaluationViewSet(
         lead = get_object_or_404(Lead, pk=serializer.validated_data["lead_id"])
         ev = create_evaluation_for_lead(lead)
         return Response(EvaluationSerializer(ev).data, status=201)
+
+    # ── Nested sub-resources ─────────────────────────────────────────────────
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"kpis/(?P<kpi_id>[^/.]+)",
+        permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer],
+    )
+    def update_kpi(self, request, pk=None, kpi_id=None):
+        """PATCH /evaluations/{id}/kpis/{kpiId}/ — update one KPI row in the kpis list."""
+        ev = self.get_object()
+        kpis = ev.kpis or []
+        item = next((k for k in kpis if str(k.get("id")) == str(kpi_id)), None)
+        if item is None:
+            raise ITrixError("KPI not found.")
+        for field in ("category", "metric", "target", "result"):
+            if field in request.data:
+                item[field] = request.data[field]
+        ev.kpis = kpis
+        ev.save(update_fields=["kpis", "updated_at"])
+        return Response(EvaluationSerializer(ev).data)

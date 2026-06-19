@@ -13,7 +13,7 @@ import logging
 
 from django.utils import timezone
 
-from apps.leads.models import Lead, LeadActivity, LeadNote, LeadStatus
+from apps.leads.models import Lead, LeadActivity, LeadMeeting, LeadNote, LeadStatus
 
 logger = logging.getLogger("itrix")
 
@@ -83,6 +83,39 @@ def add_note(lead: Lead, *, body: str, by=None) -> LeadNote:
         by_name=_actor_name(by),
     )
     return note
+
+
+def book_meeting(
+    lead: Lead,
+    *,
+    scheduled_at,
+    duration_mins: int = 30,
+    attendee: str = "",
+    location: str = "",
+    notes: str = "",
+    by=None,
+) -> LeadMeeting:
+    """Book a meeting for the lead, advance status to "Meeting Booked", and log it."""
+    meeting = LeadMeeting.objects.create(
+        lead=lead,
+        scheduled_at=scheduled_at,
+        duration_mins=duration_mins or 30,
+        attendee=attendee,
+        location=location,
+        notes=notes,
+        booked_by=by,
+        booked_by_name=_actor_name(by),
+    )
+    change_status(lead, status=LeadStatus.MEETING_BOOKED, by=by)
+    LeadActivity.objects.create(
+        lead=lead,
+        type=LeadActivity.ActivityType.MEETING,
+        label=f"Meeting booked with {attendee}." if attendee else "Meeting booked.",
+        by=by,
+        by_name=_actor_name(by),
+        meta={"meeting_id": str(meeting.id), "scheduled_at": scheduled_at.isoformat() if scheduled_at else None},
+    )
+    return meeting
 
 
 def apply_email_capture(

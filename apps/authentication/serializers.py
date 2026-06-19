@@ -91,3 +91,21 @@ class LoginSerializer(serializers.Serializer):
 
 class MeSerializer(UserSerializer):
     """Identical to ``UserSerializer``; named for clarity at the ``/auth/me/`` view."""
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """Self-service profile edit (``PATCH /auth/profile/``).
+
+    The dashboard's ``ProfileUpdate`` is ``{ name? }`` (see
+    ``itrix-dashboard/src/types/settings.ts``); ``avatarUrl`` is accepted too so the
+    same screen can set an avatar. Role/email are NOT editable here — role changes go
+    through the admin-gated team endpoint, and email is the login identity.
+    """
+
+    avatarUrl = serializers.URLField(
+        source="avatar_url", required=False, allow_blank=True
+    )
+
+    class Meta:
+        model = User
+        fields = ["name", "avatarUrl"]

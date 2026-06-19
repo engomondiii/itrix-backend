@@ -8,9 +8,55 @@ qualitative, consistent with the brand's claims discipline.
 
 from __future__ import annotations
 
+import uuid
+
 
 def _pct(x: float) -> str:
     return f"{round(x * 100)}%"
+
+
+def new_section_id() -> str:
+    """Generate a stable string id for a manually added section."""
+    return f"sec-{uuid.uuid4().hex[:8]}"
+
+
+def add_section(report, *, title: str, body: str):
+    """Append a ``{id, title, body}`` section to ``report`` and persist. Returns the report."""
+    sections = list(report.sections or [])
+    sections.append({"id": new_section_id(), "title": title.strip(), "body": body})
+    report.sections = sections
+    report.save(update_fields=["sections", "updated_at"])
+    return report
+
+
+def update_section(report, section_id: str, *, title: str | None = None, body: str | None = None):
+    """Patch a section's title/body by id and persist. Returns the report, or None if not found."""
+    sections = list(report.sections or [])
+    found = False
+    for section in sections:
+        if section.get("id") == section_id:
+            if title is not None:
+                section["title"] = title.strip()
+            if body is not None:
+                section["body"] = body
+            found = True
+            break
+    if not found:
+        return None
+    report.sections = sections
+    report.save(update_fields=["sections", "updated_at"])
+    return report
+
+
+def remove_section(report, section_id: str):
+    """Remove a section by id and persist. Returns the report, or None if not found."""
+    sections = list(report.sections or [])
+    remaining = [s for s in sections if s.get("id") != section_id]
+    if len(remaining) == len(sections):
+        return None
+    report.sections = remaining
+    report.save(update_fields=["sections", "updated_at"])
+    return report
 
 
 def build_sections(analytics: dict, *, month: str) -> list[dict]:

@@ -2,11 +2,12 @@
 Email views (JWT — Surface 2).
 
     GET  /emails/              list email logs (most recent first); ?lead_id= to filter
-    POST /emails/send/         send an ad-hoc visitor email to a lead
+    POST /emails/send/         send an ad-hoc email — lead-scoped (leadId) or by recipient (to)
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -40,12 +41,26 @@ class EmailViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def send(self, request):
         serializer = SendEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
         from rest_framework.generics import get_object_or_404
 
-        lead = get_object_or_404(Lead, pk=serializer.validated_data["lead_id"])
+        lead = None
+        if data.get("leadId"):
+            lead = get_object_or_404(Lead, pk=data["leadId"])
+
         log = build_visitor_email(
             lead,
-            subject=serializer.validated_data["subject"],
-            body=serializer.validated_data["body"],
+            subject=data["subject"],
+            body=data["body"],
+            to_email=data.get("to") or None,
+            cc=data.get("cc") or [],
+            attachments=data.get("attachments") or [],
+            scheduled_at=data.get("scheduledAt"),
         )
-        return Response(EmailLogSerializer(log).data)
+
+        scheduled = bool(data.get("scheduledAt"))
+        # Anything not delivered inline (scheduled, or delivery disabled) is queued.
+        queued = scheduled or not getattr(settings, "ENABLE_EMAIL_DELIVERY", False)
+        return Response(
+            {"ok": True, "queued": queued, "scheduled": scheduled, "id": str(log.id)}
+        )

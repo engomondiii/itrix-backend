@@ -6,6 +6,7 @@ custom actions from the v3 endpoint map:
 
     POST {id}/assign/     POST {id}/status/      POST {id}/note/
     POST {id}/escalate/   POST {id}/nda/         POST {id}/paid-eval/   POST {id}/poc/
+    POST {id}/meeting/
     GET  {id}/summary/    GET  {id}/handoff/      GET  approval-checklist/
 
 ``LeadEmailCaptureView`` (PUBLIC — Surface 1) handles ``lead-capture/email/`` and is
@@ -38,6 +39,7 @@ from apps.leads.serializers import (
     LeadEmailCaptureSerializer,
     LeadListSerializer,
     LeadUpdateSerializer,
+    MeetingSerializer,
     NoteSerializer,
     StatusSerializer,
 )
@@ -45,7 +47,13 @@ from apps.leads.services.exclusive_flag_handler import approval_checklist
 from apps.leads.services.handoff_memo_generator import generate_handoff_memo
 from apps.leads.services.lead_escalator import escalate_lead
 from apps.leads.services.lead_summary_generator import generate_lead_summary
-from apps.leads.services.lead_updater import add_note, apply_email_capture, assign_owner, change_status
+from apps.leads.services.lead_updater import (
+    add_note,
+    apply_email_capture,
+    assign_owner,
+    book_meeting,
+    change_status,
+)
 
 logger = logging.getLogger("itrix")
 User = get_user_model()
@@ -58,7 +66,11 @@ class LeadViewSet(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = Lead.objects.all().select_related("owner").prefetch_related("notes", "activities")
+    queryset = (
+        Lead.objects.all()
+        .select_related("owner")
+        .prefetch_related("notes", "activities", "meetings")
+    )
     permission_classes = [IsAuthenticated, IsDashboardUser]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
@@ -153,11 +165,34 @@ class LeadViewSet(
         return self._detail_response(lead)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def meeting(self, request, pk=None):
+        """Book a meeting, advance status to "Meeting Booked", and log it."""
+        lead = self.get_object()
+        serializer = MeetingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        book_meeting(
+            lead,
+            scheduled_at=data["scheduled_at"],
+            duration_mins=data.get("duration_mins", 30),
+            attendee=data.get("attendee", ""),
+            location=data.get("location", ""),
+            notes=data.get("notes", ""),
+            by=self._actor(),
+        )
+        return self._detail_response(lead)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
     def escalate(self, request, pk=None):
         lead = self.get_object()
         serializer = EscalateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        escalate_lead(lead, reason=serializer.validated_data.get("reason", ""), by=self._actor())
+        escalate_lead(
+            lead,
+            reason=serializer.validated_data.get("reason", ""),
+            priority=serializer.validated_data.get("priority", "normal"),
+            by=self._actor(),
+        )
         return self._detail_response(lead)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
@@ -193,10 +228,17 @@ class LeadViewSet(
             by=self._actor(),
             by_name=self._actor().display_name,
         )
+        # Capture the paid-eval setup fields on the Evaluation record (best-effort,
+        # cross-app — lazy import keeps leads independent of the evaluations app).
         try:
             from apps.evaluations.services.evaluation_creator import create_evaluation_for_lead
 
-            create_evaluation_for_lead(lead)
+            payload = {
+                k: request.data.get(k)
+                for k in ("scope", "fee", "timeline")
+                if request.data.get(k) is not None
+            }
+            create_evaluation_for_lead(lead, **payload)
         except Exception:  # noqa: BLE001
             pass
         return self._detail_response(lead)
@@ -213,10 +255,24 @@ class LeadViewSet(
             by=self._actor(),
             by_name=self._actor().display_name,
         )
+        # Capture the PoC setup fields on the PoC record (best-effort, cross-app — lazy
+        # import keeps leads independent of the pocs app). The dashboard sends camelCase
+        # keys; map them to the creator's snake_case kwargs.
         try:
             from apps.pocs.services.poc_creator import create_poc_for_lead
 
-            create_poc_for_lead(lead)
+            key_map = {
+                "scope": "scope",
+                "durationWeeks": "duration_weeks",
+                "successMetrics": "success_metrics",
+                "startDate": "start_date",
+            }
+            payload = {
+                snake: request.data.get(camel)
+                for camel, snake in key_map.items()
+                if request.data.get(camel) is not None
+            }
+            create_poc_for_lead(lead, **payload)
         except Exception:  # noqa: BLE001
             pass
         return self._detail_response(lead)

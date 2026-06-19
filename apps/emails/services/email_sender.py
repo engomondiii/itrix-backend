@@ -29,6 +29,9 @@ def send_email(
     body: str,
     lead=None,
     from_email: str | None = None,
+    cc=None,
+    attachments=None,
+    scheduled_at=None,
 ) -> EmailLog:
     """Build + (optionally) send an email, always returning the EmailLog record."""
     sender = from_email or getattr(settings, "EMAIL_FROM", "") or "team@itrix.example"
@@ -40,8 +43,16 @@ def send_email(
         subject=subject,
         body=body,
         lead=lead,
+        cc=cc or [],
+        attachments=attachments or [],
+        scheduled_at=scheduled_at,
         status=EmailLog.Status.STUBBED,
     )
+
+    # A future-dated send is queued, never delivered inline.
+    if scheduled_at is not None:
+        logger.info("[email-scheduled] %s -> %s | %s @ %s", kind, to_email, subject, scheduled_at)
+        return log
 
     if not getattr(settings, "ENABLE_EMAIL_DELIVERY", False):
         logger.info("[email-stubbed] %s -> %s | %s", kind, to_email, subject)

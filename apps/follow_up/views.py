@@ -4,8 +4,10 @@ Follow-up views (JWT — Surface 2).
     GET  /follow-up/                list pending+snoozed tasks (sorted by due)
     GET  /follow-up/overdue/        overdue tasks
     GET  /follow-up/today/          tasks due today
-    POST /follow-up/{id}/complete/  mark complete
-    POST /follow-up/{id}/snooze/    snooze by {hours} (default 24)
+    POST /follow-up/{id}/complete/    mark complete
+    POST /follow-up/{id}/snooze/      snooze by {hours} (default 24)
+    POST /follow-up/{id}/dismiss/     dismiss
+    POST /follow-up/{id}/reschedule/  set due_at to {dueAt}
 """
 
 from __future__ import annotations
@@ -20,7 +22,11 @@ from rest_framework.response import Response
 
 from apps.core.permissions import IsDashboardUser, IsNotViewer
 from apps.follow_up.models import FollowUpStatus, FollowUpTask
-from apps.follow_up.serializers import FollowUpTaskSerializer, SnoozeSerializer
+from apps.follow_up.serializers import (
+    FollowUpTaskSerializer,
+    RescheduleSerializer,
+    SnoozeSerializer,
+)
 from apps.follow_up.services.sla_breach_checker import find_overdue
 
 
@@ -70,4 +76,21 @@ class FollowUpViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         task.status = FollowUpStatus.SNOOZED
         task.breach_notified = False  # reset so a future breach re-notifies
         task.save(update_fields=["snoozed_until", "status", "breach_notified", "updated_at"])
+        return Response(FollowUpTaskSerializer(task).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def dismiss(self, request, pk=None):
+        task = self.get_object()
+        task.status = FollowUpStatus.DISMISSED
+        task.save(update_fields=["status", "updated_at"])
+        return Response(FollowUpTaskSerializer(task).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def reschedule(self, request, pk=None):
+        serializer = RescheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        task = self.get_object()
+        task.due_at = serializer.validated_data["dueAt"]
+        task.breach_notified = False  # reset so a future breach re-notifies
+        task.save(update_fields=["due_at", "breach_notified", "updated_at"])
         return Response(FollowUpTaskSerializer(task).data)

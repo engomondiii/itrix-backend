@@ -50,6 +50,7 @@ def api_index(_request):
                 "templates",
                 "reporting",
                 "notifications",
+                "settings",
             ],
             "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture"],
         }
@@ -84,4 +85,5 @@ urlpatterns = [
     path("templates/", include("apps.templates_library.urls")),     # JWT
     path("reporting/", include("apps.reporting.urls")),             # JWT
     path("notifications/", include("apps.notifications.urls")),      # JWT
+    path("settings/", include("apps.settings.urls")),                # JWT (SLA + notification prefs)
 ]

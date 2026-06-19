@@ -18,7 +18,7 @@ from apps.leads.models import Lead, LeadActivity
 logger = logging.getLogger("itrix")
 
 
-def escalate_lead(lead: Lead, *, reason: str = "", by=None) -> Lead:
+def escalate_lead(lead: Lead, *, reason: str = "", priority: str = "normal", by=None) -> Lead:
     """Escalate ``lead`` to human review, idempotently."""
     already = lead.escalated
     lead.escalated = True
@@ -27,13 +27,17 @@ def escalate_lead(lead: Lead, *, reason: str = "", by=None) -> Lead:
         lead.escalated_at = timezone.now()
     lead.save(update_fields=["escalated", "human_handoff_trigger", "escalated_at", "updated_at"])
 
+    base_label = reason or "Lead escalated to human review."
+    # No dedicated priority column on Lead — surface it on the activity (label + meta).
+    label = f"[{priority}] {base_label}" if priority and priority != "normal" else base_label
     LeadActivity.objects.create(
         lead=lead,
         type=LeadActivity.ActivityType.ESCALATED,
-        label=reason or "Lead escalated to human review.",
+        label=label,
         by=by,
         by_name=getattr(by, "display_name", "") or getattr(by, "email", "") or "system",
+        meta={"priority": priority, "reason": reason},
     )
     if not already:
-        logger.info("Lead %s escalated (%s)", lead.id, reason or "manual")
+        logger.info("Lead %s escalated (%s, priority=%s)", lead.id, reason or "manual", priority)
     return lead

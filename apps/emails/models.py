@@ -35,6 +35,10 @@ class EmailLog(BaseModel):
     error = models.TextField(blank=True, default="")
     provider_message_id = models.CharField(max_length=255, blank=True, default="")
 
+    cc = models.JSONField(default=list, blank=True)
+    attachments = models.JSONField(default=list, blank=True)
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+
     lead = models.ForeignKey(
         "leads.Lead",
         on_delete=models.SET_NULL,

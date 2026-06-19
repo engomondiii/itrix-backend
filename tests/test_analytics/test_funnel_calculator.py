@@ -75,8 +75,8 @@ def test_analytics_endpoint_returns_all_blocks(api_client):
     resp = api_client.get("/api/v1/analytics/?days=30")
     assert resp.status_code == 200
     assert set(resp.json().keys()) == {
-        "overview", "funnel", "response_time", "bottlenecks",
-        "industries", "route_distribution", "submission_trend",
+        "overview", "funnel", "sla_compliance", "patterns",
+        "industry_breakdown", "route_distribution", "submission_trend",
     }
 
 

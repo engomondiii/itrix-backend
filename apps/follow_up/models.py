@@ -18,6 +18,7 @@ class FollowUpStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     COMPLETED = "completed", "Completed"
     SNOOZED = "snoozed", "Snoozed"
+    DISMISSED = "dismissed", "Dismissed"
 
 
 class FollowUpTask(BaseModel):

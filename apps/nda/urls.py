@@ -1,4 +1,8 @@
-"""NDA URLs (mounted under /api/v1/nda/) — JWT."""
+"""NDA URLs (mounted under /api/v1/nda/) — JWT.
+
+The router's ``{pk}`` segment carries the **lead id**; the viewset resolves the NDA
+via its ``lead`` relation (see ``NDAViewSet.lookup_field``).
+"""
 
 from __future__ import annotations
 

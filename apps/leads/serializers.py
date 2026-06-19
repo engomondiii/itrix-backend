@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.leads.models import Lead, LeadActivity, LeadNote
+from apps.leads.models import Lead, LeadActivity, LeadMeeting, LeadNote
 
 
 class LeadNoteSerializer(serializers.ModelSerializer):
@@ -38,6 +38,23 @@ class LeadActivitySerializer(serializers.ModelSerializer):
 
     def get_by(self, obj) -> str | None:
         return obj.by_name or (obj.by.display_name if obj.by else None)
+
+
+class LeadMeetingSerializer(serializers.ModelSerializer):
+    scheduledAt = serializers.DateTimeField(source="scheduled_at")
+    durationMins = serializers.IntegerField(source="duration_mins")
+    location = serializers.CharField(allow_blank=True)
+    notes = serializers.CharField(allow_blank=True, required=False)
+    bookedBy = serializers.SerializerMethodField()
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = LeadMeeting
+        fields = ["id", "scheduledAt", "durationMins", "attendee", "location", "notes", "bookedBy", "createdAt"]
+        read_only_fields = fields
+
+    def get_bookedBy(self, obj) -> str | None:
+        return obj.booked_by_name or (obj.booked_by.display_name if obj.booked_by else None)
 
 
 class _LeadBaseSerializer(serializers.ModelSerializer):
@@ -100,6 +117,7 @@ class LeadDetailSerializer(_LeadBaseSerializer):
     qualification = serializers.JSONField()
     notes = LeadNoteSerializer(many=True, read_only=True)
     activity = LeadActivitySerializer(source="activities", many=True, read_only=True)
+    meetings = LeadMeetingSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lead
@@ -132,6 +150,7 @@ class LeadDetailSerializer(_LeadBaseSerializer):
             "qualification",
             "notes",
             "activity",
+            "meetings",
         ]
         read_only_fields = fields
 
@@ -141,6 +160,8 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
 
     visitorName = serializers.CharField(source="visitor_name", required=False, allow_blank=True)
     primaryPain = serializers.CharField(source="primary_pain", required=False, allow_blank=True)
+    ctaClicked = serializers.CharField(source="cta_clicked", required=False, allow_blank=True)
+    documentsViewed = serializers.IntegerField(source="documents_viewed", required=False)
 
     class Meta:
         model = Lead
@@ -152,8 +173,8 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
             "role",
             "primaryPain",
             "status",
-            "cta_clicked",
-            "documents_viewed",
+            "ctaClicked",
+            "documentsViewed",
         ]
 
 
@@ -172,6 +193,19 @@ class NoteSerializer(serializers.Serializer):
 
 class EscalateSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
+    priority = serializers.ChoiceField(
+        choices=["normal", "high", "urgent"], required=False, default="normal"
+    )
+
+
+class MeetingSerializer(serializers.Serializer):
+    """Payload for the book-meeting action (dashboard ``BookMeetingDialog``)."""
+
+    scheduledAt = serializers.DateTimeField(source="scheduled_at")
+    durationMins = serializers.IntegerField(source="duration_mins", required=False, default=30)
+    attendee = serializers.CharField(allow_blank=True, required=False, default="")
+    location = serializers.CharField(allow_blank=True, required=False, default="")
+    notes = serializers.CharField(allow_blank=True, required=False, default="")
 
 
 class LeadEmailCaptureSerializer(serializers.Serializer):

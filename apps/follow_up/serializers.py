@@ -29,3 +29,7 @@ class FollowUpTaskSerializer(serializers.ModelSerializer):
 
 class SnoozeSerializer(serializers.Serializer):
     hours = serializers.IntegerField(required=False, default=24, min_value=1, max_value=720)
+
+
+class RescheduleSerializer(serializers.Serializer):
+    dueAt = serializers.DateTimeField()

@@ -18,3 +18,17 @@ class MonthlyReportSerializer(serializers.ModelSerializer):
 
 class GenerateReportSerializer(serializers.Serializer):
     month = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SectionInputSerializer(serializers.Serializer):
+    """Input for adding a section ({title, body})."""
+
+    title = serializers.CharField()
+    body = serializers.CharField()
+
+
+class SectionPatchSerializer(serializers.Serializer):
+    """Input for patching a section — either/both of {title, body}."""
+
+    title = serializers.CharField(required=False)
+    body = serializers.CharField(required=False)

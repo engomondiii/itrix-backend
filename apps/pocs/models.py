@@ -29,6 +29,11 @@ class PoC(BaseModel):
     milestones = models.JSONField(default=list, blank=True)  # [{id,label,status,dueAt?}]
     kpis = models.JSONField(default=list, blank=True)        # [{id,category,metric,baseline?,target?,result?}]
     risks = models.JSONField(default=list, blank=True)       # [{id,description,severity,mitigation?}]
+    # Captured when the PoC is opened (dashboard's optional fields).
+    scope = models.TextField(blank=True, default="")
+    duration_weeks = models.PositiveIntegerField(null=True, blank=True)
+    success_metrics = models.TextField(blank=True, default="")
+    start_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

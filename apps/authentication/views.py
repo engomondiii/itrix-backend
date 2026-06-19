@@ -26,7 +26,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.authentication.permissions import IsAuthenticatedTeamMember
-from apps.authentication.serializers import LoginSerializer, UserSerializer
+from apps.authentication.serializers import (
+    LoginSerializer,
+    ProfileUpdateSerializer,
+    UserSerializer,
+)
 from apps.authentication.tokens import build_tokens_for_user
 
 logger = logging.getLogger("itrix")
@@ -81,6 +85,30 @@ class MeView(APIView):
 
     def get(self, request):
         return Response({"user": UserSerializer(request.user).data})
+
+
+class ProfileView(APIView):
+    """Self-service profile for the current team member (``/auth/profile/``).
+
+    The dashboard's ``settings/profile`` proxy reads/writes the bare ``SessionUser``
+    shape here (not wrapped in ``{user}`` like ``/auth/me/``).
+
+        GET    profile/                 -> SessionUser
+        PATCH  profile/   {name?, avatarUrl?}  -> updated SessionUser
+    """
+
+    permission_classes = [IsAuthenticatedTeamMember]
+
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(
+            instance=request.user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
 
 
 class ITrixTokenRefreshView(TokenRefreshView):

@@ -1,9 +1,10 @@
 """
 NDA models.
 
-``NDARecord`` tracks an NDA through required → sent → signed, with a small checklist. One
-NDA per lead. Matches the dashboard's ``NDARecord`` type
-(``{id, leadId, leadName, company, status, checklist[], requestedAt, signedAt?}``).
+``NDARecord`` tracks an NDA through required → sent → signed (or declined/expired), with
+a small checklist and the document itself. One NDA per lead. Matches the dashboard's
+``NDARecord`` type (``{id, leadId, leadName, company, status, checklist[], docType, body,
+signerName?, signerEmail?, requestedAt, sentAt?, signedAt?, declineReason?}``).
 The checklist is stored as JSON (list of ``{id, label, done}``).
 """
 
@@ -18,6 +19,13 @@ class NDAStatus(models.TextChoices):
     REQUIRED = "required", "Required"
     SENT = "sent", "Sent"
     SIGNED = "signed", "Signed"
+    DECLINED = "declined", "Declined"
+    EXPIRED = "expired", "Expired"
+
+
+class NDADocType(models.TextChoices):
+    MUTUAL = "mutual", "Mutual NDA"
+    ONE_WAY = "one-way", "One-way NDA"
 
 
 class NDARecord(BaseModel):
@@ -28,6 +36,13 @@ class NDARecord(BaseModel):
     company = models.CharField(max_length=255, blank=True, default="")
     status = models.CharField(max_length=12, choices=NDAStatus.choices, default=NDAStatus.REQUIRED)
     checklist = models.JSONField(default=list, blank=True)
+    doc_type = models.CharField(
+        max_length=12, choices=NDADocType.choices, default=NDADocType.MUTUAL
+    )
+    body = models.TextField(blank=True, default="")
+    signer_name = models.CharField(max_length=255, blank=True, default="")
+    signer_email = models.EmailField(blank=True, default="")
+    decline_reason = models.TextField(blank=True, default="")
     requested_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
     signed_at = models.DateTimeField(null=True, blank=True)

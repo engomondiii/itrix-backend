@@ -22,3 +22,34 @@ class IsAuthenticatedTeamMember(BasePermission):
     def has_permission(self, request, view) -> bool:
         user = request.user
         return bool(user and user.is_authenticated and user.is_active)
+
+
+class IsGovernanceAdmin(BasePermission):
+    """
+    Governance administration (claim-card writes, approval actions) is restricted to
+    ADMIN and ASSESSMENT roles — the people accountable for approved wording. VIEWER and
+    SPECIALIST may read the queue but not resolve it.
+    """
+
+    message = "Governance administration requires an ADMIN or ASSESSMENT role."
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        if not (user and user.is_authenticated and getattr(user, "is_active", False)):
+            return False
+        return getattr(user, "role", "") in ("ADMIN", "ASSESSMENT")
+
+
+class IsJourneyController(BasePermission):
+    """
+    Guarded manual journey advance (POST journey/leads/{id}/advance/) is restricted to
+    ADMIN and ASSESSMENT roles, since a manual transition can trigger reveals + fan-out.
+    """
+
+    message = "Advancing a lead's journey requires an ADMIN or ASSESSMENT role."
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        if not (user and user.is_authenticated and getattr(user, "is_active", False)):
+            return False
+        return getattr(user, "role", "") in ("ADMIN", "ASSESSMENT")

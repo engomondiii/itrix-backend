@@ -146,6 +146,7 @@ class LeadCreator:
             human_handoff_trigger=exclusivity.requires_human_review,
             qualification=answers,
             sla_response_due_at=sla_due,
+            journey_state="IN_REVIEW",
         )
 
         existing = Lead.objects.filter(review_session=session).first()
@@ -166,6 +167,16 @@ class LeadCreator:
                 label=f"Lead created from review — Tier {tier}, score {score_total}/100.",
                 meta={"product_route": product_route, "license_pathway": license_pathway},
             )
+
+        # ── v4.0: advance the journey to DIAGNOSED (value delivered) ─────────
+        # Deterministic + audited; the result page is the delivered value. This is
+        # best-effort so lead creation never fails on a journey hiccup.
+        try:
+            from apps.journey.services.advance import mark_diagnosed
+
+            mark_diagnosed(lead, meta={"review_session": str(session.id)})
+        except Exception:  # noqa: BLE001 - journey advance must not block lead creation
+            logger.exception("journey advance to DIAGNOSED failed for lead %s", lead.id)
 
         logger.info(
             "Lead %s for review %s (tier=%s score=%s route=%s)",

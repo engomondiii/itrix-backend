@@ -110,3 +110,45 @@ class QualifyView(APIView):
 
         result = process_qualification(session, serializer.validated_data["answers"])
         return Response(result.to_dict(), status=status.HTTP_200_OK)
+
+
+class ReviewChatView(APIView):
+    """
+    POST /api/v1/review/sessions/{id}/chat/  — PUBLIC.
+
+    A review-chat turn with the Concierge. Persists the turn to the durable conversation
+    and returns the governed reply synchronously (so the funnel works with realtime off).
+    When governance holds the reply, ``underReview`` is true and ``reply`` is empty.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = "review_submit"
+
+    def post(self, request, session_id):
+        session = get_object_or_404(ReviewSession, pk=session_id)
+        body = (request.data.get("message") or request.data.get("body") or "").strip()
+        if not body:
+            return Response(
+                {"error": {"detail": "message is required.", "code": "invalid"}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.leads.models import Lead
+        from apps.review.services.review_chat import handle_review_chat_turn
+
+        lead = Lead.objects.filter(review_session=session).first()
+        result = handle_review_chat_turn(
+            review_session_id=str(session.id), lead=lead, body=body
+        )
+        return Response(
+            {
+                "conversationId": result.conversation_id,
+                "reply": result.reply,
+                "suggestNda": result.suggest_nda,
+                "governanceStatus": result.governance_status,
+                "underReview": result.under_review,
+                "citedChunkIds": result.cited_chunk_ids,
+            },
+            status=status.HTTP_200_OK,
+        )

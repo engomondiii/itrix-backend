@@ -57,3 +57,23 @@ class AnalyticsView(APIView):
                 "submission_trend": submission_trend(days=days),
             }
         )
+
+
+class PitchAnalyticsView(APIView):
+    """
+    GET analytics/pitch/?days=30 — TEAM.
+
+    Platform-wide pitch-engagement aggregation (Backend v4 §Phase 3). Internal signal —
+    exposed only through team-JWT analytics; never wired into a portal/public payload.
+    """
+
+    permission_classes = [IsAuthenticated, IsDashboardUser]
+
+    def get(self, request):
+        try:
+            days = int(request.query_params.get("days", 30))
+        except (TypeError, ValueError):
+            days = 30
+        from apps.analytics.services.pitch_engagement import pitch_engagement_overview
+
+        return Response(pitch_engagement_overview(days=days))

@@ -51,6 +51,8 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 # Applications
 # ─────────────────────────────────────────────────────────────────────────────
 DJANGO_APPS = [
+    # Daphne must load before staticfiles so its runserver command takes over (Channels).
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -65,6 +67,7 @@ THIRD_PARTY_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
+    "channels",
 ]
 
 # LOCAL_APPS — every itriX app is registered here. Phase 1 ships these five;
@@ -75,6 +78,15 @@ LOCAL_APPS = [
     "apps.team",
     "apps.visitors",
     "apps.review",
+    # ── Phase 1 (v4.0) — Identity, Journey & Agent Runtime ──────────────────
+    "apps.journey",
+    "apps.clients",
+    "apps.agents",
+    # ── Phase 2 (v4.0) — Conversation & Realtime ────────────────────────────
+    "apps.conversations",
+    "apps.realtime",
+    # ── Phase 3 (v4.0) — Governance fabric ──────────────────────────────────
+    "apps.governance",
     # ── Phase 2 — Intelligence Core ──────────────────────────────────────────
     "apps.knowledge_core",
     "apps.ai_engine",
@@ -264,6 +276,9 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "TOKEN_OBTAIN_SERIALIZER": "apps.authentication.serializers.ITrixTokenObtainPairSerializer",
+    # Two coexisting JWT audiences (v4.0): the team plane is explicitly "team";
+    # the client plane ("client") is issued + verified by apps.clients.tokens.
+    "AUDIENCE": "team",
 }
 
 
@@ -301,6 +316,11 @@ ENABLE_AI_ENGINE = env_bool("ENABLE_AI_ENGINE", False)
 ENABLE_EMAIL_DELIVERY = env_bool("ENABLE_EMAIL_DELIVERY", False)
 ENABLE_CELERY = env_bool("ENABLE_CELERY", False)
 
+# ── v4.0 capability flags (all default False so the shipped funnel is untouched) ──
+ENABLE_AGENTS = env_bool("ENABLE_AGENTS", False)
+ENABLE_CLIENT_PORTAL = env_bool("ENABLE_CLIENT_PORTAL", False)
+ENABLE_REALTIME = env_bool("ENABLE_REALTIME", False)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # External service configuration (consumed in Phases 2–3, read here once)
@@ -324,9 +344,37 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = not ENABLE_CELERY
 
+# ── Channels / realtime transport (v4.0 Phase 2) ─────────────────────────────
+# When ENABLE_REALTIME is on we use the Redis channel layer (reusing REDIS_URL) so
+# WebSocket fan-out works across processes. Otherwise we use the in-memory layer,
+# which is perfect for tests and single-process dev and requires no broker.
+if ENABLE_REALTIME:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+
 # Frontends (used for building absolute links in emails / result pages later)
 FRONTEND_WEB_URL = env("FRONTEND_WEB_URL", "http://localhost:3000")
 FRONTEND_DASHBOARD_URL = env("FRONTEND_DASHBOARD_URL", "http://localhost:3001")
+
+# ── v4.0 identity plane + agent runtime configuration ────────────────────────
+# Capability tokens (journey reveals) are HMAC-signed with this secret; the client
+# plane signs its own JWTs with CLIENT_JWT_SIGNING_KEY. Both fall back to SECRET_KEY
+# so the project boots before the keys are provisioned.
+CAPABILITY_TOKEN_SECRET = env("CAPABILITY_TOKEN_SECRET", SECRET_KEY)
+CLIENT_JWT_SIGNING_KEY = env("CLIENT_JWT_SIGNING_KEY", SECRET_KEY)
+# Single-use account-invite token lifetime (reveal ② → ③).
+ACCOUNT_INVITE_TTL_HOURS = int(env("ACCOUNT_INVITE_TTL_HOURS", "72"))
+# Agent output at/below this claim level auto-delivers; above it queues for human
+# approval (Backend v4 §5.2 governance).
+AGENT_AUTO_APPROVE_MAX_LEVEL = int(env("AGENT_AUTO_APPROVE_MAX_LEVEL", "2"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

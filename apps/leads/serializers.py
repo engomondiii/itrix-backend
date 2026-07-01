@@ -77,6 +77,18 @@ class _LeadBaseSerializer(serializers.ModelSerializer):
     def get_owner(self, obj) -> str | None:
         return obj.owner.display_name if obj.owner else None
 
+    # v4.0 journey exposure
+    journeyState = serializers.CharField(source="journey_state", read_only=True)
+    clientId = serializers.SerializerMethodField()
+    valueDelivered = serializers.SerializerMethodField()
+
+    def get_clientId(self, obj) -> str | None:
+        account = getattr(obj, "client_account", None)
+        return str(account.id) if account else None
+
+    def get_valueDelivered(self, obj) -> bool:
+        return getattr(obj, "value_delivered_at", None) is not None
+
 
 class LeadListSerializer(_LeadBaseSerializer):
     """Lightweight row for the leads table (``LeadListItem``)."""
@@ -98,6 +110,7 @@ class LeadListSerializer(_LeadBaseSerializer):
             "owner",
             "specialRights",
             "submittedAt",
+            "journeyState",
         ]
         read_only_fields = fields
 
@@ -147,6 +160,9 @@ class LeadDetailSerializer(_LeadBaseSerializer):
             "ctaClicked",
             "documentsViewed",
             "submittedAt",
+            "journeyState",
+            "clientId",
+            "valueDelivered",
             "qualification",
             "notes",
             "activity",

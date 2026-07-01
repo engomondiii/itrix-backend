@@ -163,6 +163,26 @@ class Lead(BaseModel):
     escalated = models.BooleanField(default=False)
     escalated_at = models.DateTimeField(null=True, blank=True)
 
+    # ── v4.0 journey state machine + client link (Backend v4 §3.2) ───────────
+    # The authoritative journey state lives here; transitions go through
+    # apps.journey.services.advance.advance() — never set directly in a view.
+    journey_state = models.CharField(
+        max_length=20,
+        default="ARRIVED",
+        db_index=True,
+        help_text="Progressive-disclosure state (apps.journey.JourneyState).",
+    )
+    # 1:1 to the account-holding Client is the REVERSE side of clients.Client.lead
+    # (access as ``lead.client_account``). We intentionally do NOT add a forward
+    # ``client`` field here because ``client_id`` already exists on Lead (the visitor's
+    # anonymous client id from Surface 1) and would clash.
+    # Timestamp the moment value was delivered (reaching DIAGNOSED). Value-first
+    # enforcement: a commitment ask is only allowed once this is set.
+    value_delivered_at = models.DateTimeField(null=True, blank=True)
+    # Audit of the most recent gate decision (deterministic gates, §3.3).
+    gate_decision = models.CharField(max_length=16, blank=True, default="")
+    gate_decision_reason = models.CharField(max_length=255, blank=True, default="")
+
     submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -173,6 +193,7 @@ class Lead(BaseModel):
             models.Index(fields=["tier", "status"]),
             models.Index(fields=["status", "submitted_at"]),
             models.Index(fields=["owner", "status"]),
+            models.Index(fields=["journey_state"]),
         ]
 
     def __str__(self) -> str:

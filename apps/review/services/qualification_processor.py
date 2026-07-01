@@ -169,6 +169,41 @@ def process_qualification(session, answers: dict) -> QualificationResult:
         logger.exception("Result page generation failed during qualification for lead %s", lead.id)
         next_step = lead.recommended_next_step or ""
 
+    # ── v4.0: advance the journey to reveal the client page (reveal ①) ───────
+    # lead_creator already advanced the journey to DIAGNOSED (value delivered). Now that
+    # the personalized page exists, reveal it. Best-effort — never blocks the response.
+    try:
+        from apps.journey.services.advance import reveal_client_page
+
+        reveal_client_page(lead, meta={"review_session": str(session.id)})
+    except Exception:  # noqa: BLE001 - journey reveal must not block qualification
+        logger.exception("journey reveal_client_page failed for lead %s", lead.id)
+
+    # ── v4.0: optionally warm up the Concierge agent (behind ENABLE_AGENTS) ──
+    # This primes the review-chat agent for the visitor's opening context. It is a
+    # no-op unless ENABLE_AGENTS is on, and it never affects the returned result.
+    try:
+        from django.conf import settings
+
+        if getattr(settings, "ENABLE_AGENTS", False):
+            from apps.agents.services.context import AgentContext
+            from apps.agents.services.runtime import run_concierge
+
+            run_concierge(
+                AgentContext(
+                    lead_id=str(lead.id),
+                    prompt=getattr(session, "prompt", "") or "",
+                    pressures=list(getattr(session, "pressure_areas", []) or []),
+                    product_route=product_route,
+                    license_pathway=license_pathway,
+                    tier=tier,
+                    context_label="review",
+                    extra={"message": getattr(session, "prompt", "") or ""},
+                )
+            )
+    except Exception:  # noqa: BLE001 - agent warm-up is best-effort
+        logger.exception("Concierge warm-up failed for lead %s", lead.id)
+
     logger.info(
         "Qualification processed for review %s: total=%s tier=%s route=%s lead=%s",
         session.id,

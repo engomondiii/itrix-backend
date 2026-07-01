@@ -1,19 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# itriX backend — development & test dependencies
-# Install with:  pip install -r requirements.txt -r requirements-dev.txt
-# ─────────────────────────────────────────────────────────────────────────────
-
-pytest==8.2.1
-pytest-django==4.8.0
-pytest-cov==5.0.0
-factory-boy==3.3.0
-faker==25.2.0
-
-# Lint / format
-ruff==0.4.5
-black==24.4.2
-isort==5.13.2
-
-# Helpful in dev
-ipython==8.24.0
-django-extensions==3.2.3
+pytest
+pytest-django
+pytest-asyncio
+factory-boy

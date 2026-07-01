@@ -70,3 +70,28 @@ def notify_nda_signed(nda) -> Notification:
         href=f"/leads/{nda.lead_id}",
         lead=getattr(nda, "lead", None),
     )
+
+
+def notify_journey_event(lead, *, to_state: str) -> "Notification | None":
+    """
+    Create a team notification when a lead's journey reaches a key state
+    (DIAGNOSED / INVITED / CLIENT / ENGAGED). Best-effort; unknown states are ignored.
+    Uses the SYSTEM kind so no schema change is required.
+    """
+    who = lead.company or lead.visitor_name or lead.email or "A lead"
+    titles = {
+        "DIAGNOSED": f"Diagnosed: {who}",
+        "INVITED": f"Invited to workspace: {who}",
+        "CLIENT": f"New client account: {who}",
+        "ENGAGED": f"Engaged (NDA/eval): {who}",
+    }
+    title = titles.get(to_state)
+    if not title:
+        return None
+    return create_notification(
+        kind=Notification.Kind.SYSTEM,
+        title=title,
+        body=f"Journey advanced to {to_state}.",
+        href=f"/leads/{lead.id}",
+        lead=lead,
+    )

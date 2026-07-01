@@ -21,6 +21,13 @@ from django.http import JsonResponse
 from django.urls import include, path
 
 from apps.leads.views import LeadEmailCaptureView
+from apps.agents.views import (
+    CockpitLeadView,
+    CockpitNextActionView,
+    ConsoleConversationListView,
+    ConsoleMessageView,
+)
+from apps.result_page.views import ResultPageClientChatView, ResultPageClientView
 
 
 def api_index(_request):
@@ -50,9 +57,19 @@ def api_index(_request):
                 "templates",
                 "reporting",
                 "notifications",
-                "settings",
+                "journey",
+                "agents",
+                "accounts",
+                "client",
+                "portal",
+                "client-page",
+                "conversations",
+                "governance",
+                "console",
+                "cockpit",
+                "analytics-pitch",
             ],
-            "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture"],
+            "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture", "client-page", "accounts"],
         }
     )
 
@@ -64,6 +81,20 @@ urlpatterns = [
     path("team/", include("apps.team.urls")),
     path("visitors/", include("apps.visitors.urls")),       # PUBLIC (Surface 1)
     path("review/", include("apps.review.urls")),           # PUBLIC (Surface 1)
+    # ── Phase 1 (v4.0) — Identity, Journey & Agent Runtime ───────────────────
+    path("journey/", include("apps.journey.urls")),         # PUBLIC token GET + TEAM lead routes
+    path("agents/", include("apps.agents.urls")),           # TEAM (partial: run, behind ENABLE_AGENTS)
+    path("", include("apps.clients.urls")),                 # PUBLIC invite claim + CLIENT auth/portal/*
+    # ── Phase 2 (v4.0) — Conversation, Realtime & Client Portal ──────────────
+    path("client-page/<str:token>/chat/", ResultPageClientChatView.as_view(), name="client-page-chat"),  # PUBLIC token
+    path("client-page/<str:token>/", ResultPageClientView.as_view(), name="client-page"),                # PUBLIC token
+    path("conversations/", include("apps.conversations.urls")),   # TEAM console reads
+    # ── Phase 3 (v4.0) — Governance, Console & Cockpit ───────────────────────
+    path("governance/", include("apps.governance.urls")),        # TEAM claim-cards + audit
+    path("console/conversations/", ConsoleConversationListView.as_view(), name="console-conversations"),
+    path("console/conversations/<uuid:conversation_id>/message/", ConsoleMessageView.as_view(), name="console-message"),
+    path("cockpit/leads/<uuid:lead_id>/next-action/", CockpitNextActionView.as_view(), name="cockpit-next-action"),
+    path("cockpit/leads/<uuid:lead_id>/", CockpitLeadView.as_view(), name="cockpit-lead"),
     # ── Phase 2 — Intelligence Core ──────────────────────────────────────────
     path("ai/", include("apps.ai_engine.urls")),                          # PUBLIC generate-result
     path("result-page/", include("apps.result_page.urls")),              # public GET + JWT generate
@@ -85,5 +116,4 @@ urlpatterns = [
     path("templates/", include("apps.templates_library.urls")),     # JWT
     path("reporting/", include("apps.reporting.urls")),             # JWT
     path("notifications/", include("apps.notifications.urls")),      # JWT
-    path("settings/", include("apps.settings.urls")),                # JWT (SLA + notification prefs)
 ]

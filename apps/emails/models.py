@@ -20,6 +20,8 @@ class EmailLog(BaseModel):
         INTERNAL_ALERT = "internal_alert", "Internal alert"
         FOLLOW_UP = "follow_up", "Follow-up"
         VISITOR = "visitor", "Visitor (generic)"
+        CLIENT_PAGE_REVEAL = "client_page_reveal", "Client page reveal"
+        ACCOUNT_INVITE = "account_invite", "Account invite"
 
     class Status(models.TextChoices):
         STUBBED = "stubbed", "Stubbed (delivery disabled)"

@@ -25,6 +25,36 @@ PROHIBITED_CLAIMS = [
     "replaces your hardware",
 ]
 
+# ── Appendix-B canonical-wording substitutions (Backend v4 §5.2, §6) ──────────
+# Certain phrasings must ALWAYS be expressed in the approved canonical form. The most
+# important: ALPHA Core is "table-free index-ordered algebraic execution" and must NEVER
+# be described as "lookup-table execution" (or table/lookup-based execution). These are
+# applied as hard substitutions on every outbound message.
+CANONICAL_SUBSTITUTIONS = [
+    (r"lookup[- ]?table execution", "table-free index-ordered algebraic execution"),
+    (r"table[- ]?based execution", "table-free index-ordered algebraic execution"),
+    (r"lookup[- ]?table[- ]?based", "table-free index-ordered algebraic"),
+    (r"uses a lookup table", "uses table-free index-ordered algebraic execution"),
+    (r"\bmagic\b", "engineered"),
+    (r"\bsilver bullet\b", "a strong potential fit"),
+    (r"\bcure[- ]?all\b", "broadly applicable approach"),
+    (r"\bbest[- ]?in[- ]?class\b", "well-suited"),
+    (r"\bworld[- ]?class\b", "high-quality"),
+    (r"\bindustry[- ]?leading\b", "competitive"),
+    (r"\brevolutionary\b", "novel"),
+    (r"\bbreakthrough\b", "advance"),
+    (r"\bcheaper than\b", "potentially more cost-effective than, pending evaluation,"),
+    (r"faster than (?:the )?competition", "potentially faster in eligible cases"),
+]
+
+# Phrases that are HARD-BLOCKED (never scrubbed away silently, always require human
+# review) — an unapproved benchmark number or competitor comparison.
+HARD_BLOCK_PATTERNS = [
+    r"benchmark(?:ed|s)? (?:against|vs\.?)",
+    r"\d+\s?x faster",
+    r"\d+\s?x (?:cheaper|less energy|lower cost)",
+    r"\d+%\s+(?:faster|cheaper|less energy|lower cost)",
+]
 # Generic risky patterns (guarantees / universals / unbounded superlatives).
 _RISKY_PATTERNS = [
     r"\bguarantee(?:s|d)?\b",
@@ -37,6 +67,7 @@ _RISKY_PATTERNS = [
 ]
 
 _RISKY_RE = re.compile("|".join(_RISKY_PATTERNS), re.IGNORECASE)
+_HARD_BLOCK_RE = re.compile("|".join(HARD_BLOCK_PATTERNS), re.IGNORECASE)
 
 
 def find_violations(text: str) -> list[str]:
@@ -46,7 +77,13 @@ def find_violations(text: str) -> list[str]:
     lowered = text.lower()
     violations = [claim for claim in PROHIBITED_CLAIMS if claim.lower() in lowered]
     violations += sorted({m.group(0).lower() for m in _RISKY_RE.finditer(text)})
+    violations += sorted({m.group(0).lower() for m in _HARD_BLOCK_RE.finditer(text)})
     return violations
+
+
+def has_hard_block(text: str) -> bool:
+    """True if the text contains a pattern that must be human-reviewed (never auto-scrubbed)."""
+    return bool(text and _HARD_BLOCK_RE.search(text))
 
 
 def contains_prohibited(text: str) -> bool:
@@ -74,5 +111,8 @@ def scrub(text: str) -> str:
         r"\bunlimited\b": "substantial",
     }
     for pattern, repl in replacements.items():
+        out = re.sub(pattern, repl, out, flags=re.IGNORECASE)
+    # Appendix-B canonical-wording substitutions (always applied).
+    for pattern, repl in CANONICAL_SUBSTITUTIONS:
         out = re.sub(pattern, repl, out, flags=re.IGNORECASE)
     return out

@@ -81,3 +81,126 @@ class ResultPageGenerateView(APIView):
             )
         result_obj, _report = ResultGenerator().generate_for_lead(lead)
         return Response(ResultPageSerializer(result_obj).data, status=status.HTTP_201_CREATED)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Phase 2 — the customized CLIENT PAGE (behind the client_page capability token)
+# ═════════════════════════════════════════════════════════════════════════════
+class ResultPageClientView(APIView):
+    """
+    GET client-page/{token}/ — PUBLIC (token-gated).
+
+    Verifies the client_page capability token, asserts the journey permits the client
+    page, and returns the customized page (result sections + embedded Pitch room). Data
+    is released only when (token valid) AND (journey permits) AND (disclosure allows).
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def get(self, request, token: str):
+        from apps.journey.models import JourneyState
+        from apps.journey.services import capability_token as ct
+
+        try:
+            payload = ct.verify(token, expected_typ=ct.TOKEN_CLIENT_PAGE)
+        except ct.CapabilityTokenError as exc:
+            return Response({"detail": f"Invalid token: {exc}"}, status=status.HTTP_404_NOT_FOUND)
+
+        lead = Lead.objects.filter(id=payload.sub).first()
+        if lead is None:
+            return Response({"detail": "Unknown subject."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Journey must have reached (or passed) CLIENT_PAGE for the page to be reachable.
+        reached = lead.journey_state in {
+            JourneyState.CLIENT_PAGE,
+            JourneyState.INVITED,
+            JourneyState.CLIENT,
+            JourneyState.ENGAGED,
+            JourneyState.DORMANT,
+        }
+        if not reached:
+            return Response({"detail": "Not yet available."}, status=status.HTTP_404_NOT_FOUND)
+
+        data = ResultGenerator().build_client_page(lead, context="public")
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ResultPageClientChatView(APIView):
+    """
+    POST client-page/{token}/chat/ — PUBLIC (token-gated).
+
+    Chat on the customized client page. Verifies the client_page token, resolves the
+    lead's client-page conversation, and returns the governed Concierge reply. Shares the
+    review-chat code path (persist + route + fan out).
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_scope = "review_submit"
+
+    def post(self, request, token: str):
+        from apps.journey.services import capability_token as ct
+
+        try:
+            payload = ct.verify(token, expected_typ=ct.TOKEN_CLIENT_PAGE)
+        except ct.CapabilityTokenError as exc:
+            return Response({"detail": f"Invalid token: {exc}"}, status=status.HTTP_404_NOT_FOUND)
+
+        lead = Lead.objects.filter(id=payload.sub).first()
+        if lead is None:
+            return Response({"detail": "Unknown subject."}, status=status.HTTP_404_NOT_FOUND)
+
+        body = (request.data.get("message") or request.data.get("body") or "").strip()
+        if not body:
+            return Response(
+                {"error": {"detail": "message is required.", "code": "invalid"}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Route through the client-page conversation → Concierge (governed).
+        from apps.agents.services.context import AgentContext, PLANE_PUBLIC
+        from apps.agents.services.runtime import run_concierge
+        from apps.conversations.services import fan_out, ingest
+        from apps.conversations.services.history import get_or_create_client_page_conversation
+
+        conv = get_or_create_client_page_conversation(lead)
+        inbound = ingest.ingest_inbound(conv, sender_kind="visitor", body=body)
+        fan_out.broadcast_message(inbound)
+
+        session = getattr(lead, "review_session", None)
+        out = run_concierge(
+            AgentContext(
+                lead_id=str(lead.id),
+                prompt=getattr(session, "prompt", "") or body,
+                pressures=list(getattr(session, "pressure_areas", []) or []),
+                product_route=lead.product_route,
+                license_pathway=lead.commercial_path if lead.commercial_path != "none" else None,
+                tier=lead.tier,
+                plane=PLANE_PUBLIC,
+                context_label="client_page",
+                extra={"message": body},
+            )
+        )
+        payload_out = out.payload or {}
+        reply_msg = ingest.ingest_agent_message(
+            conv,
+            agent_key="concierge",
+            body=payload_out.get("reply", ""),
+            governance_status=out.governance_status,
+            claim_level=out.claim_level,
+            cited_chunk_ids=out.chunk_ids,
+        )
+        fan_out.broadcast_message(reply_msg)
+
+        return Response(
+            {
+                "conversationId": str(conv.id),
+                "reply": payload_out.get("reply", "") if reply_msg.is_deliverable else "",
+                "suggestNda": bool(payload_out.get("suggestNda", False)),
+                "governanceStatus": out.governance_status,
+                "underReview": not reply_msg.is_deliverable,
+                "citedChunkIds": out.chunk_ids,
+            },
+            status=status.HTTP_200_OK,
+        )

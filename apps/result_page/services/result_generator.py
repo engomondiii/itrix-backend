@@ -65,27 +65,59 @@ class ResultGenerator:
             ),
         }
 
-        # ── Optional AI/RAG enrichment ───────────────────────────────────────
+        # ── Optional Diagnosis-agent enrichment (v4.0) ───────────────────────
+        # When ENABLE_AGENTS is on, the narrative is produced by the Diagnosis agent
+        # through the agent runtime (records an AgentRun + applies governance). When it
+        # is off, we fall back to the compatibility shim (run_rag), which itself keys on
+        # ENABLE_AI_ENGINE — so with every flag off the page is fully deterministic,
+        # exactly as it shipped. Either way we merge ONLY the narrative fields the agent
+        # actually produced, keeping the deterministic builders as the source of truth.
         report = {"used_ai": False, "chunk_count": 0, "prohibited_removed": [], "quant_hedged": []}
+        narrative_keys = ("problemMirror", "alphaFitSummary", "diagnosis", "kpiPreview", "recommendedNextStep")
         try:
-            from apps.ai_engine.services.rag_pipeline import run_rag
+            from django.conf import settings
 
-            rag = run_rag(
-                prompt=prompt,
-                product_route=product_route,
-                license_pathway=commercial_path if commercial_path != "none" else None,
-                tier=tier,
-                pressures=pressures,
-                context=context,
-            )
-            report["used_ai"] = rag.used_ai
-            report["chunk_count"] = len(rag.chunks)
-            # Merge only the narrative fields the AI actually produced.
-            for key in ("problemMirror", "alphaFitSummary", "diagnosis", "kpiPreview", "recommendedNextStep"):
-                if rag.partial.get(key):
-                    sections[key] = rag.partial[key]
+            if getattr(settings, "ENABLE_AGENTS", False):
+                from apps.agents.services.context import AgentContext
+                from apps.agents.services.runtime import run_diagnosis
+
+                agent_ctx = AgentContext(
+                    lead_id=str(lead.id),
+                    prompt=prompt,
+                    pressures=list(pressures or []),
+                    product_route=product_route,
+                    license_pathway=commercial_path if commercial_path != "none" else None,
+                    tier=tier,
+                    context_label="result_page",
+                    nda_signed=(context == "nda"),
+                )
+                out = run_diagnosis(agent_ctx)
+                report["used_ai"] = out.used_ai
+                report["chunk_count"] = len(out.chunk_ids)
+                report["governance_status"] = out.governance_status
+                # Only merge agent output that auto-approved (never surface held drafts).
+                if out.governance_status == "auto_approved":
+                    for key in narrative_keys:
+                        if out.payload.get(key):
+                            sections[key] = out.payload[key]
+            else:
+                from apps.ai_engine.services.rag_pipeline import run_rag
+
+                rag = run_rag(
+                    prompt=prompt,
+                    product_route=product_route,
+                    license_pathway=commercial_path if commercial_path != "none" else None,
+                    tier=tier,
+                    pressures=pressures,
+                    context=context,
+                )
+                report["used_ai"] = rag.used_ai
+                report["chunk_count"] = len(rag.chunks)
+                for key in narrative_keys:
+                    if rag.partial.get(key):
+                        sections[key] = rag.partial[key]
         except Exception:  # noqa: BLE001
-            logger.exception("RAG enrichment failed; using deterministic sections only")
+            logger.exception("Diagnosis enrichment failed; using deterministic sections only")
 
         # ── Persist (one ResultPage per lead) ────────────────────────────────
         defaults = dict(
@@ -110,6 +142,56 @@ class ResultGenerator:
             lead.save(update_fields=["recommended_next_step", "updated_at"])
 
         return result_obj, report
+
+    def build_client_page(self, lead: Lead, *, context: str = "public", nda_signed: bool = False) -> dict:
+        """
+        Assemble the CUSTOMIZED CLIENT PAGE payload (Phase 2): the persisted result page
+        plus the embedded Pitch agent room. Served behind the client_page capability
+        token by ResultPageClientView. The Pitch room degrades to a deterministic room
+        when agents are off, so the page always has a pitch.
+        """
+        from apps.result_page.models import ResultPage
+        from apps.result_page.serializers import ResultPageSerializer
+
+        result_obj = ResultPage.objects.filter(lead=lead).first()
+        if result_obj is None:
+            result_obj, _report = self.generate_for_lead(lead, context=context)
+
+        pitch = self._build_pitch(lead, context=context, nda_signed=nda_signed)
+        data = ResultPageSerializer(result_obj).data
+        data["pitch"] = pitch
+        return data
+
+    def _build_pitch(self, lead: Lead, *, context: str, nda_signed: bool) -> dict:
+        """Run the Pitch agent through the runtime (governed); deterministic fallback otherwise."""
+        try:
+            from apps.agents.services.context import AgentContext
+            from apps.agents.services.pitch import PitchAgent
+            from apps.agents.services.runtime import run_pitch
+
+            session = getattr(lead, "review_session", None)
+            ctx = AgentContext(
+                lead_id=str(lead.id),
+                prompt=getattr(session, "prompt", "") or "",
+                pressures=list(getattr(session, "pressure_areas", []) or []),
+                product_route=lead.product_route,
+                license_pathway=lead.commercial_path if lead.commercial_path != "none" else None,
+                tier=lead.tier,
+                context_label="pitch",
+                nda_signed=nda_signed,
+                extra={"commercial_intent": getattr(lead, "commercial_intent", "")},
+            )
+            from django.conf import settings
+
+            if getattr(settings, "ENABLE_AGENTS", False):
+                out = run_pitch(ctx)
+                if out.governance_status == "auto_approved" and out.payload.get("slides"):
+                    return out.payload
+            # Agents off or held → deterministic room (never blocks the page).
+            return PitchAgent().run_fallback(ctx).payload
+        except Exception:  # noqa: BLE001
+            logger.exception("Pitch assembly failed for lead %s; omitting pitch room", lead.id)
+            return {}
 
 
 def generate_result_for_lead(lead: Lead, **kwargs):

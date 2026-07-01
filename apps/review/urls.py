@@ -7,6 +7,7 @@ from django.urls import path
 from apps.review.views import (
     PromptSubmitView,
     QualifyView,
+    ReviewChatView,
     ReviewSessionCreateView,
 )
 
@@ -23,5 +24,10 @@ urlpatterns = [
         "sessions/<uuid:session_id>/qualify/",
         QualifyView.as_view(),
         name="qualify",
+    ),
+    path(
+        "sessions/<uuid:session_id>/chat/",
+        ReviewChatView.as_view(),
+        name="review-chat",
     ),
 ]

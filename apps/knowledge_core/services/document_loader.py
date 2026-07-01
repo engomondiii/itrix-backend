@@ -81,6 +81,28 @@ def _load_pdf(data: bytes) -> str:
     return "\n\n".join(p.strip() for p in pages if p.strip())
 
 
+def _sanitize_text(text: str) -> str:
+    """
+    Strip characters that can't be stored in a PostgreSQL text column.
+
+    PostgreSQL rejects NUL (0x00) bytes outright, and PDF text extraction (pypdf) in
+    particular can introduce stray nulls and other C0 control characters from the source
+    file's encoding. We remove NULs and the non-printable control range while preserving
+    the whitespace that matters for chunking (tab, newline, carriage return). This runs for
+    every format so the database insert can never fail on a stray control byte.
+    """
+    if not text:
+        return ""
+    # Drop NULs explicitly first (the hard PostgreSQL blocker).
+    text = text.replace("\x00", "")
+    # Remove other C0 control chars except tab (\t), newline (\n), carriage return (\r).
+    allowed = {"\t", "\n", "\r"}
+    cleaned = "".join(
+        ch for ch in text if ch in allowed or ord(ch) >= 32
+    )
+    return cleaned
+
+
 def load_document_text(source_ref: str) -> str:
     """Return the plain text of the document at ``source_ref`` (local path or s3://)."""
     ext = _ext(source_ref)
@@ -97,6 +119,9 @@ def load_document_text(source_ref: str) -> str:
         text = _load_pdf(data)
     else:  # pragma: no cover - guarded above
         raise UnsupportedDocument(f"Unsupported document type: {ext}")
+
+    # Strip NUL/control bytes so PostgreSQL can store the text safely.
+    text = _sanitize_text(text)
 
     logger.info("Loaded %s (%d chars) from %s", ext, len(text), source_ref)
     return text

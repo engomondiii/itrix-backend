@@ -1,9 +1,16 @@
 """
-Authentication backend.
+Authentication backend (team plane).
 
 Authenticate by email (case-insensitive). DRF SimpleJWT calls ``authenticate`` with
 ``username=<email>`` because USERNAME_FIELD is ``email``; this backend also accepts an
 explicit ``email`` kwarg so direct calls work too.
+
+v4.0 coexistence note: this backend authenticates TEAM users only. Team JWTs carry
+``aud="team"`` (see ``apps.authentication.tokens`` + ``SIMPLE_JWT["AUDIENCE"]``) and are
+verified by DRF SimpleJWT's ``JWTAuthentication``. The CLIENT plane is entirely separate
+— it authenticates via ``apps.clients.backends.ClientJWTAuthentication`` against
+``aud="client"`` tokens and the ``Client`` model, never Django auth users. A token from
+one plane is therefore never valid on the other.
 """
 
 from __future__ import annotations

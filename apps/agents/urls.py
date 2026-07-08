@@ -15,6 +15,7 @@ from __future__ import annotations
 from django.urls import path
 
 from apps.agents.views import (
+    AgentRunListView,
     AgentRunView,
     ApprovalActionView,
     ApprovalQueueView,
@@ -25,5 +26,6 @@ app_name = "agents"
 urlpatterns = [
     path("approval-queue/", ApprovalQueueView.as_view(), name="approval-queue"),
     path("approval/<uuid:approval_id>/<str:action>/", ApprovalActionView.as_view(), name="approval-action"),
+    path("runs/", AgentRunListView.as_view(), name="agent-runs"),
     path("<str:key>/run/", AgentRunView.as_view(), name="agent-run"),
 ]

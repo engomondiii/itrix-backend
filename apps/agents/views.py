@@ -177,6 +177,20 @@ class ApprovalActionView(APIView):
         return Response(ApprovalRequestSerializer(req).data, status=status.HTTP_200_OK)
 
 
+# ── Agent-run audit ───────────────────────────────────────────────────────────
+class AgentRunListView(APIView):
+    """GET agents/runs/ — TEAM. Recent agent-run audit records (most recent first)."""
+
+    permission_classes = [IsAuthenticated, IsDashboardUser]
+
+    def get(self, request):
+        from apps.agents.models import AgentRun
+        from apps.agents.serializers import AgentRunSerializer
+
+        qs = AgentRun.objects.all().order_by("-created_at")[:200]
+        return Response(AgentRunSerializer(qs, many=True).data)
+
+
 # ── Cockpit ───────────────────────────────────────────────────────────────────
 class CockpitLeadView(APIView):
     """GET cockpit/leads/{id}/ — TEAM. The internal per-lead read (signals never leave the team plane)."""
@@ -195,6 +209,7 @@ class CockpitLeadView(APIView):
         except Exception:  # noqa: BLE001
             pitch = {}
 
+        read = self._visitor_read(lead)
         return Response(
             {
                 "leadId": str(lead.id),
@@ -206,8 +221,64 @@ class CockpitLeadView(APIView):
                 "commercialPath": lead.commercial_path_display,
                 "valueDelivered": getattr(lead, "value_delivered_at", None) is not None,
                 "pitchEngagement": pitch,
+                # The richer internal "read" (deterministic; team plane only — these
+                # signals never leave the team plane / never reach a visitor).
+                **read,
             }
         )
+
+    @staticmethod
+    def _visitor_read(lead) -> dict:
+        """Deterministic internal visitor-read derived from the lead (no LLM)."""
+        from apps.journey.models import JourneyState
+
+        def clamp(n: float) -> int:
+            return max(0, min(100, int(round(n))))
+
+        score = lead.score or 0
+        route = (getattr(lead, "product_route", "") or "").lower()
+        special = getattr(lead, "special_rights", "") or ""
+        has_special = special not in ("", "None", "none")
+        pain = getattr(lead, "primary_pain", "") or ""
+
+        if "core" in route:
+            visitor_type = "Semiconductor / Hardware partner"
+        elif "both" in route:
+            visitor_type = "Strategic executive"
+        elif "general" in route:
+            visitor_type = "Curious visitor"
+        else:
+            visitor_type = "Cloud / AI infrastructure"
+
+        ladder_by_state = {
+            JourneyState.ARRIVED: "Review",
+            JourneyState.IN_REVIEW: "Review",
+            JourneyState.DIAGNOSED: "Review",
+            JourneyState.CLIENT_PAGE: "Review",
+            JourneyState.INVITED: "Assessment",
+            JourneyState.CLIENT: "Assessment",
+            JourneyState.ENGAGED: "PoC",
+            JourneyState.DORMANT: "Review",
+        }
+
+        return {
+            "pain": pain or None,
+            "gain": "Lower compute cost at the same SLA, validated through evaluation.",
+            "visitorType": visitor_type,
+            "buyerPsychology": (
+                "Buys validated evidence, not claims — reassured by a scoped paid "
+                "assessment before commitment."
+            ),
+            "objectionSignals": ["Wants proof before any commitment"] if score < 60 else [],
+            "readiness": {
+                "nda": clamp(score - 8),
+                "assessment": clamp(score),
+                "poc": clamp(score - 18),
+            },
+            # Internal directional signal ONLY — never a prediction, never shown to a visitor.
+            "licenseOutProbability": clamp(score + (18 if has_special else 0)),
+            "ladderStage": ladder_by_state.get(lead.journey_state, "Review"),
+        }
 
 
 class CockpitNextActionView(APIView):

@@ -35,23 +35,9 @@ from apps.result_page.services.proof_preview_builder import build_proof_preview
 logger = logging.getLogger("itrix")
 
 
-class _SkipAIEnrichment(Exception):
-    """Internal sentinel: build the result page deterministically (no model call)."""
-
-
 class ResultGenerator:
-    def generate_for_lead(
-        self, lead: Lead, *, context: str = "public", use_ai: bool = True
-    ) -> tuple[ResultPage, dict]:
-        """
-        Build, persist, and return the result page for ``lead`` plus a report dict.
-
-        ``use_ai`` gates the (slow) Diagnosis-agent / RAG enrichment. Background callers
-        pass ``use_ai=True`` (default) to produce the AI-enriched page. The synchronous
-        client-page GET path passes ``use_ai=False`` so it can persist a deterministic
-        page INSTANTLY and never block on a live model call (the background build from
-        qualification supplies the enriched version).
-        """
+    def generate_for_lead(self, lead: Lead, *, context: str = "public") -> tuple[ResultPage, dict]:
+        """Build, persist, and return the result page for ``lead`` plus a report dict."""
         product_route = lead.product_route  # canonical code
         commercial_path = lead.commercial_path  # canonical code
         tier = lead.tier
@@ -90,11 +76,6 @@ class ResultGenerator:
         narrative_keys = ("problemMirror", "alphaFitSummary", "diagnosis", "kpiPreview", "recommendedNextStep")
         try:
             from django.conf import settings
-
-            if not use_ai:
-                # Deterministic-only build (fast, no model call). Used by the client-page
-                # GET path so the page never blocks on AI.
-                raise _SkipAIEnrichment()
 
             if getattr(settings, "ENABLE_AGENTS", False):
                 from apps.agents.services.context import AgentContext
@@ -135,9 +116,6 @@ class ResultGenerator:
                 for key in narrative_keys:
                     if rag.partial.get(key):
                         sections[key] = rag.partial[key]
-        except _SkipAIEnrichment:
-            # Intentional deterministic-only build (use_ai=False) — not an error.
-            pass
         except Exception:  # noqa: BLE001
             logger.exception("Diagnosis enrichment failed; using deterministic sections only")
 
@@ -175,14 +153,9 @@ class ResultGenerator:
         from apps.result_page.models import ResultPage
         from apps.result_page.serializers import ResultPageSerializer
 
-        # HANG-PROOF (v4.0.4): the client-page GET must return FAST. Never run a live
-        # model call on this path. If the AI-enriched ResultPage already exists (built in
-        # the background from qualification), serve it. If it doesn't exist yet, build a
-        # DETERMINISTIC page instantly (use_ai=False) so the visitor gets the page now; the
-        # background build / a later load supplies the enriched narrative.
         result_obj = ResultPage.objects.filter(lead=lead).first()
         if result_obj is None:
-            result_obj, _report = self.generate_for_lead(lead, context=context, use_ai=False)
+            result_obj, _report = self.generate_for_lead(lead, context=context)
 
         pitch = self._build_pitch(lead, context=context, nda_signed=nda_signed)
         data = ResultPageSerializer(result_obj).data
@@ -190,19 +163,11 @@ class ResultGenerator:
         return data
 
     def _build_pitch(self, lead: Lead, *, context: str, nda_signed: bool) -> dict:
-        """
-        Assemble the embedded Pitch room.
-
-        HANG-PROOF (v4.0.4): this runs on the synchronous client-page GET path, so it uses
-        the DETERMINISTIC pitch room (no live Claude call). The deterministic room is
-        claim-safe and structurally identical; the visitor gets a fully-formed pitch
-        instantly instead of waiting ~20s+ for the Pitch agent. (The governed Pitch agent
-        still runs where latency is acceptable — e.g. background regeneration — but never
-        blocks page delivery.)
-        """
+        """Run the Pitch agent through the runtime (governed); deterministic fallback otherwise."""
         try:
             from apps.agents.services.context import AgentContext
             from apps.agents.services.pitch import PitchAgent
+            from apps.agents.services.runtime import run_pitch
 
             session = getattr(lead, "review_session", None)
             ctx = AgentContext(
@@ -216,6 +181,13 @@ class ResultGenerator:
                 nda_signed=nda_signed,
                 extra={"commercial_intent": getattr(lead, "commercial_intent", "")},
             )
+            from django.conf import settings
+
+            if getattr(settings, "ENABLE_AGENTS", False):
+                out = run_pitch(ctx)
+                if out.governance_status == "auto_approved" and out.payload.get("slides"):
+                    return out.payload
+            # Agents off or held → deterministic room (never blocks the page).
             return PitchAgent().run_fallback(ctx).payload
         except Exception:  # noqa: BLE001
             logger.exception("Pitch assembly failed for lead %s; omitting pitch room", lead.id)

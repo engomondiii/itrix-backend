@@ -1,37 +1,33 @@
 """
-Qualification processor — PHASE 2 / v4.0.1 FINAL FORM.
+Qualification processor — PHASE 2 / v4.0 FINAL FORM.
 
 When a visitor finishes the qualification questions, this turns their answers into a
-scored, routed result, creates a **real Lead**, reveals the client page (reveal ①), and
-returns the result — **including the freshly minted client-page capability token and the
-resulting journey state** — to the public site.
+scored, routed result, creates a **real Lead**, generates the personalized result page,
+advances the journey to reveal the client page (reveal ①), and returns the result —
+**including the freshly minted client-page capability token and the resulting journey
+state** — to the public site.
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ v4.0   RESPONSE-SHAPE FIX  — return capability_token + journey_state             ║
-║ v4.0.1 HANG-PROOF FIX      — never block the token response on AI work           ║
+║ v4.0 RESPONSE-SHAPE FIX                                                          ║
 ║                                                                                ║
-║ Root cause of the stuck /review/preparing page in production (AI flags ON):     ║
-║   qualify ran, INSIDE the request, (a) the Diagnosis agent (OpenAI embed +       ║
-║   Pinecone query + a Claude call) via ResultGenerator AND (b) a second Claude     ║
-║   call for the Concierge warm-up — with no timeouts, behind gunicorn --timeout   ║
-║   120. When that combined work was slow, the worker was killed and the browser   ║
-║   never received the token, so /review/preparing spun forever.                   ║
+║ The public site was upgraded to v3.0 and now REQUIRES two extra fields in the   ║
+║ qualify response so it can hand the visitor off to the token-gated /c/[token]   ║
+║ page:                                                                           ║
+║     • capability_token — the client-page capability token (reveal ①)            ║
+║     • journey_state    — the resulting journey state (e.g. CLIENT_PAGE)         ║
 ║                                                                                ║
-║ This version makes the token the FIRST thing produced and guarantees it is       ║
-║ returned regardless of AI latency:                                              ║
-║   1. Score + route + create the Lead (fast, deterministic).                      ║
-║   2. Mint the client-page token IMMEDIATELY (reveal ①) — before any AI.          ║
-║   3. Build + persist the result page with a bounded AI enrichment that can        ║
-║      never delay the token (the AI clients now carry hard timeouts; and the       ║
-║      whole enrichment is wrapped so any failure is swallowed). If it is slow/off, ║
-║      the deterministic result page is persisted and the /c/[token] page still     ║
-║      renders — it regenerates on demand if needed.                                ║
-║   4. The synchronous Concierge warm-up is REMOVED from the request path (it was   ║
-║      pure priming and added a second blocking Claude call). The Concierge still   ║
-║      answers live in the review/portal chat, unchanged.                           ║
+║ Previously the token was minted as a side-effect of ``reveal_client_page`` but  ║
+║ the return value was discarded and ``to_dict()`` had no field for it, so the    ║
+║ token never reached the browser and the review dead-ended at /review/preparing. ║
 ║                                                                                ║
-║ The response includes BOTH snake_case and camelCase keys so the public site's    ║
-║ contract can never drift again.                                                  ║
+║ This version captures the ``AdvanceResult``, extracts the token + state, and    ║
+║ includes them in the response. It is robust to:                                 ║
+║   • the reveal being an idempotent no-op on retry (re-mints a fresh token),      ║
+║   • the reveal raising (falls back to minting a token directly from the lead),   ║
+║ so a valid client-page token is returned whenever a real Lead exists.            ║
+║                                                                                ║
+║ The legacy keys are unchanged; only additive fields are introduced, so any       ║
+║ existing consumer keeps working.                                                ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
@@ -70,7 +66,7 @@ def route_license(answers: dict) -> str | None:
     return _route_license(answers)
 
 
-# ── Result container (Phase 1 shape + v4.0 journey fields) ───────────────────
+# ── Result container (same public shape as Phase 1 + v4.0 journey fields) ────
 @dataclass
 class QualificationResult:
     breakdown: dict[str, int]
@@ -89,17 +85,21 @@ class QualificationResult:
 
     def to_dict(self) -> dict:
         """
-        Serialize for the public API. Returns BOTH snake_case (legacy / other consumers)
-        and camelCase (the v3.0 public site reads these) keys so neither side can drift
-        into a casing mismatch again.
+        Serialize for the public API. We return BOTH snake_case (legacy / other
+        consumers) and camelCase (the v3.0 public site reads these) keys so neither
+        side can drift into a casing mismatch again. The proxy may forward this
+        verbatim and the browser will find the keys it expects.
         """
         breakdown = self.breakdown
         total = self.total
         return {
-            # ── legacy snake_case shape ──────────────────────────────────────
+            # ── legacy snake_case shape (unchanged) ──────────────────────────
             "lead_id": self.lead_id,
             "lead_is_placeholder": self.lead_is_placeholder,
-            "score": {"breakdown": breakdown, "total": total},
+            "score": {
+                "breakdown": breakdown,
+                "total": total,
+            },
             "tier": self.tier,
             "tier_label": self.tier_label,
             "product_route": self.product_route,
@@ -139,19 +139,23 @@ def _client_page_token_for(lead) -> tuple[str | None, str | None]:
     """
     Return ``(capability_token, journey_state)`` for the lead's client-page reveal.
 
-    Robust — always returns a usable token when a Lead exists:
+    Strategy (robust — always returns a usable token when a Lead exists):
       1. Advance DIAGNOSED → CLIENT_PAGE via ``reveal_client_page`` and read the token
-         off the returned ``AdvanceResult.reveal`` (normal path; also covers idempotent
-         no-op retries, where ``advance`` still recomputes the reveal).
-      2. If that yields no token (raised / unexpected), mint a client-page token directly
-         from the lead via ``reveal_for_state``.
-    Never raises.
+         off the returned ``AdvanceResult.reveal``. This is the normal path.
+      2. If the advance is an idempotent no-op (lead already at/after CLIENT_PAGE, e.g.
+         a retry) the reveal descriptor is still recomputed by ``advance``, so the
+         token is present — we use it.
+      3. If the advance raises or yields no token for any reason, fall back to minting a
+         client-page token directly from the lead id via ``reveal_for_state``.
+
+    Never raises; returns ``(None, <state>)`` only if token minting is impossible.
     """
     from apps.journey.models import JourneyState
 
     token: str | None = None
     state: str | None = None
 
+    # ── Path 1 + 2: advance (or idempotent no-op) and read the reveal token ──
     try:
         from apps.journey.services.advance import reveal_client_page
 
@@ -162,10 +166,13 @@ def _client_page_token_for(lead) -> tuple[str | None, str | None]:
     except Exception:  # noqa: BLE001 - journey reveal must not block qualification
         logger.exception("journey reveal_client_page failed for lead %s", getattr(lead, "id", "?"))
 
+    # ── Path 3: defensive fallback — mint a client-page token from current state ──
     if not token:
         try:
             from apps.journey.services.reveal import reveal_for_state
 
+            # Prefer the lead's current state; if it hasn't reached CLIENT_PAGE for any
+            # reason, mint against CLIENT_PAGE explicitly so the hand-off still works.
             current = getattr(lead, "journey_state", None) or JourneyState.ARRIVED
             reveal = reveal_for_state(lead, JourneyState.CLIENT_PAGE) or reveal_for_state(lead, current)
             if reveal:
@@ -174,109 +181,22 @@ def _client_page_token_for(lead) -> tuple[str | None, str | None]:
         except Exception:  # noqa: BLE001
             logger.exception("client-page token fallback mint failed for lead %s", getattr(lead, "id", "?"))
 
+    # Final state resolution (never leave it empty when we know the lead's state).
     if not state:
         state = getattr(lead, "journey_state", None) or JourneyState.CLIENT_PAGE
 
     return token, state
 
 
-def _build_result_page_now(lead_id: str) -> None:
-    """
-    Build + persist the personalized result page for ``lead_id`` (used by the background
-    worker below). Re-fetches the lead so it is safe to run off the request thread. The
-    AI clients carry hard timeouts; any failure is swallowed and logged.
-    """
-    try:
-        import django
-
-        # Ensure a usable DB connection on this thread; close it when done so we don't
-        # leak connections from the pool.
-        from django.db import close_old_connections
-
-        close_old_connections()
-        from apps.leads.models import Lead
-        from apps.result_page.services.result_generator import ResultGenerator
-
-        lead = Lead.objects.filter(id=lead_id).first()
-        if lead is None:
-            return
-        ResultGenerator().generate_for_lead(lead)
-    except Exception:  # noqa: BLE001 - background enrichment must never surface
-        logger.exception("Background result-page generation failed for lead %s", lead_id)
-    finally:
-        try:
-            from django.db import close_old_connections
-
-            close_old_connections()
-        except Exception:  # noqa: BLE001
-            pass
-
-
-def _kick_off_result_page(lead) -> str:
-    """
-    Start result-page generation WITHOUT blocking the qualify response.
-
-    Preferred path: hand it to Celery (when ENABLE_CELERY is on). Otherwise run it in a
-    daemon background thread so the HTTP response returns immediately with the token. The
-    /c/[token] page regenerates the result page on demand if the background build hasn't
-    finished yet, so nothing user-visible depends on this completing before the response.
-
-    Returns a synchronous, deterministic ``next_step`` for the response body (never waits
-    on the model).
-    """
-    lead_id = str(lead.id)
-
-    # Try Celery first (non-blocking, durable) if the project wired a task + it's enabled.
-    try:
-        from django.conf import settings
-
-        if getattr(settings, "ENABLE_CELERY", False):
-            try:
-                from apps.result_page.tasks import generate_result_page_task  # optional
-
-                generate_result_page_task.delay(lead_id)
-                return _sync_next_step(lead)
-            except Exception:  # noqa: BLE001 - no task module / broker: fall through to thread
-                logger.debug("Celery result-page task unavailable; using background thread.")
-    except Exception:  # noqa: BLE001
-        pass
-
-    # Fallback: daemon thread. Does not block the response; errors are swallowed inside.
-    try:
-        import threading
-
-        threading.Thread(
-            target=_build_result_page_now,
-            args=(lead_id,),
-            name=f"resultpage-{lead_id[:8]}",
-            daemon=True,
-        ).start()
-    except Exception:  # noqa: BLE001 - if we somehow can't spawn, the /c page regenerates
-        logger.exception("Failed to start background result-page thread for lead %s", lead_id)
-
-    return _sync_next_step(lead)
-
-
-def _sync_next_step(lead) -> str:
-    """A fast, deterministic next-step for the response (no model call)."""
-    if getattr(lead, "recommended_next_step", ""):
-        return lead.recommended_next_step
-    try:
-        from apps.result_page.services.next_step_builder import build_next_step
-
-        return build_next_step(tier=lead.tier, product_route=lead.product_route)
-    except Exception:  # noqa: BLE001
-        return ""
-
-
 # ── Public entry point ───────────────────────────────────────────────────────
 def process_qualification(session, answers: dict) -> QualificationResult:
     """
-    Score + route a completed qualification, create the real Lead, MINT THE CLIENT-PAGE
-    TOKEN FIRST, then build the result page (bounded, best-effort), and return the public
-    result including ``capability_token`` + ``journey_state``.
+    Score + route a completed qualification, create the real Lead, generate its result
+    page, reveal the client page, and return the public result — now including the
+    client-page ``capability_token`` and the resulting ``journey_state`` so the public
+    site can hand the visitor off to /c/[token].
     """
-    # ── 1) Score + route (authoritative, deterministic, fast) ────────────────
+    # ── Score + route (authoritative, via the dedicated apps) ────────────────
     score = LeadScorer.score(answers)
     breakdown, total, tier, tier_label = score.breakdown, score.total, score.tier, score.tier_label
     product_route = _route_product(answers)
@@ -303,8 +223,9 @@ def process_qualification(session, answers: dict) -> QualificationResult:
         ]
     )
 
-    # ── 2) Create (or update) the REAL lead (fast, deterministic) ────────────
+    # ── Create (or update) the REAL lead ─────────────────────────────────────
     from apps.leads.services.lead_creator import LeadCreator
+    from apps.result_page.services.result_generator import ResultGenerator
 
     lead = LeadCreator.create_from_review(
         session,
@@ -316,16 +237,28 @@ def process_qualification(session, answers: dict) -> QualificationResult:
         license_pathway=license_pathway,
     )
 
+    # Keep the session's placeholder field pointing at the real lead for traceability.
     try:
         session.placeholder_lead_id = lead.id
         session.save(update_fields=["placeholder_lead_id", "updated_at"])
     except Exception:  # noqa: BLE001 - field is optional / best-effort
         pass
 
-    # ── 3) MINT THE CLIENT-PAGE TOKEN IMMEDIATELY (reveal ①) ─────────────────
-    # This is the critical fix: the token exists BEFORE any AI work, so the response can
-    # always carry it even if the (bounded) result generation below is slow or fails.
+    # ── Generate + persist the personalized result page ──────────────────────
+    next_step = ""
+    try:
+        result_obj, _report = ResultGenerator().generate_for_lead(lead)
+        next_step = result_obj.recommended_next_step
+    except Exception:  # noqa: BLE001 - never block qualification on result generation
+        logger.exception("Result page generation failed during qualification for lead %s", lead.id)
+        next_step = lead.recommended_next_step or ""
+
+    # ── v4.0: advance the journey to reveal the client page (reveal ①) ───────
+    # lead_creator already advanced the journey to DIAGNOSED (value delivered). Now that
+    # the personalized page exists, reveal it AND CAPTURE the minted token + state so we
+    # can return them to the public site. Best-effort — never blocks the response.
     capability_token, journey_state = _client_page_token_for(lead)
+
     if not capability_token:
         logger.warning(
             "No client-page capability token could be minted for lead %s; the public "
@@ -333,17 +266,30 @@ def process_qualification(session, answers: dict) -> QualificationResult:
             lead.id,
         )
 
-    # ── 4) Kick off result-page generation OFF the request path ──────────────
-    # The AI-heavy result page (Diagnosis agent → embed + Pinecone + Claude) is built in a
-    # background thread (or Celery when enabled) so it can NEVER delay the qualify response.
-    # We return a fast deterministic next_step now; the /c/[token] page shows the enriched
-    # page once it's ready (and regenerates on demand if the background build lags).
-    next_step = _kick_off_result_page(lead)
+    # ── v4.0: optionally warm up the Concierge agent (behind ENABLE_AGENTS) ──
+    # This primes the review-chat agent for the visitor's opening context. It is a
+    # no-op unless ENABLE_AGENTS is on, and it never affects the returned result.
+    try:
+        from django.conf import settings
 
-    # NOTE (v4.0.1): the synchronous Concierge "warm-up" Claude call that used to run here
-    # has been REMOVED from the request path. It was best-effort priming only and added a
-    # second blocking model call to the critical qualify path. The Concierge still answers
-    # live in the review + portal chat (unchanged); nothing user-visible is lost.
+        if getattr(settings, "ENABLE_AGENTS", False):
+            from apps.agents.services.context import AgentContext
+            from apps.agents.services.runtime import run_concierge
+
+            run_concierge(
+                AgentContext(
+                    lead_id=str(lead.id),
+                    prompt=getattr(session, "prompt", "") or "",
+                    pressures=list(getattr(session, "pressure_areas", []) or []),
+                    product_route=product_route,
+                    license_pathway=license_pathway,
+                    tier=tier,
+                    context_label="review",
+                    extra={"message": getattr(session, "prompt", "") or ""},
+                )
+            )
+    except Exception:  # noqa: BLE001 - agent warm-up is best-effort
+        logger.exception("Concierge warm-up failed for lead %s", lead.id)
 
     logger.info(
         "Qualification processed for review %s: total=%s tier=%s route=%s lead=%s state=%s token=%s",

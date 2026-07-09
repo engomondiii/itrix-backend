@@ -376,17 +376,6 @@ ACCOUNT_INVITE_TTL_HOURS = int(env("ACCOUNT_INVITE_TTL_HOURS", "72"))
 # approval (Backend v4 §5.2 governance).
 AGENT_AUTO_APPROVE_MAX_LEVEL = int(env("AGENT_AUTO_APPROVE_MAX_LEVEL", "2"))
 
-# ── AI call hardening (v4.0.1) ───────────────────────────────────────────────
-# Hard wall-clock timeout (seconds) applied to every Claude / OpenAI / Pinecone call so
-# a slow or stalled provider can never tie up a web worker (Railway gunicorn kills
-# workers at --timeout 120). Keep this well under that limit.
-AI_CALL_TIMEOUT_SECONDS = int(env("AI_CALL_TIMEOUT_SECONDS", "20"))
-# SDK-level retry cap for a single Claude call (kept small so total latency stays bounded).
-AI_CALL_MAX_RETRIES = int(env("AI_CALL_MAX_RETRIES", "1"))
-# Whether the internal lead summary may use Claude on the (synchronous) creation path.
-# OFF by default so lead creation is instant; the deterministic summary is always safe.
-LEAD_SUMMARY_USE_AI = env_bool("LEAD_SUMMARY_USE_AI", False)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging

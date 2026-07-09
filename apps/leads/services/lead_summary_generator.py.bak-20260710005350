@@ -2,19 +2,10 @@
 Lead summary generator.
 
 Produces the short, internal "compute bottleneck" summary shown on the lead and the
-``GET leads/{id}/summary/`` endpoint. When the AI engine is enabled it *can* ask Claude
-for a crisp summary; otherwise it composes a clear, deterministic summary from the prompt,
+``GET leads/{id}/summary/`` endpoint. When the AI engine is enabled it asks Claude for
+a crisp summary; otherwise it composes a clear, deterministic summary from the prompt,
 pressure areas, and routed product — so the field is always populated, with no AI
 dependency in Phase 2's default configuration.
-
-── HANG-PROOFING (v4.0.1) ────────────────────────────────────────────────────
-Lead creation runs on the SYNCHRONOUS qualify request path. A Claude call here was a
-hidden blocking dependency that (with AI on) could push the qualify response toward the
-120 s gunicorn worker limit and hang /review/preparing. The AI summary is therefore now
-OPT-IN: by default (``LEAD_SUMMARY_USE_AI`` unset/false) ``generate_lead_summary`` returns
-the deterministic summary instantly. The AI path still exists for background/offline use
-(pass ``allow_ai=True`` explicitly, or set ``LEAD_SUMMARY_USE_AI=True``), and the Claude
-client itself is now hard-timeout-bounded regardless.
 
 All output respects claims discipline (no guarantees / superlatives).
 """
@@ -57,29 +48,12 @@ def _deterministic_summary(*, prompt: str, pressures: list[str], product_route: 
     return f"Visitor reports {pain_str}. {route_str}"
 
 
-def generate_lead_summary(
-    *,
-    prompt: str,
-    pressures: list[str],
-    product_route: str,
-    tier: int,
-    allow_ai: bool | None = None,
-) -> str:
-    """
-    Return a concise internal summary of the lead's bottleneck.
-
-    By default this is fully deterministic and instant (safe on the synchronous request
-    path). The AI path is used only when explicitly allowed — either ``allow_ai=True`` or
-    the ``LEAD_SUMMARY_USE_AI`` setting is truthy — AND the engine is enabled.
-    """
-    if allow_ai is None:
-        allow_ai = bool(getattr(settings, "LEAD_SUMMARY_USE_AI", False))
-
-    if not (allow_ai and settings.ENABLE_AI_ENGINE):
+def generate_lead_summary(*, prompt: str, pressures: list[str], product_route: str, tier: int) -> str:
+    """Return a concise internal summary of the lead's bottleneck."""
+    if not settings.ENABLE_AI_ENGINE:
         return _deterministic_summary(prompt=prompt, pressures=pressures, product_route=product_route)
 
-    # AI path — kept defensive: any failure falls back to the deterministic summary. The
-    # Claude client carries a hard timeout, so this cannot hang even when opted in.
+    # AI path — kept defensive: any failure falls back to the deterministic summary.
     try:
         from apps.ai_engine.services.claude_client import ClaudeClient
 
@@ -98,5 +72,5 @@ def generate_lead_summary(
             prompt=prompt, pressures=pressures, product_route=product_route
         )
     except Exception:  # noqa: BLE001
-        logger.warning("AI lead summary failed/timed out; using deterministic summary.")
+        logger.exception("AI lead summary failed; using deterministic summary")
         return _deterministic_summary(prompt=prompt, pressures=pressures, product_route=product_route)

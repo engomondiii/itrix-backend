@@ -94,6 +94,7 @@ class Command(BaseCommand):
         self._seed_templates()
         self._seed_report()
         self._seed_sla()
+        self._seed_governance(leads, admin, team)
 
         self._summary(admin)
 
@@ -113,6 +114,19 @@ class Command(BaseCommand):
         Template.objects.filter(name__startswith="[Demo]").delete()
         MonthlyReport.objects.filter(month=self._report_month()).delete()
         Notification.objects.filter(lead__isnull=True, title__startswith="[Demo]").delete()
+
+        # Governance/operations records. Conversations cascade off Lead, but
+        # ApprovalRequest.lead is SET_NULL and ClaimCard has no lead at all, so both
+        # would survive the flush as orphans. Remove the demo rows explicitly.
+        from apps.conversations.models import Conversation
+        from apps.governance.models import ApprovalRequest, ClaimCard
+
+        Conversation.objects.filter(title__startswith="[Demo]").delete()  # cascades messages
+        ClaimCard.objects.filter(key__startswith="demo_").delete()
+        ApprovalRequest.objects.filter(
+            agent_key__in=["proof", "objection", "proposal"], lead__isnull=True
+        ).delete()
+
         self.stdout.write(f"  removed {n_leads} demo leads and {n_users} demo users")
 
     # ── users ────────────────────────────────────────────────────────────────
@@ -599,6 +613,123 @@ class Command(BaseCommand):
     def _seed_sla(self):
         SlaThresholds.load()  # creates the singleton with defaults if absent
         self.stdout.write(self.style.SUCCESS("  SLA thresholds: ensured"))
+
+    # ── governance & operations (console, approvals, claim-cards) ──────────────
+    def _seed_governance(self, leads, admin, team):
+        """
+        Seed the operator surfaces that otherwise render empty: the Claim-Card
+        library, two client conversations, and an approval queue that exercises the
+        single-approver (L3) and two-approver (L4/L5) paths.
+
+        Without this, Console / Approvals / Claim-Cards / Audit all show empty states,
+        because nothing in the funnel creates them: agents below the auto-approve
+        threshold (L1–L2) never queue an approval, and conversations only appear when
+        a real visitor chats through Surface 1.
+        """
+        from apps.conversations.models import (
+            Conversation,
+            ConversationContext,
+            GovernanceStatus,
+            Message,
+            SenderKind,
+        )
+        from apps.governance.models import ApprovalRequest, ApprovalStatus, ClaimCard, ClaimLevel
+
+        # A second elevated approver so the L4/L5 two-approver rule is satisfiable.
+        second = next((u for u in team if u.role == User.Role.ASSESSMENT), None)
+
+        # 1) Claim-Card library — the approved wording agents are checked against.
+        cards = [
+            ("demo_alpha_core_execution", "[Demo] ALPHA Core execution wording",
+             "table-free index-ordered algebraic execution", ClaimLevel.L1,
+             "Hard rule — never say 'lookup-table execution'."),
+            ("demo_sustainable_ai", "[Demo] Sustainable AI positioning",
+             "itriX builds Computational AI Infrastructure for Sustainable AI.", ClaimLevel.L1,
+             "Approved public one-liner."),
+            ("demo_axiom_spd", "[Demo] AXIOM SPD / Cholesky speedup",
+             "May reduce cost and improve speed for specific SPD/Cholesky workloads. "
+             "Specific ratios are internal-only until approved.", ClaimLevel.L3,
+             "The 3–4x figure is INTERNAL-ONLY. Cite before any external use."),
+            ("demo_energy_roi", "[Demo] Energy reduction (ROI)",
+             "Potential energy reduction for eligible workloads, validated through evaluation.",
+             ClaimLevel.L4, "Commercial/ROI — mandatory approval, never auto-delivered."),
+        ]
+        n_cards = 0
+        for key, title, wording, level, notes in cards:
+            _, created = ClaimCard.objects.get_or_create(
+                key=key,
+                defaults=dict(
+                    title=title, approved_wording=wording, claim_level=level,
+                    owner=admin, is_active=True, notes=notes,
+                ),
+            )
+            n_cards += int(created)
+
+        # 2) Two conversations with real message history, tied to demo leads.
+        convos = []
+        seeds = [
+            (ConversationContext.REVIEW, "[Demo] Cloud AI compute cost", [
+                (SenderKind.CLIENT, "", "Our inference bill is growing faster than usage. "
+                                        "Where does the waste come from?"),
+                (SenderKind.AGENT, "diagnosis",
+                 "Rising spend usually traces to redundant computation entering at the "
+                 "representation layer, before kernels run. A short review can map where."),
+            ]),
+            (ConversationContext.PORTAL, "[Demo] Semiconductor SDK partner", [
+                (SenderKind.CLIENT, "", "Can you share the benchmark harness so our team "
+                                        "can reproduce it?"),
+                (SenderKind.TEAM, "", "We can share the harness under NDA — I'll prepare the "
+                                      "paperwork and follow up."),
+            ]),
+        ]
+        for i, (context, title, msgs) in enumerate(seeds):
+            lead = leads[i] if i < len(leads) else None
+            conv, created = Conversation.objects.get_or_create(
+                title=title,
+                defaults=dict(context=context, lead=lead, is_active=True, last_message_at=self.now),
+            )
+            if created:
+                for kind, agent_key, body in msgs:
+                    Message.objects.create(
+                        conversation=conv, sender_kind=kind, agent_key=agent_key, body=body,
+                        governance_status=GovernanceStatus.AUTO_APPROVED, claim_level=1,
+                    )
+            convos.append(conv)
+
+        # 3) Approval queue — one L3 (single approver), one L4 already awaiting its
+        #    second approver, and one L5 legal draft.
+        approvals = [
+            ("proof", ClaimLevel.L3, ApprovalStatus.PENDING, None,
+             "In an internal SPD/Cholesky benchmark, the real-block representation reduced "
+             "solve time by roughly 3–4x. We can share the harness under NDA.",
+             ["wp_alpha_secret_001", "axiom_benchmark_003"], convos[0]),
+            ("objection", ClaimLevel.L4, ApprovalStatus.AWAITING_SECOND, admin,
+             "On ROI: partners typically model payback against GPU-hour and energy savings; "
+             "a paid assessment quantifies the candidate reduction for your workload before "
+             "any commitment.",
+             ["commercialization_007"], convos[0]),
+            ("proposal", ClaimLevel.L5, ApprovalStatus.PENDING, None,
+             "Draft LOI: itriX grants a 24-month field-exclusive license for the semiconductor "
+             "SDK, with a minimum guarantee and milestone schedule as discussed.",
+             ["commercial_pathway_012"], convos[1]),
+        ]
+        n_appr = 0
+        for agent_key, level, status, first, body, chunks, conv in approvals:
+            _, created = ApprovalRequest.objects.get_or_create(
+                agent_key=agent_key,
+                draft_body=body,
+                defaults=dict(
+                    lead=conv.lead, conversation_id=str(conv.id), claim_level=level,
+                    cited_chunk_ids=chunks, status=status, first_approver=first,
+                ),
+            )
+            n_appr += int(created)
+
+        self.stdout.write(self.style.SUCCESS(
+            f"  claim cards: +{n_cards}, conversations: {len(convos)}, approvals: +{n_appr}"))
+        if second is None:
+            self.stdout.write(self.style.WARNING(
+                "  note: no second ASSESSMENT approver — L4/L5 drafts cannot be fully approved"))
 
     # ── summary ────────────────────────────────────────────────────────────────
     def _summary(self, admin):

@@ -86,10 +86,10 @@ class ConsoleConversationListView(APIView):
 
     def get(self, request):
         from apps.conversations.models import Conversation
-        from apps.conversations.serializers import ConversationSummarySerializer
+        from apps.conversations.serializers import TeamConversationSummarySerializer
 
         qs = Conversation.objects.filter(is_active=True).order_by("-last_message_at")[:200]
-        return Response(ConversationSummarySerializer(qs, many=True).data)
+        return Response(TeamConversationSummarySerializer(qs, many=True).data)
 
 
 class ConsoleMessageView(APIView):

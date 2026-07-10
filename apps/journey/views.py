@@ -97,6 +97,30 @@ class JourneyLeadView(APIView):
         return Response(JourneyLeadSerializer(payload).data, status=status.HTTP_200_OK)
 
 
+class JourneyOverviewView(APIView):
+    """
+    GET journey/overview/ — TEAM. How many leads sit in each journey state.
+
+    Feeds the Surface 2 overview widget. Counts in one query; states with no leads
+    are returned as 0 so the client can render a stable set of bars.
+    """
+
+    permission_classes = [IsDashboardUser]
+
+    def get(self, request):
+        from django.db.models import Count
+
+        from apps.leads.models import Lead
+
+        counts = dict(
+            Lead.objects.values_list("journey_state")
+            .annotate(n=Count("id"))
+            .values_list("journey_state", "n")
+        )
+        distribution = {state.value: counts.get(state.value, 0) for state in JourneyState}
+        return Response({"distribution": distribution, "total": sum(distribution.values())})
+
+
 class JourneyAdvanceView(APIView):
     """POST journey/leads/{id}/advance/ — TEAM. Guarded manual advance (audited)."""
 

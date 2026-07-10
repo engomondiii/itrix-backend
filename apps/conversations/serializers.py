@@ -87,3 +87,30 @@ class ConversationThreadSerializer(serializers.ModelSerializer):
         from apps.conversations.services.history import deliverable_messages
 
         return MessageSerializer(deliverable_messages(obj), many=True).data
+
+
+# ── Team-plane variants ───────────────────────────────────────────────────────
+# The serializers above are consumed by the CLIENT portal, so they must never carry
+# internal identifiers. The team console needs the owning lead in order to link a
+# thread back to its CRM record — so it gets its own shapes, used only behind
+# team-JWT views.
+
+
+class TeamConversationSummarySerializer(ConversationSummarySerializer):
+    """Console conversation row — adds the owning lead (team plane only)."""
+
+    leadId = serializers.CharField(source="lead_id", read_only=True)
+
+    class Meta(ConversationSummarySerializer.Meta):
+        fields = [*ConversationSummarySerializer.Meta.fields, "leadId"]
+        read_only_fields = fields
+
+
+class TeamConversationThreadSerializer(ConversationThreadSerializer):
+    """Console thread — adds the owning lead (team plane only)."""
+
+    leadId = serializers.CharField(source="lead_id", read_only=True)
+
+    class Meta(ConversationThreadSerializer.Meta):
+        fields = [*ConversationThreadSerializer.Meta.fields, "leadId"]
+        read_only_fields = fields

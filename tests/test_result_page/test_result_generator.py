@@ -29,6 +29,8 @@ WEB_RESULT_KEYS = {
     "kpiPreview",
     "proofPreview",
     "recommendedNextStep",
+    # Surface 1 polls this to know when the AI-assembled page has replaced the
+    # deterministic first paint (added with the client-page auto-update).
     "usedAi",
 }
 

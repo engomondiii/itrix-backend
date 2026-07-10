@@ -142,6 +142,42 @@ class ClientTokenRefreshView(APIView):
         return Response(build_tokens_for_client(client), status=status.HTTP_200_OK)
 
 
+class ClientSetPasswordView(APIView):
+    """POST client/auth/password/set/ — PUBLIC. Set a password from a single-use token.
+
+    Safety net for invites that were claimed without a password. On success it mints a
+    fresh client-JWT so the caller can drop the visitor straight into the workspace.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def post(self, request):
+        if not getattr(settings, "ENABLE_CLIENT_PORTAL", False):
+            return _portal_enabled_response()
+
+        from apps.clients.serializers import PasswordSetRequestSerializer
+        from apps.clients.services.set_password import (
+            SetPasswordError,
+            set_password_with_token,
+        )
+
+        ser = PasswordSetRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            client = set_password_with_token(
+                ser.validated_data["token"], ser.validated_data["password"]
+            )
+        except SetPasswordError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        tokens = build_tokens_for_client(client)
+        return Response(
+            {"client": ClientIdentitySerializer(client).data, **tokens},
+            status=status.HTTP_200_OK,
+        )
+
+
 class ClientLogoutView(APIView):
     """POST client/auth/logout/ — CLIENT. Stateless JWT: the client just drops the token."""
 

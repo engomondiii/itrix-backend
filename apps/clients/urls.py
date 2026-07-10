@@ -18,6 +18,7 @@ from apps.clients.views import (
     ClientLoginView,
     ClientLogoutView,
     ClientMeView,
+    ClientSetPasswordView,
     ClientTokenRefreshView,
     InviteClaimView,
     PortalConversationListView,
@@ -37,6 +38,7 @@ urlpatterns = [
     # Client auth (client-JWT plane)
     path("client/auth/login/", ClientLoginView.as_view(), name="client-login"),
     path("client/auth/token/refresh/", ClientTokenRefreshView.as_view(), name="client-token-refresh"),
+    path("client/auth/password/set/", ClientSetPasswordView.as_view(), name="client-password-set"),
     path("client/auth/logout/", ClientLogoutView.as_view(), name="client-logout"),
     path("client/me/", ClientMeView.as_view(), name="client-me"),
     # Portal data endpoints (CLIENT)

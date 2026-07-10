@@ -35,6 +35,13 @@ class InviteClaimResponseSerializer(serializers.Serializer):
 
     client = ClientIdentitySerializer()
     requiresPasswordSet = serializers.BooleanField()
+
+
+class PasswordSetRequestSerializer(serializers.Serializer):
+    """Body for ``POST client/auth/password/set/`` (first-time / reset)."""
+
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=10)
     access = serializers.CharField(required=False)
     refresh = serializers.CharField(required=False)
 

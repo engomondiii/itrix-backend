@@ -29,9 +29,10 @@ RUN DJANGO_SETTINGS_MODULE=itrix.settings.production SECRET_KEY=build-time-dummy
 
 EXPOSE 8000
 
-# Railway/Heroku inject $PORT; default to 8000 locally.
+# Railway/Heroku inject $PORT.
 #
-# v4.0.3: serve BOTH HTTP and WebSocket from ONE ASGI process with Daphne. gunicorn (WSGI)
-# cannot handle /ws/* upgrades — running it made every WebSocket route 404. Daphne serves
-# the full Django HTTP API too, so nothing else changes.
-CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT:-8000} itrix.asgi:application"]
+# v4.0.4: serve BOTH HTTP and WebSocket from ONE ASGI process with Daphne. gunicorn (WSGI)
+# cannot handle /ws/* upgrades. We start via a small entrypoint so $PORT is expanded by the
+# shell to a real integer BEFORE daphne runs (daphne rejects a non-integer -p, unlike
+# gunicorn). Shell-form CMD guarantees /bin/sh performs the variable expansion.
+CMD daphne -b 0.0.0.0 -p ${PORT:-8000} itrix.asgi:application

@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# patch scratch
+_fix/
+backend_fix/
+*.bak-*
+itrix-backend-fix.zip

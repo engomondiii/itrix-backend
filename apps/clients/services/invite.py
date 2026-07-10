@@ -55,15 +55,30 @@ def claim_invite(
     role: str = "",
 ) -> tuple[Client, bool]:
     """
-    Consume an account_invite token → create the Client (reveal ③).
+    Consume a capability token → create the Client (reveal ③).
+
+    Accepts EITHER an ``account_invite`` token (the dedicated single-use invite) OR the
+    ``client_page`` token the visitor already holds in their URL. Both are signed
+    capability tokens bound to the same lead via ``sub``; accepting the client_page
+    token lets the front-end claim with the token it already has, without a separate
+    invite-token round-trip. Security is preserved because the journey gate
+    (``account_invite_allowed``) is re-checked here regardless of token type — a
+    client_page token can only create a workspace once the journey authorizes it.
 
     Returns ``(client, requires_password_set)``. Raises ``InviteError`` on an invalid,
     expired, wrong-typed, or already-consumed token, or if the lead may not be invited.
     """
-    try:
-        payload = ct.verify(token, expected_typ=ct.TOKEN_ACCOUNT_INVITE)
-    except ct.CapabilityTokenError as exc:
-        raise InviteError(f"Invalid invite: {exc}") from exc
+    # Accept either token type. Verify signature+expiry once we know which it is.
+    payload = None
+    last_error: Exception | None = None
+    for expected in (ct.TOKEN_ACCOUNT_INVITE, ct.TOKEN_CLIENT_PAGE):
+        try:
+            payload = ct.verify(token, expected_typ=expected)
+            break
+        except ct.CapabilityTokenError as exc:
+            last_error = exc
+    if payload is None:
+        raise InviteError(f"Invalid invite: {last_error}")
 
     from apps.leads.models import Lead
 
@@ -72,11 +87,10 @@ def claim_invite(
         raise InviteError("Unknown invite subject.")
 
     # ── Recovery path ────────────────────────────────────────────────────────
-    # If a Client already exists for this lead, the invite has effectively already
-    # been claimed (a refresh, a double-submit, or a prior attempt). We do NOT want
-    # to dead-end the visitor at "we'll be in touch" — we just log them straight in.
-    # Apply any newly-supplied password/profile (e.g. they set a password this time
-    # after an earlier email-only attempt), then return the existing client.
+    # If a Client already exists for this lead, the workspace was already created (a
+    # refresh, a double-submit, or a prior attempt). Do NOT dead-end the visitor at
+    # "we'll be in touch" — log them straight in. Apply any newly-supplied
+    # password/profile (e.g. they set a password after an earlier email-only pass).
     existing = Client.objects.filter(lead=lead).select_related("credential").first()
     if existing is not None:
         _apply_recovery_details(
@@ -91,14 +105,14 @@ def claim_invite(
         requires_password_set = not (credential and credential.has_password)
         return existing, requires_password_set
 
-    # The journey must still permit an invite (gate re-checked at claim time).
+    # The journey must permit an invite (gate re-checked at claim time). This is the
+    # security boundary that makes accepting the client_page token safe.
     if not account_invite_allowed(lead):
         raise InviteError("This lead is no longer eligible for a workspace invite.")
 
-    # Consume the single-use nonce atomically. Only reached on genuine first-time
-    # creation (no client exists yet), so a real replay of a burned token with no
-    # client behind it still fails — but a legitimate visitor never gets stuck.
-    if payload.single_use:
+    # Consume the single-use nonce atomically — only for genuine single-use invite
+    # tokens. A client_page token is long-lived and must not be burned here.
+    if payload.single_use and payload.typ == ct.TOKEN_ACCOUNT_INVITE:
         from apps.clients.models_consumed import ConsumedInvite
 
         try:
@@ -132,9 +146,9 @@ def _apply_recovery_details(
     """
     Fill in details on an already-existing client during invite recovery.
 
-    Only sets fields that are currently empty (so we never clobber what the client
-    already has), and only sets a password if they don't have one yet — turning a
-    prior email-only account into a fully-credentialed one on this pass.
+    Only sets fields that are currently empty (never clobbers existing data), and only
+    sets a password if the client doesn't have one yet — turning a prior email-only
+    account into a fully-credentialed one on this pass.
     """
     from apps.clients.models import ClientCredential
 

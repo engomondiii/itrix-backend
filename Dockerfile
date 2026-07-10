@@ -30,4 +30,8 @@ RUN DJANGO_SETTINGS_MODULE=itrix.settings.production SECRET_KEY=build-time-dummy
 EXPOSE 8000
 
 # Railway/Heroku inject $PORT; default to 8000 locally.
-CMD ["sh", "-c", "gunicorn itrix.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
+#
+# v4.0.3: serve BOTH HTTP and WebSocket from ONE ASGI process with Daphne. gunicorn (WSGI)
+# cannot handle /ws/* upgrades — running it made every WebSocket route 404. Daphne serves
+# the full Django HTTP API too, so nothing else changes.
+CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT:-8000} itrix.asgi:application"]

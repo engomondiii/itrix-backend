@@ -35,6 +35,10 @@ class ClaimCardSerializer(serializers.ModelSerializer):
 
 class ApprovalRequestSerializer(serializers.ModelSerializer):
     leadId = serializers.CharField(source="lead_id", read_only=True)
+    # The thread this draft is delivered into. Surface 2 links back to it from the
+    # approval queue and the governance audit, so a reviewer can read the context
+    # before approving.
+    conversationId = serializers.CharField(source="conversation_id", read_only=True)
     agentKey = serializers.CharField(source="agent_key", read_only=True)
     claimLevel = serializers.IntegerField(source="claim_level", read_only=True)
     draftBody = serializers.CharField(source="draft_body", read_only=True)
@@ -49,6 +53,7 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "leadId",
+            "conversationId",
             "agentKey",
             "claimLevel",
             "draftBody",

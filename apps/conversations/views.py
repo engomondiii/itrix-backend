@@ -17,8 +17,8 @@ from rest_framework.views import APIView
 
 from apps.conversations.models import Conversation
 from apps.conversations.serializers import (
-    ConversationSummarySerializer,
-    ConversationThreadSerializer,
+    TeamConversationSummarySerializer,
+    TeamConversationThreadSerializer,
 )
 from apps.core.permissions import IsDashboardUser
 
@@ -30,7 +30,7 @@ class TeamConversationListView(APIView):
 
     def get(self, request):
         qs = Conversation.objects.filter(is_active=True).order_by("-last_message_at")[:200]
-        return Response(ConversationSummarySerializer(qs, many=True).data)
+        return Response(TeamConversationSummarySerializer(qs, many=True).data)
 
 
 class TeamConversationDetailView(APIView):
@@ -40,4 +40,4 @@ class TeamConversationDetailView(APIView):
 
     def get(self, request, conversation_id):
         conv = get_object_or_404(Conversation, id=conversation_id)
-        return Response(ConversationThreadSerializer(conv).data)
+        return Response(TeamConversationThreadSerializer(conv).data)

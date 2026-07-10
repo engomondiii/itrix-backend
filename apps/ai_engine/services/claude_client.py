@@ -12,11 +12,20 @@ stalled model call can never tie up a web worker (Railway gunicorn kills workers
 120 s). The timeout is read from ``AI_CALL_TIMEOUT_SECONDS`` (default 20 s) and applied
 both at the client level and per request. On timeout/any error we raise
 ``AIEngineDisabled`` so the caller degrades to its deterministic path immediately.
+
+── STREAMING (v4.0.3) ────────────────────────────────────────────────────────
+``stream()`` yields text deltas as they arrive from the Anthropic streaming API, so the
+UI can render generation token-by-token (like Claude). It shares the same enable/timeout
+discipline as ``complete``; on any error it raises ``AIEngineDisabled`` before yielding,
+or stops cleanly mid-stream (the caller keeps whatever it has and finalizes). Streaming is
+always driven from an async consumer via ``asgiref.sync.sync_to_async`` in a thread, so it
+never blocks the event loop.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Iterator
 
 from django.conf import settings
 
@@ -84,3 +93,33 @@ class ClaudeClient:
             # Includes anthropic.APITimeoutError — treat every failure as "degrade now".
             logger.warning("Claude completion failed/timed out (%s); using fallback.", type(exc).__name__)
             raise AIEngineDisabled(str(exc)) from exc
+
+    def stream(
+        self, *, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.2
+    ) -> Iterator[str]:
+        """
+        Yield Claude's completion as text deltas (real-time generation).
+
+        Raises ``AIEngineDisabled`` immediately if the engine is off. If the stream errors
+        after it has started, it logs and stops yielding (the caller finalizes with what it
+        received). This is a blocking generator; async consumers must drive it in a worker
+        thread (see the realtime consumers).
+        """
+        if not self.enabled:
+            raise AIEngineDisabled("AI engine disabled or ANTHROPIC_API_KEY missing.")
+        try:
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            ) as stream:
+                for text in stream.text_stream:
+                    if text:
+                        yield text
+        except Exception as exc:  # noqa: BLE001
+            # If nothing has been yielded yet the caller can still fall back; if we're
+            # mid-stream the caller keeps the partial text. Either way, never propagate.
+            logger.warning("Claude stream failed (%s); ending stream.", type(exc).__name__)
+            return

@@ -222,3 +222,6 @@ _fix/
 backend_fix/
 *.bak-*
 itrix-backend-fix.zip
+
+# itriX patch safety backups
+.patch-backup-*/

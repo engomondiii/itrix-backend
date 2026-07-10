@@ -14,6 +14,18 @@ consumer:
 Cross-plane tokens are rejected: a team token on the portal socket, or a client token on
 the console socket, resolves to the public plane (the consumer then closes). A token from
 one plane is never valid on another.
+
+── SUBPROTOCOL CONTRACT (v4.0.3) ─────────────────────────────────────────────
+The browser's ``WebSocket(url, protocols)`` requests one or more subprotocols; the server
+MUST accept exactly one that the browser offered or the handshake fails with a protocol
+error. The itrix-web client sends a single protocol string:
+
+    "itrix.bearer.<token>"
+
+so we read the token off that prefix and echo the FULL original string back as the
+accepted subprotocol (stored on ``scope["ws_subprotocol_ack"]`` for the consumer's
+``accept(subprotocol=...)``). We also keep accepting the older two-protocol form
+``["itrix.<plane>", "<token>"]`` for backward compatibility.
 """
 
 from __future__ import annotations
@@ -22,21 +34,35 @@ import logging
 
 logger = logging.getLogger("itrix")
 
+_BEARER_PREFIX = "itrix.bearer."
+
 
 def _extract_token(scope) -> tuple[str, str]:
     """
-    Return (token, subprotocol_to_ack). The client sends two subprotocols:
-    ``["itrix.<plane>", "<token>"]`` — we read the token from the second and echo the
-    first back so the handshake completes.
+    Return ``(token, subprotocol_to_ack)``.
+
+    Supported client formats:
+      • NEW (itrix-web): a single protocol ``"itrix.bearer.<token>"`` — token is the
+        suffix; we echo the whole string back so the handshake completes.
+      • LEGACY: two protocols ``["itrix.<plane>", "<token>"]`` — token is the last;
+        we echo the first (the ``itrix.<plane>`` marker) back.
     """
-    protocols = []
+    protocols: list[str] = []
     for name, value in scope.get("headers", []):
         if name == b"sec-websocket-protocol":
-            protocols = [p.strip() for p in value.decode().split(",")]
+            protocols = [p.strip() for p in value.decode().split(",") if p.strip()]
             break
     if not protocols:
         return "", ""
-    # Convention: first protocol is the ack token "itrix.<plane>", token is the last.
+
+    # NEW single-protocol bearer form.
+    for proto in protocols:
+        if proto.startswith(_BEARER_PREFIX):
+            token = proto[len(_BEARER_PREFIX):]
+            # Echo the exact protocol the browser offered.
+            return token, proto
+
+    # LEGACY two-protocol form: ack the first, token is the last.
     ack = protocols[0]
     token = protocols[-1] if len(protocols) > 1 else ""
     return token, ack
@@ -90,8 +116,6 @@ class WSAuthMiddleware:
     @staticmethod
     def _try_client_token(token: str):
         try:
-            import jwt
-
             from apps.clients.models import Client
             from apps.clients.tokens import decode_client_token
 

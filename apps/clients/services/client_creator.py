@@ -42,6 +42,17 @@ def create_client_for_lead(
     """
     existing = Client.objects.filter(lead=lead).first()
     if existing:
+        # Idempotent: if the client exists but has no password yet and one was
+        # supplied, set it so the account becomes fully credentialed.
+        if password:
+            credential = getattr(existing, "credential", None)
+            if credential is None:
+                credential = ClientCredential(client=existing)
+            if not credential.has_password:
+                credential.set_password(password)
+                credential.set_password_token = ""
+                credential.set_password_expires_at = None
+                credential.save()
         return existing, False
 
     client = Client.objects.create(

@@ -71,11 +71,33 @@ def claim_invite(
     if lead is None:
         raise InviteError("Unknown invite subject.")
 
+    # ── Recovery path ────────────────────────────────────────────────────────
+    # If a Client already exists for this lead, the invite has effectively already
+    # been claimed (a refresh, a double-submit, or a prior attempt). We do NOT want
+    # to dead-end the visitor at "we'll be in touch" — we just log them straight in.
+    # Apply any newly-supplied password/profile (e.g. they set a password this time
+    # after an earlier email-only attempt), then return the existing client.
+    existing = Client.objects.filter(lead=lead).select_related("credential").first()
+    if existing is not None:
+        _apply_recovery_details(
+            existing,
+            email=email,
+            password=password,
+            full_name=full_name,
+            organization=organization,
+            role=role,
+        )
+        credential = getattr(existing, "credential", None)
+        requires_password_set = not (credential and credential.has_password)
+        return existing, requires_password_set
+
     # The journey must still permit an invite (gate re-checked at claim time).
     if not account_invite_allowed(lead):
         raise InviteError("This lead is no longer eligible for a workspace invite.")
 
-    # Consume the single-use nonce atomically.
+    # Consume the single-use nonce atomically. Only reached on genuine first-time
+    # creation (no client exists yet), so a real replay of a burned token with no
+    # client behind it still fails — but a legitimate visitor never gets stuck.
     if payload.single_use:
         from apps.clients.models_consumed import ConsumedInvite
 
@@ -96,3 +118,49 @@ def claim_invite(
     credential = getattr(client, "credential", None)
     requires_password_set = not (credential and credential.has_password)
     return client, requires_password_set
+
+
+def _apply_recovery_details(
+    client,
+    *,
+    email: str | None,
+    password: str | None,
+    full_name: str,
+    organization: str,
+    role: str,
+) -> None:
+    """
+    Fill in details on an already-existing client during invite recovery.
+
+    Only sets fields that are currently empty (so we never clobber what the client
+    already has), and only sets a password if they don't have one yet — turning a
+    prior email-only account into a fully-credentialed one on this pass.
+    """
+    from apps.clients.models import ClientCredential
+
+    changed: list[str] = []
+    if email and not client.email:
+        client.email = email.strip()
+        changed.append("email")
+    if full_name and not client.full_name:
+        client.full_name = full_name
+        changed.append("full_name")
+    if organization and not client.organization:
+        client.organization = organization
+        changed.append("organization")
+    if role and not client.role:
+        client.role = role
+        changed.append("role")
+    if changed:
+        changed.append("updated_at")
+        client.save(update_fields=changed)
+
+    if password:
+        credential = getattr(client, "credential", None)
+        if credential is None:
+            credential = ClientCredential(client=client)
+        if not credential.has_password:
+            credential.set_password(password)
+            credential.set_password_token = ""
+            credential.set_password_expires_at = None
+            credential.save()

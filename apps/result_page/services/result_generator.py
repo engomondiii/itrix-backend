@@ -16,6 +16,7 @@ This module is imported lazily by ai_engine.views to avoid an import cycle.
 from __future__ import annotations
 
 import logging
+import threading
 
 from apps.leads.models import (
     COMMERCIAL_PATH_DISPLAY,
@@ -156,6 +157,16 @@ class ResultGenerator:
             recommended_next_step=sections["recommendedNextStep"],
             used_ai=report["used_ai"],
         )
+        # NEVER let a deterministic build (use_ai=False) clobber an already AI-enriched
+        # page (v4.0.6). The client-page GET writes a fast deterministic page; if the
+        # background AI build already finished first, overwriting it here would drop the
+        # rich narrative back to the stub and pin usedAi=False. So when this build is
+        # deterministic and an AI page already exists, keep the AI page.
+        if not report["used_ai"]:
+            existing = ResultPage.objects.filter(lead=lead).first()
+            if existing is not None and getattr(existing, "used_ai", False):
+                return existing, report
+
         result_obj, _created = ResultPage.objects.update_or_create(lead=lead, defaults=defaults)
 
         # Keep the lead's stored next step in sync if it was empty.
@@ -184,10 +195,59 @@ class ResultGenerator:
         if result_obj is None:
             result_obj, _report = self.generate_for_lead(lead, context=context, use_ai=False)
 
+        # AI ENRICHMENT WITHOUT CELERY (v4.0.6): the GET stays instant (we never call the
+        # model on this path), but if the stored page is still deterministic and the agent
+        # layer is enabled, kick the AI regeneration onto a background thread. It persists
+        # the enriched ResultPage a few seconds later, so the next GET / the WS
+        # clientpage.final shows usedAi=True with the rich narrative — no Celery worker and
+        # no blocking the visitor. Guarded so only one build runs at a time per lead.
+        try:
+            from django.conf import settings
+
+            if getattr(settings, "ENABLE_AGENTS", False) and not getattr(result_obj, "used_ai", False):
+                self._enrich_in_background(lead, context=context)
+        except Exception:  # noqa: BLE001 - enrichment scheduling must never break the GET
+            logger.exception("Failed to schedule background enrichment for lead %s", lead.id)
+
         pitch = self._build_pitch(lead, context=context, nda_signed=nda_signed)
         data = ResultPageSerializer(result_obj).data
         data["pitch"] = pitch
         return data
+
+    # In-process guard so a burst of GETs (page + chat + journey sockets all hit the API
+    # at once) doesn't launch several concurrent model builds for the same lead.
+    _enriching: set = set()
+    _enriching_lock = threading.Lock()
+
+    def _enrich_in_background(self, lead: Lead, *, context: str) -> None:
+        """Spawn a daemon thread that builds + persists the AI-enriched page for ``lead``."""
+        import threading
+
+        lead_id = str(lead.id)
+
+        # De-dupe: skip if a build for this lead is already in flight.
+        with ResultGenerator._enriching_lock:
+            if lead_id in ResultGenerator._enriching:
+                return
+            ResultGenerator._enriching.add(lead_id)
+
+        def _run():
+            from django.db import close_old_connections
+
+            close_old_connections()
+            try:
+                fresh = Lead.objects.filter(id=lead_id).first()
+                if fresh is not None:
+                    self.generate_for_lead(fresh, context=context, use_ai=True)
+                    logger.info("Background AI enrichment complete for lead %s", lead_id)
+            except Exception:  # noqa: BLE001
+                logger.exception("Background AI enrichment failed for lead %s", lead_id)
+            finally:
+                with ResultGenerator._enriching_lock:
+                    ResultGenerator._enriching.discard(lead_id)
+                close_old_connections()
+
+        threading.Thread(target=_run, name=f"enrich-{lead_id[:8]}", daemon=True).start()
 
     def _build_pitch(self, lead: Lead, *, context: str, nda_signed: bool) -> dict:
         """

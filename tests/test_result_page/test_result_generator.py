@@ -29,6 +29,7 @@ WEB_RESULT_KEYS = {
     "kpiPreview",
     "proofPreview",
     "recommendedNextStep",
+    "usedAi",
 }
 
 

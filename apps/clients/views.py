@@ -216,14 +216,34 @@ class PortalOverviewView(APIView):
         conv = get_or_create_portal_conversation(client)
         unread = unread_count(conv, client=client)
 
-        next_steps: list[str] = []
-        if not client.nda_signed:
-            next_steps.append("Review and sign the NDA to unlock detailed technical materials.")
-        next_steps.append("Continue the conversation with your iTrix contact in the portal.")
+        # ── Contract mapping (frontend PortalOverview) ───────────────────────
+        # The internal journey state machine (apps.journey.JourneyState) is NOT
+        # the client-facing portal stage. The web workspace expects a fixed
+        # PortalStage enum and PortalNextStepKey enum; emitting anything else
+        # makes the workspace overview crash ("reading 'title'"). Map here.
+        journey_state = (lead.journey_state if lead else "CLIENT")
+
+        # journey_state -> PortalStage (frontend src/types/portal.types.ts)
+        _STAGE_MAP = {
+            "ARRIVED": "review_ready",
+            "IN_REVIEW": "briefing_preparing",
+            "DIAGNOSED": "review_ready",
+            "CLIENT_PAGE": "review_ready",
+            "INVITED": "conversation_arranging",
+            "CLIENT": "conversation_arranging",
+            "ENGAGED": "evaluation_in_progress",
+            "DORMANT": "review_ready",
+        }
+        stage = _STAGE_MAP.get(journey_state, "review_ready")
+
+        # nextSteps must be PortalNextStepKey values, not free text.
+        next_steps: list[str] = ["read_briefing", "talk_to_itrix"]
+        if client.nda_signed:
+            next_steps.append("consider_evaluation")
 
         payload = {
             "client": client,
-            "stage": (lead.journey_state if lead else "CLIENT"),
+            "stage": stage,
             "unreadMessages": unread,
             "briefingAvailable": True,
             "nextSteps": next_steps,

@@ -244,3 +244,8 @@ private_blobs/
 .env
 .env.orig
 db.sqlite3
+
+# v6.0 fix artefacts
+itrix-backend-v6-*/
+itrix-backend-v6-*.zip
+.v6-*-backup-*/

@@ -144,6 +144,11 @@ class ThreadListCreateView(APIView):
                 self._persist_first_turn(thread, body)
             except MessageTooLong as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+            # The first sentence deserves an answer in the same response. Waiting
+            # for a socket that may never connect is how a visitor concludes the
+            # surface is broken.
+            _generate_assistant_turn(thread, body)
+            thread.refresh_from_db()
 
         payload = ThreadDetailSerializer(thread).data
         response = Response(payload, status=status.HTTP_201_CREATED)
@@ -279,14 +284,18 @@ class ThreadTurnsView(APIView):
         except MessageTooLong as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
+        # Generate the reply here too. The socket streams it when connected; this
+        # guarantees an answer when it is not. See _generate_assistant_turn.
+        assistant = _generate_assistant_turn(thread, ser.validated_data["body"])
+
         return Response(
             {
                 "threadId": str(thread.id),
                 "turn": ThreadTurnSerializer(message).data,
-                # Honest about what happens next. Phase 1 has no assistant generation on
-                # this path: the socket produces it. Saying "streaming" when nothing will
-                # stream would be a lie the UI then has to handle.
-                "assistantTurn": None,
+                # Null ONLY when generation was genuinely unavailable. The client
+                # then shows its honest degraded state rather than a fabricated
+                # answer.
+                "assistantTurn": assistant,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -310,3 +319,113 @@ class ThreadShellView(APIView):
             else shell.for_anonymous_thread(thread)
         )
         return Response(contract, status=status.HTTP_200_OK)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Assistant generation on the HTTP path (v6.0 delivery fix)
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1 generated replies ONLY in the WebSocket consumer, on ``turn.submit``.
+# That is the right place for STREAMING — but it made the answer depend entirely
+# on a socket handshake succeeding, and when the handshake failed the visitor got
+# their own words back and nothing else. No error, no explanation: just silence
+# where the reply should be.
+#
+# A conversation surface whose answer requires a working WebSocket has a single
+# point of failure in the one interaction that matters. So the HTTP path now
+# generates too:
+#
+#   * socket connected   -> it streams, and this returns the settled turn
+#   * socket unavailable  -> this still answers, in one piece
+#
+# The reply is GOVERNED IDENTICALLY either way — same envelope, same guard, same
+# settle. Generation being reachable from two transports must never mean two
+# standards of review.
+
+
+def _generate_assistant_turn(thread, body: str):
+    """
+    Produce the assistant reply for a turn, governed.
+
+    Returns a serialized turn dict, or None when generation is unavailable — in
+    which case the caller says so honestly rather than fabricating an answer.
+    """
+    from apps.agents.services.context import PLANE_PUBLIC, AgentContext
+    from apps.conversations.models import StreamingStatus
+    from apps.conversations.services import ingest
+    from apps.governance.services import stream_envelope, stream_guard
+
+    lead = getattr(thread, "lead", None)
+    session = getattr(lead, "review_session", None) if lead else None
+
+    ctx = AgentContext(
+        lead_id=str(lead.id) if lead else None,
+        prompt=getattr(session, "prompt", "") or body,
+        pressures=list(getattr(session, "pressure_areas", []) or []),
+        product_route=getattr(lead, "product_route", "general") if lead else "general",
+        tier=getattr(lead, "tier", 4) if lead else 4,
+        # ALWAYS the public plane on this route. An anonymous visitor is
+        # anonymous regardless of what their thread has reached.
+        plane=PLANE_PUBLIC,
+        context_label="anonymous_review",
+        extra={"message": body, "thread_id": str(thread.id)},
+    )
+
+    # PART 1 — the pre-flight envelope. A turn that would require level-4 or -5
+    # approval never renders provisionally, on this path either.
+    envelope = stream_envelope.for_context(ctx, intended_claim_level=1)
+
+    text = ""
+    degraded = False
+    if envelope.may_stream:
+        try:
+            from apps.agents.services.concierge import ConciergeAgent
+
+            agent = ConciergeAgent()
+            out = agent.run(ctx)
+            payload = out.payload or {}
+            text = (payload.get("reply") or "").strip() or agent.fallback_reply
+        except Exception:  # noqa: BLE001
+            logger.exception("assistant generation failed for thread %s", thread.id)
+            degraded = True
+    else:
+        text = envelope.replacement_body
+
+    if degraded or not text:
+        return None
+
+    # PART 2 — the guard, applied to the completed text. On this path there is no
+    # partial render to discard, so a hit replaces rather than halts.
+    hits = stream_guard.scan(text)
+    if hits:
+        logger.warning(
+            "assistant reply held by the guard on thread %s (%s)",
+            thread.id, ", ".join(sorted({h.category for h in hits})),
+        )
+        text = stream_envelope.UNDER_REVIEW_WORDING
+        status = StreamingStatus.UNDER_REVIEW
+        governance_status = "pending"
+    else:
+        # PART 3 — settle.
+        try:
+            from apps.agents.services.governance import govern_text
+
+            decision = govern_text(text, claim_level=1, context="anonymous_review")
+            governance_status = decision.get("status", "auto_approved")
+            text = decision.get("text") or text
+        except Exception:  # noqa: BLE001
+            logger.exception("settle-time governance unavailable; holding")
+            governance_status = "pending"
+        deliverable = governance_status in ("auto_approved", "approved")
+        status = StreamingStatus.SETTLED if deliverable else StreamingStatus.UNDER_REVIEW
+        if not deliverable:
+            text = stream_envelope.UNDER_REVIEW_WORDING
+
+    message = ingest.ingest_agent_message(
+        thread.conversation,
+        agent_key="concierge",
+        body=text,
+        governance_status=governance_status,
+        claim_level=1,
+        thread=thread,
+        streaming_status=status,
+    )
+    return ThreadTurnSerializer(message).data

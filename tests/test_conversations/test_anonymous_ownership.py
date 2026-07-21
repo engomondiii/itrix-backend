@@ -35,9 +35,19 @@ def test_the_first_prompt_becomes_turn_one():
     )
     assert response.status_code == 201
     turns = response.data["turns"]
-    assert len(turns) == 1
+
+    # Turn 1 is the visitor's own sentence, verbatim and at seq 1.
+    assert turns[0]["senderKind"] == "visitor"
     assert "HBM" in turns[0]["body"]
     assert turns[0]["seq"] == 1
+
+    # v6.0 delivery fix: the assistant answers in the SAME response rather than
+    # waiting for a socket that may never connect. So a second turn is expected
+    # — but only ever an assistant one, and only after the visitor's.
+    assert len(turns) <= 2
+    if len(turns) == 2:
+        assert turns[1]["senderKind"] == "agent"
+        assert turns[1]["seq"] == 2
 
 
 def test_another_session_cannot_read_your_thread():

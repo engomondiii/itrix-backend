@@ -44,7 +44,22 @@ def _load_lead(sub: str):
 
 
 def _journey_payload(lead) -> dict:
-    state = lead.journey_state or JourneyState.ARRIVED
+    """
+    The public journey payload.
+
+    ── THE RAILS CONTRACT IS RETIRED (Phase 3) ──────────────────────────────
+    ``left_rail`` and ``right_rail`` were emitted as deprecation stubs through Phases
+    1-2, giving both frontends a full release to migrate. They are now ABSENT.
+    ``sidebar_sections`` and ``conversation_header`` come from the shell contract.
+
+    The NBA is delivered as an INLINE CARD rather than a page CTA (§5), with the
+    commitment gate applied at the payload — a commitment card present where
+    ``value_delivered`` is false is a defect, so it is never built.
+    """
+    from apps.journey.models import normalize_state
+    from apps.journey.services import cards as cards_svc
+
+    state = normalize_state(lead.journey_state)
     reveal = reveal_for_state(lead, state)
     reveals = [reveal] if reveal else []
     return {
@@ -53,6 +68,7 @@ def _journey_payload(lead) -> dict:
         "valueDelivered": getattr(lead, "value_delivered_at", None) is not None,
         "accountInviteAvailable": account_invite_allowed(lead),
         "reveals": reveals,
+        "cards": cards_svc.build(lead),
     }
 
 

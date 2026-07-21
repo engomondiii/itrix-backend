@@ -112,13 +112,14 @@ class ResultPageClientView(APIView):
             return Response({"detail": "Unknown subject."}, status=status.HTTP_404_NOT_FOUND)
 
         # Journey must have reached (or passed) CLIENT_PAGE for the page to be reachable.
-        reached = lead.journey_state in {
-            JourneyState.CLIENT_PAGE,
-            JourneyState.INVITED,
-            JourneyState.CLIENT,
-            JourneyState.ENGAGED,
-            JourneyState.DORMANT,
-        }
+        # Expressed as a NUMBER rather than a set of members so adding a state to the
+        # ladder never silently makes the page unreachable from it. DORMANT is off-ladder
+        # but has seen the page, so it is admitted explicitly.
+        from apps.journey.models import journey_number, normalize_state
+
+        state = normalize_state(lead.journey_state)
+        number = journey_number(state)
+        reached = state == JourneyState.DORMANT.value or (number is not None and number >= 4)
         if not reached:
             return Response({"detail": "Not yet available."}, status=status.HTTP_404_NOT_FOUND)
 

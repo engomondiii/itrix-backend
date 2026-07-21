@@ -80,3 +80,85 @@ class StrategyAgent(BaseAgent):
             used_ai=False,
             claim_level=0,
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 3: NBA candidates
+# ─────────────────────────────────────────────────────────────────────────────
+# Every candidate carries an explicit ``commercial`` boolean. It is set HERE, on the
+# candidate, rather than inferred downstream from the label — because
+# "would you like to discuss another workload?" is a commercial action and does not look
+# like one. A precedence rule that has to guess which candidates are commercial will
+# eventually guess wrong in the direction that sells.
+
+
+def nba_candidates(subject) -> list:
+    """
+    Build the next-best-action candidates for ``subject``.
+
+    Returns ``ActionCandidate`` objects for ``nba_precedence.rank``. This function does
+    NOT rank them and does NOT decide what is shown — that is the precedence rule's job,
+    and keeping the two separate is what lets the rule be tested independently of
+    whatever the strategy agent happens to propose today.
+    """
+    from apps.governance.services.nba_precedence import (
+        KIND_COMMERCIAL,
+        KIND_ENABLEMENT,
+        KIND_INFORMATIONAL,
+        KIND_OUTCOME,
+        KIND_SUPPORT,
+        ActionCandidate,
+    )
+    from apps.journey.models import journey_number
+
+    if subject is None:
+        return []
+
+    state = journey_number(getattr(subject, "journey_state", None)) or 1
+    candidates: list[ActionCandidate] = []
+
+    if state <= 3:
+        candidates.append(ActionCandidate(
+            key="continue_review", label="Continue the review",
+            kind=KIND_INFORMATIONAL, weight=50,
+            detail="Tell us a little more and we will sharpen the reflection.",
+        ))
+    elif state <= 5:
+        candidates.append(ActionCandidate(
+            key="open_brief", label="Open your brief",
+            kind=KIND_INFORMATIONAL, weight=60,
+        ))
+        candidates.append(ActionCandidate(
+            key="book_review", label="Book a compute bottleneck review",
+            kind=KIND_COMMERCIAL, commercial=True, weight=40,
+            detail="A working session on one representative workload.",
+        ))
+    elif state <= 9:
+        candidates.append(ActionCandidate(
+            key="review_progress", label="Review progress against the agreed plan",
+            kind=KIND_OUTCOME, weight=60,
+        ))
+        candidates.append(ActionCandidate(
+            key="expand_scope", label="Discuss extending to another workload",
+            kind=KIND_COMMERCIAL, commercial=True, weight=30,
+        ))
+    else:
+        candidates.append(ActionCandidate(
+            key="review_outcomes", label="Review your outcomes",
+            kind=KIND_OUTCOME, weight=70,
+        ))
+        candidates.append(ActionCandidate(
+            key="enablement", label="Enablement for your team",
+            kind=KIND_ENABLEMENT, weight=50,
+        ))
+        candidates.append(ActionCandidate(
+            key="expand_scope", label="Discuss extending to another workload",
+            kind=KIND_COMMERCIAL, commercial=True, weight=20,
+        ))
+
+    candidates.append(ActionCandidate(
+        key="talk_to_specialist", label="Talk to a specialist",
+        kind=KIND_SUPPORT, weight=45,
+        detail="A named human, without going through an agent first.",
+    ))
+    return candidates

@@ -398,3 +398,56 @@ def _visitor_session_from(request) -> str:
         return header.strip()[:64]
     cookie = request.COOKIES.get("itrix_visitor_session", "") or ""
     return cookie.strip()[:64]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 3: the portal's next-best-action
+# ─────────────────────────────────────────────────────────────────────────────
+class PortalNextBestActionView(APIView):
+    """
+    GET portal/next-action/ — CLIENT plane.
+
+    PASSES THROUGH ``nba_precedence`` (§11.1), the SAME rule the cockpit uses, so a
+    customer and an operator can never see contradictory guidance.
+
+    The customer receives ONLY the action. The suppression reason is internal — a
+    customer does not need to be told we decided not to sell to them today, and telling
+    them would surface a commercial deliberation they never asked to be part of.
+    """
+
+    permission_classes = [IsAuthenticatedClient]
+
+    def get(self, request):
+        from apps.governance.services import nba_precedence
+
+        client = request.user
+        candidates = self._candidates(client)
+        decision = nba_precedence.next_best_action(client, candidates)
+
+        return Response(
+            {
+                # to_client_payload() deliberately omits suppressionReason.
+                "nextBestAction": decision.to_client_payload(),
+                "cards": self._cards(client),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _candidates(client):
+        try:
+            from apps.agents.services.strategy import nba_candidates
+
+            return nba_candidates(getattr(client, "lead", None))
+        except Exception:  # noqa: BLE001
+            return []
+
+    @staticmethod
+    def _cards(client):
+        """Inline cards, with the commitment gate already applied at the payload."""
+        try:
+            from apps.journey.services import cards
+
+            return cards.build(getattr(client, "lead", None), client=client)
+        except Exception:  # noqa: BLE001
+            return []

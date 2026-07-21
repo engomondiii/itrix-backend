@@ -73,3 +73,38 @@ def _claim_level(document, chunk) -> int:
         "nda_only": 3,
         "internal_only": 4,
     }.get(disclosure, 1)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2: customer_scope for the sixth tier
+# ─────────────────────────────────────────────────────────────────────────────
+def customer_scope_for(document) -> str:
+    """
+    The customer this document belongs to, or "" for everything else.
+
+    Only ``customer_contract`` material carries a scope. Derived from the filename
+    convention ``<customer-id>__<title>.docx`` inside ``knowledge_docs/customer_contract/``.
+
+    Returns "" when it cannot be determined — and an unscoped contract chunk is served to
+    NOBODY (the disclosure filter defaults closed), so an unparseable filename fails safe
+    rather than leaking.
+    """
+    level = (getattr(document, "disclosure_level", "") or "").lower()
+    if level != "customer_contract":
+        return ""
+
+    name = (getattr(document, "title", "") or "") or str(getattr(document, "file_path", ""))
+    stem = name.replace("\\", "/").split("/")[-1]
+    if "__" in stem:
+        candidate = stem.split("__", 1)[0].strip()
+        if candidate:
+            return candidate[:64]
+    return ""
+
+
+def tag_with_customer_scope(metadata: dict, document) -> dict:
+    """Add ``customer_scope`` to a chunk's metadata before it is embedded."""
+    scope = customer_scope_for(document)
+    if scope:
+        metadata = {**metadata, "customer_scope": scope}
+    return metadata

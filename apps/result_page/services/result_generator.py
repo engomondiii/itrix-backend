@@ -284,3 +284,38 @@ class ResultGenerator:
 
 def generate_result_for_lead(lead: Lead, **kwargs):
     return ResultGenerator().generate_for_lead(lead, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2: the pitch room is ALSO an in-thread artifact
+# ─────────────────────────────────────────────────────────────────────────────
+def emit_pitch_room_artifact(lead, page: dict | None = None):
+    """
+    Deliver the pitch room as an Artifact IN THE THREAD, alongside the tokenized page.
+
+    §2.5: the in-thread rendering is PRIMARY; the token route is an alternative for
+    emailing, sharing and printing. The risk register is explicit about what happens if
+    that inverts — "deep-linked artifacts become the real interface and the thread
+    decays" — so the artifact is generated even when a tokenized page already exists.
+
+    Best-effort: a page that rendered must not fail because the thread copy did not.
+    """
+    import logging
+
+    logger = logging.getLogger("itrix")
+    try:
+        from apps.conversations.models import Thread
+        from apps.journey.constants import ARTIFACT_PITCH_ROOM
+        from apps.journey.services import artifacts
+
+        thread = Thread.objects.filter(lead=lead).order_by("-last_activity_at").first()
+        if thread is None:
+            return None
+        artifact = artifacts.generate(
+            thread, ARTIFACT_PITCH_ROOM, payload=page or None, force=True
+        )
+        artifacts.bind_capability_token(artifact)
+        return artifact
+    except Exception:  # noqa: BLE001
+        logger.debug("pitch-room artifact not emitted (thread or registry unavailable)")
+        return None

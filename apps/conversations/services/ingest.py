@@ -116,6 +116,12 @@ def _after_inbound_turn(thread, message, body: str) -> None:
     except Exception:  # noqa: BLE001
         logger.exception("thread post-turn bookkeeping failed")
 
+    # ── v6.0 Phase 2: support-intent routing ─────────────────────────────────
+    # A SUPPORT QUESTION IS NEVER ANSWERED WITH A COMMERCIAL ANSWER. Routing happens
+    # here, before any agent sees the turn, so the decision is deterministic rather than
+    # something the model gets to weigh up.
+    _route_support_intent(thread, body)
+
     # A turn posted on an empty thread starts the review (1 -> 2). Idempotent: a second
     # turn is a satisfied no-op, not an error.
     lead = getattr(thread, "lead", None)
@@ -127,6 +133,60 @@ def _after_inbound_turn(thread, message, body: str) -> None:
         on_first_turn(lead, thread=thread)
     except Exception:  # noqa: BLE001 - an invalid transition here is expected mid-journey
         logger.debug("first-turn advance skipped for lead %s", getattr(lead, "id", "?"))
+
+
+def _route_support_intent(thread, body: str) -> None:
+    """
+    Detect a support request on a State 10 thread and route it to a human.
+
+    Deterministic detection (Layer 1 stays LLM-free): if a model decided what counted as
+    a support request, a model would be deciding when the commercial-suppression rule
+    applies.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, "ENABLE_CUSTOMER_SUCCESS", False):
+        return
+    client = getattr(thread, "client", None)
+    if client is None:
+        return
+    try:
+        from apps.customer_success.services import support_router
+
+        if not support_router.detect_support_intent(body):
+            return
+        if not getattr(client, "first_payment_recorded_at", None):
+            return
+        support_router.route(client, body, thread=thread)
+    except Exception:  # noqa: BLE001
+        logger.exception("support routing failed for thread %s", getattr(thread, "id", "?"))
+
+
+def associate_attachments(message, attachment_ids) -> int:
+    """
+    Link staged attachments to the turn they were sent with.
+
+    Returns how many were linked. A missing attachment is skipped rather than raising —
+    the visitor's words are already on the record and must not be lost to a bad id.
+    """
+    if not attachment_ids:
+        return 0
+    linked = 0
+    try:
+        from apps.conversations.models import MessageAttachment
+
+        for order, attachment_id in enumerate(attachment_ids):
+            if not attachment_id:
+                continue
+            MessageAttachment.objects.get_or_create(
+                message=message,
+                attachment_id=str(attachment_id),
+                defaults={"order": order},
+            )
+            linked += 1
+    except Exception:  # noqa: BLE001
+        logger.exception("attachment association failed for message %s", message.id)
+    return linked
 
 
 def ingest_agent_message(

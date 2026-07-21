@@ -15,6 +15,7 @@ from __future__ import annotations
 from django.urls import path
 
 from apps.clients.views import (
+    PortalNextBestActionView,
     ClientLoginView,
     ClientLogoutView,
     ClientMeView,
@@ -53,4 +54,5 @@ urlpatterns = [
     path("portal/evaluation/", PortalEvaluationView.as_view(), name="portal-evaluation"),
     path("portal/poc/", PortalPoCView.as_view(), name="portal-poc"),
     path("portal/settings/", PortalSettingsView.as_view(), name="portal-settings"),
+    path("portal/next-action/", PortalNextBestActionView.as_view(), name="portal-next-action"),
 ]

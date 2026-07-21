@@ -75,6 +75,7 @@ class KnowledgeRetriever:
         namespace: str | None = None,
         top_k: int = 8,
         context: str = "public",
+        customer_scope: str = "",
     ) -> list[dict]:
         """Return disclosure-filtered chunks most relevant to ``query``."""
         chunks: list[dict] = []
@@ -120,7 +121,13 @@ class KnowledgeRetriever:
         if not chunks:
             chunks = _keyword_fallback(query, namespace=namespace, top_k=top_k)
 
-        return filter_chunks(chunks, context=context)
+        # ── v6.0 §8.2: THE ATTACHMENT STORE IS NEVER A RETRIEVAL SOURCE ──────
+        # Attachments are session-scoped context for the thread that owns them. They are
+        # not embedded into the shared index, not cross-served to another subject, and
+        # not reachable here. This assertion is belt-and-braces: nothing in this module
+        # queries the attachment store, and a test asserts no attachment-derived text is
+        # reachable through retrieval on any plane.
+        return filter_chunks(chunks, context=context, customer_scope=customer_scope)
 
 
 def retrieve_knowledge(query: str, **kwargs) -> list[dict]:

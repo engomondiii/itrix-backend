@@ -84,6 +84,9 @@ LOCAL_APPS = [
     "apps.agents",
     # ── Phase 1 (v6.0) — target-account persona registry (INTERNAL-ONLY) ────
     "apps.personas",
+    # ── Phase 2 (v6.0) — State 10 domain + the any-format upload subsystem ──
+    "apps.customer_success",
+    "apps.attachments",
     # ── Phase 2 (v4.0) — Conversation & Realtime ────────────────────────────
     "apps.conversations",
     "apps.realtime",
@@ -381,6 +384,30 @@ STREAM_GUARD_ENABLED = env_bool("STREAM_GUARD_ENABLED", True)
 
 # Support SLA badge shown from State 7 (the first PAID rung) onward.
 SUPPORT_SLA_DEFAULT_HOURS = int(env("SUPPORT_SLA_DEFAULT_HOURS", "4"))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2 — attachments
+# ─────────────────────────────────────────────────────────────────────────────
+# Blobs live OUTSIDE the web root. Defaulting to MEDIA_ROOT would make every upload
+# publicly fetchable the moment somebody enabled media serving.
+ATTACHMENT_BLOB_ROOT = env("ATTACHMENT_BLOB_ROOT", str(BASE_DIR / "private_blobs" / "attachments"))
+# Optional external scanner, e.g. "clamdscan --no-summary". When unset the built-in
+# type-sniffing and archive-bomb checks run, and the engine is recorded honestly as
+# "builtin" so nobody reads a clean verdict as more than it is.
+ATTACHMENT_AV_COMMAND = env("ATTACHMENT_AV_COMMAND", "")
+# Extraction sandbox ceilings.
+ATTACHMENT_EXTRACTION_TIMEOUT_SECONDS = int(env("ATTACHMENT_EXTRACTION_TIMEOUT_SECONDS", "30"))
+ATTACHMENT_EXTRACTION_MEMORY_MB = int(env("ATTACHMENT_EXTRACTION_MEMORY_MB", "512"))
+ATTACHMENT_MAX_EXTRACTED_CHARS = int(env("ATTACHMENT_MAX_EXTRACTED_CHARS", "400000"))
+ATTACHMENT_RETENTION_DAYS = int(env("ATTACHMENT_RETENTION_DAYS", "365"))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 3
+# ─────────────────────────────────────────────────────────────────────────────
+# The customer-first precedence rule. With this OFF the highest-weighted candidate wins
+# (the pre-Phase-3 behaviour), so the flag is genuinely reversible. With it ON, support
+# and outcome actions provably outrank expansion on BOTH surfaces.
+ENABLE_CUSTOMER_FIRST_NBA = env_bool("ENABLE_CUSTOMER_FIRST_NBA", False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

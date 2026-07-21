@@ -250,15 +250,19 @@ class CockpitLeadView(APIView):
         else:
             visitor_type = "Cloud / AI infrastructure"
 
+        # Updated for the ten-state ladder (Phase 3 removed CLIENT and ENGAGED).
         ladder_by_state = {
-            JourneyState.ARRIVED: "Review",
-            JourneyState.IN_REVIEW: "Review",
-            JourneyState.DIAGNOSED: "Review",
-            JourneyState.CLIENT_PAGE: "Review",
-            JourneyState.INVITED: "Assessment",
-            JourneyState.CLIENT: "Assessment",
-            JourneyState.ENGAGED: "PoC",
-            JourneyState.DORMANT: "Review",
+            JourneyState.ARRIVED.value: "Review",
+            JourneyState.IN_REVIEW.value: "Review",
+            JourneyState.DIAGNOSED.value: "Review",
+            JourneyState.CLIENT_PAGE.value: "Review",
+            JourneyState.INVITED.value: "Assessment",
+            JourneyState.NDA_REVIEW.value: "Assessment",
+            JourneyState.ASSESSMENT.value: "Assessment",
+            JourneyState.POC.value: "PoC",
+            JourneyState.INTEGRATION.value: "Integration",
+            JourneyState.CUSTOMER_SUCCESS.value: "Customer success",
+            JourneyState.DORMANT.value: "Review",
         }
 
         return {
@@ -282,38 +286,88 @@ class CockpitLeadView(APIView):
 
 
 class CockpitNextActionView(APIView):
-    """GET cockpit/leads/{id}/next-action/ — TEAM. Deterministic next-best-action."""
+    """
+    GET cockpit/leads/{id}/next-action/ — TEAM.
+
+    ── PASSES THROUGH nba_precedence (§11.1) ────────────────────────────────
+    The portal path and this cockpit path call the SAME rule, so a customer and an
+    operator can never see contradictory guidance. If the rule were implemented twice
+    they would drift, and the first symptom would be a customer being sold to while
+    their operator was looking at an unresolved outage.
+
+    The response carries ``suppressionReason`` — INTERNAL-ONLY, and the reason this
+    endpoint is team-gated. An operator who sees "no expansion action" with no
+    explanation assumes the system is broken and works around it.
+    """
 
     permission_classes = [IsAuthenticated, IsDashboardUser]
 
     def get(self, request, lead_id):
-        from apps.journey.models import JourneyState
+        from apps.governance.services import nba_precedence
         from apps.journey.services.gate import account_invite_allowed
         from apps.leads.models import Lead
 
         lead = get_object_or_404(Lead, id=lead_id)
         state = lead.journey_state
-        action, reason = self._next_action(lead, state, account_invite_allowed(lead))
-        return Response({"leadId": str(lead.id), "state": state, "nextAction": action, "reason": reason})
+
+        decision = nba_precedence.for_lead(lead, self._candidates(lead))
+        action, reason = self._state_action(lead, state, account_invite_allowed(lead))
+
+        payload = {
+            "leadId": str(lead.id),
+            "state": state,
+            # The deterministic, state-derived action — unchanged from v4.0 so existing
+            # cockpit behaviour is preserved.
+            "nextAction": action,
+            "reason": reason,
+            # The governed recommendation, with its suppression reason.
+            **decision.to_team_payload(),
+        }
+        return Response(payload)
 
     @staticmethod
-    def _next_action(lead, state, invite_allowed: bool) -> tuple[str, str]:
-        from apps.journey.models import JourneyState
+    def _candidates(lead):
+        try:
+            from apps.agents.services.strategy import nba_candidates
 
-        if state in (JourneyState.ARRIVED, JourneyState.IN_REVIEW):
+            return nba_candidates(lead)
+        except Exception:  # noqa: BLE001
+            return []
+
+    @staticmethod
+    def _state_action(lead, state, invite_allowed: bool) -> tuple[str, str]:
+        """
+        The state-derived action.
+
+        Updated for the ten-state ladder: the deprecated CLIENT and ENGAGED members were
+        removed in Phase 3, so this maps the live vocabulary. ``normalize_state`` handles
+        any stale row so an un-migrated record still resolves rather than falling to the
+        generic branch.
+        """
+        from apps.journey.models import JourneyState, normalize_state
+
+        state = normalize_state(state)
+
+        if state in (JourneyState.ARRIVED.value, JourneyState.IN_REVIEW.value):
             return "await_diagnosis", "The review is still in progress."
-        if state == JourneyState.DIAGNOSED:
+        if state == JourneyState.DIAGNOSED.value:
             return "reveal_client_page", "Value delivered — reveal the customized client page."
-        if state == JourneyState.CLIENT_PAGE:
+        if state == JourneyState.CLIENT_PAGE.value:
             if invite_allowed:
                 return "send_account_invite", "Lead passed the invite gate — send the workspace invite."
             return "nurture", "Not yet invite-eligible — nurture until a stronger signal appears."
-        if state == JourneyState.INVITED:
+        if state == JourneyState.INVITED.value:
             return "await_claim", "Invite sent — awaiting account creation."
-        if state == JourneyState.CLIENT:
-            return "propose_evaluation", "Client onboarded — propose a scoped evaluation."
-        if state == JourneyState.ENGAGED:
-            return "advance_engagement", "Engaged — progress the evaluation / PoC."
-        if state == JourneyState.DORMANT:
+        if state == JourneyState.NDA_REVIEW.value:
+            return "propose_evaluation", "Workspace created — progress the NDA and propose a scoped assessment."
+        if state == JourneyState.ASSESSMENT.value:
+            return "run_assessment", "Paid assessment in progress — deliver the Boundary Waste Map."
+        if state == JourneyState.POC.value:
+            return "run_poc", "PoC in progress — report results against the agreed KPIs."
+        if state == JourneyState.INTEGRATION.value:
+            return "close_integration", "Integration underway — progress the commercial decisions."
+        if state == JourneyState.CUSTOMER_SUCCESS.value:
+            return "customer_success", "Contracted customer — outcomes and support come first."
+        if state == JourneyState.DORMANT.value:
             return "reactivate", "Dormant — re-engage if a stronger signal returns."
         return "review", "No specific action determined."

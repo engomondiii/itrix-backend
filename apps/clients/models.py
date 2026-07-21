@@ -45,6 +45,31 @@ class Client(BaseModel):
     is_active = models.BooleanField(default=True)
     last_login_at = models.DateTimeField(null=True, blank=True)
 
+    # ── v6.0 Phase 2: the customer lifecycle ─────────────────────────────────
+    # A Client becomes a CUSTOMER when a contract is executed. The distinction matters
+    # because it gates the sixth disclosure tier (customer_contract) — a client with a
+    # signed NDA is not yet a customer.
+    contract_state = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="'' | negotiating | executed | active | churned",
+    )
+    # R16: customer-success modules activate at the FIRST PAYMENT, not at license-out.
+    # A paid Assessment customer already has named owners, support and success goals.
+    first_payment_recorded_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Derived health class. INTERNAL-ONLY (§10.5) — never on a client-plane payload.
+    # NULL means UNKNOWN, and unknown must never authorize an expansion (see
+    # journey.services.gate.expansion_allowed).
+    customer_health = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="'' (unknown) | stable | at_risk | critical",
+    )
+
     class Meta:
         verbose_name = "Client"
         verbose_name_plural = "Clients"

@@ -82,19 +82,31 @@ class JourneyState(models.TextChoices):
     CUSTOMER_SUCCESS = "CUSTOMER_SUCCESS", "Customer success"
     # Off-ladder.
     DORMANT = "DORMANT", "Dormant"
-    # ── DEPRECATED (removed in Backend v6.0 Phase 3, migration 0005) ─────────
-    CLIENT = "CLIENT", "Client (deprecated — use NDA_REVIEW)"
-    ENGAGED = "ENGAGED", "Engaged (deprecated — use ASSESSMENT/POC/INTEGRATION)"
+
+    # ── The deprecated CLIENT and ENGAGED members were REMOVED in Phase 3 ────
+    # (migration 0005). They survived exactly one release as aliases so that any row
+    # migration 0003 had not yet touched could still deserialise. That window has closed.
+    #
+    # ``normalize_state`` still maps the old VALUES forward, because a row written by a
+    # process that has not restarted is not a reason to fail a read — but the enum no
+    # longer offers them, so nothing new can be written with them.
 
 
 # The states that are actually part of the ladder (excludes DORMANT + deprecated).
 LADDER_STATES: tuple[str, ...] = tuple(JOURNEY_NUMBERS)
 
-# Deprecated values and where a read path should treat them as pointing.
-DEPRECATED_STATE_ALIASES: dict[str, str] = {
-    JourneyState.CLIENT.value: JourneyState.NDA_REVIEW.value,
-    JourneyState.ENGAGED.value: JourneyState.ASSESSMENT.value,
+# Legacy values and where a read path treats them as pointing.
+#
+# The ENUM MEMBERS are gone (Phase 3); these raw strings remain as a READ-SIDE mapping so
+# a stale row cannot break a page render. Writing them is impossible — they are not
+# offered by the enum and not present in ALLOWED_TRANSITIONS.
+LEGACY_STATE_ALIASES: dict[str, str] = {
+    "CLIENT": JourneyState.NDA_REVIEW.value,
+    "ENGAGED": JourneyState.ASSESSMENT.value,
 }
+
+# Kept under the old name for one more release so any external import still resolves.
+DEPRECATED_STATE_ALIASES = LEGACY_STATE_ALIASES
 
 
 def normalize_state(state: str | None) -> str:
@@ -113,8 +125,8 @@ def normalize_state(state: str | None) -> str:
     """
     if not state:
         return JourneyState.ARRIVED.value
-    if state in DEPRECATED_STATE_ALIASES:
-        return DEPRECATED_STATE_ALIASES[state]
+    if state in LEGACY_STATE_ALIASES:
+        return LEGACY_STATE_ALIASES[state]
     if state in JOURNEY_NUMBERS or state in OFF_LADDER_STATES:
         return state
     return JourneyState.ARRIVED.value
@@ -229,21 +241,7 @@ ALLOWED_TRANSITIONS: dict[str, dict[str, str]] = {
     },
     JourneyState.DORMANT.value: {
         JourneyEvent.REACTIVATE.value: JourneyState.CLIENT_PAGE.value,
-    },
-    # ── deprecated source states: accept the same events as their aliases so a row
-    # migration 0003 has not yet touched can still move forward. ─────────────────
-    JourneyState.CLIENT.value: {
-        JourneyEvent.NDA_SIGNED.value: JourneyState.NDA_REVIEW.value,
-        JourneyEvent.FIRST_PAYMENT.value: JourneyState.ASSESSMENT.value,
-        JourneyEvent.ENGAGE.value: JourneyState.ASSESSMENT.value,
-        JourneyEvent.GATE_DORMANT.value: JourneyState.DORMANT.value,
-    },
-    JourneyState.ENGAGED.value: {
-        JourneyEvent.POC_START.value: JourneyState.POC.value,
-        JourneyEvent.INTEGRATION_START.value: JourneyState.INTEGRATION.value,
-        JourneyEvent.CONTRACT_EXECUTED.value: JourneyState.CUSTOMER_SUCCESS.value,
-        JourneyEvent.GATE_DORMANT.value: JourneyState.DORMANT.value,
-    },
+    }
 }
 
 
@@ -305,3 +303,16 @@ class JourneyTransition(BaseModel):
             f"JourneyTransition({self.lead_id}: "
             f"{self.from_state}->{self.to_state} on {self.event})"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The v6.0 artifact registry
+# ─────────────────────────────────────────────────────────────────────────────
+# Artifact / QuestionSuggestion / CoverageSnapshot live in ``models_artifacts.py`` for
+# review clarity but MUST be imported here so Django registers them under the
+# ``journey`` app label.
+from apps.journey.models_artifacts import (  # noqa: E402,F401  (re-export)
+    Artifact,
+    CoverageSnapshot,
+    QuestionSuggestion,
+)

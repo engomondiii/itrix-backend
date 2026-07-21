@@ -13,14 +13,25 @@ list, so nothing above the caller's allowed tier reaches the visitor.
 from __future__ import annotations
 
 # Ordering from most to least open.
-DISCLOSURE_ORDER = ["public", "controlled_public", "nda_only", "internal_only", "prohibited"]
+DISCLOSURE_ORDER = [
+    "public", "controlled_public", "nda_only", "customer_contract",
+    "internal_only", "prohibited",
+]
 
 # What each context is permitted to see.
 CONTEXT_ALLOWED = {
     "public": {"public"},
     "controlled": {"public", "controlled_public"},
     "nda": {"public", "controlled_public", "nda_only"},
-    "internal": {"public", "controlled_public", "nda_only", "internal_only"},
+    # ── v6.0: the SIXTH TIER ─────────────────────────────────────────────────
+    # customer_contract material is SCOPED PER CUSTOMER and NEVER CROSS-SERVED.
+    # Reaching this tier is not enough on its own — ``customer_scope`` must also
+    # match, and ``filter_chunks`` enforces that separately below. A customer who
+    # can see the tier must still not see another customer's contract material.
+    "customer_contract": {"public", "controlled_public", "nda_only", "customer_contract"},
+    "internal": {
+        "public", "controlled_public", "nda_only", "customer_contract", "internal_only",
+    },
 }
 
 # Never exposed outside internal tooling, regardless of context.
@@ -38,21 +49,37 @@ def is_allowed(level: str, *, context: str = "public") -> bool:
     return level in allowed_levels(context)
 
 
-def filter_chunks(chunks: list[dict], *, context: str = "public") -> list[dict]:
+def filter_chunks(
+    chunks: list[dict], *, context: str = "public", customer_scope: str = ""
+) -> list[dict]:
     """
     Keep only chunks whose ``disclosure_level`` is allowed in ``context``.
 
-    ``chunks`` items are dicts carrying at least ``disclosure_level`` (directly or under
-    ``metadata``).
+    ``customer_scope`` adds the SECOND gate for the sixth tier. A customer_contract chunk
+    is served only when its own scope matches the caller's — an empty caller scope can
+    never match a scoped chunk, so the default is closed.
     """
     permitted = allowed_levels(context)
     kept: list[dict] = []
     for chunk in chunks:
-        level = (chunk.get("disclosure_level") or chunk.get("metadata", {}).get("disclosure_level") or "public").lower()
+        metadata = chunk.get("metadata", {}) or {}
+        level = (
+            chunk.get("disclosure_level") or metadata.get("disclosure_level") or "public"
+        ).lower()
         if level in NEVER_PUBLIC and context != "internal":
             continue
-        if level in permitted:
-            kept.append(chunk)
+        if level not in permitted:
+            continue
+
+        # THE SECOND GATE. customer_contract material is scoped per customer and NEVER
+        # cross-served. The team plane is exempt because internal review must be able to
+        # see the material it is reviewing.
+        if level == "customer_contract" and context != "internal":
+            chunk_scope = str(chunk.get("customer_scope") or metadata.get("customer_scope") or "")
+            if not chunk_scope or chunk_scope != str(customer_scope or ""):
+                continue
+
+        kept.append(chunk)
     return kept
 
 

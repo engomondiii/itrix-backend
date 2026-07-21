@@ -42,6 +42,22 @@ class ClaimLevel(models.IntegerChoices):
     L5 = 5, "L5 — legal / binding (draft only)"
 
 
+class DisclosureCeiling(models.TextChoices):
+    """
+    The six disclosure tiers (Backend v6.0 §Phase 3, §8.1).
+
+    ``customer_contract`` is the sixth, added in v6.0. It is SCOPED PER CUSTOMER and
+    never cross-served — reaching the tier is not sufficient on its own, and the
+    disclosure filter applies the scope as a second gate.
+    """
+
+    PUBLIC = "public", "Public"
+    CONTROLLED_PUBLIC = "controlled_public", "Controlled public"
+    NDA_ONLY = "nda_only", "NDA only"
+    CUSTOMER_CONTRACT = "customer_contract", "Customer contract"
+    INTERNAL_ONLY = "internal_only", "Internal only"
+
+
 class ClaimCard(BaseModel):
     """A pre-registered claim with approved wording + an approval owner."""
 
@@ -52,6 +68,15 @@ class ClaimCard(BaseModel):
     )
     claim_level = models.PositiveSmallIntegerField(
         choices=ClaimLevel.choices, default=ClaimLevel.L2
+    )
+    # The highest tier at which this claim's approved wording may be used. Gains
+    # ``customer_contract`` in v6.0 Phase 3 — a claim approved for a contracted customer
+    # is not thereby approved for an NDA-only prospect.
+    disclosure_ceiling = models.CharField(
+        max_length=24,
+        choices=DisclosureCeiling.choices,
+        default=DisclosureCeiling.PUBLIC,
+        db_index=True,
     )
     # Optional linkage to the knowledge_core ClaimRecord this card governs.
     claim_record_id = models.CharField(max_length=64, blank=True, default="", db_index=True)

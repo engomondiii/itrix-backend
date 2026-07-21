@@ -99,3 +99,26 @@ def rolling_summaries(thread_id: str, state_key: str = "") -> str:
     except Exception:  # noqa: BLE001
         logger.exception("rolling_summaries failed for thread %s", thread_id)
         return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Celery beat schedule (Backend v6.0 §Phase 3)
+# ─────────────────────────────────────────────────────────────────────────────
+# Registered on the app at import so a deploy cannot forget to schedule them. Retention
+# in particular is a PRIVACY OBLIGATION, not an optimisation — it must not quietly stop
+# because somebody edited a settings file.
+try:
+    from celery.schedules import crontab
+
+    BEAT_SCHEDULE = {
+    "anon_retention_sweep": {
+        "task": "itrix.conversations.anon_retention_sweep",
+        "schedule": crontab(hour=4, minute=30),
+    },  # anonymous thread expiry
+    }
+
+    if app is not None:
+        existing = getattr(app.conf, "beat_schedule", None) or {}
+        app.conf.beat_schedule = {**existing, **BEAT_SCHEDULE}
+except Exception:  # noqa: BLE001 - celery optional
+    BEAT_SCHEDULE = {}

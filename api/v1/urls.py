@@ -66,6 +66,10 @@ def api_index(_request):
                 "conversations",
                 "threads",
                 "personas",
+                "attachments",
+                "portal-success",
+                "cockpit-customers",
+                "analytics-v6",
                 "governance",
                 "console",
                 "cockpit",
@@ -94,6 +98,11 @@ urlpatterns = [
     # ── Phase 1 (v6.0) — the conversation spine ──────────────────────────────
     path("threads/", include("apps.conversations.urls_thread")),  # PUBLIC session-scoped
     path("personas/", include("apps.personas.urls")),             # TEAM internal-only
+    # ── Phase 2 (v6.0) — attachments + the State 10 customer-success surface ─
+    path("attachments/", include("apps.attachments.urls")),       # PUBLIC session-scoped
+    path("portal/success/", include("apps.customer_success.urls")),  # CLIENT plane
+    # ── Phase 3 (v6.0) — cockpit aggregates (TEAM plane only) ────────────────
+    path("cockpit/", include("api.v1.cockpit_urls")),
     # ── Phase 3 (v4.0) — Governance, Console & Cockpit ───────────────────────
     path("governance/", include("apps.governance.urls")),        # TEAM claim-cards + audit
     path("console/conversations/", ConsoleConversationListView.as_view(), name="console-conversations"),

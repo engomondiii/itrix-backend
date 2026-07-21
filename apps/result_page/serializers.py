@@ -3,7 +3,7 @@ Result Page serializers.
 
 Emits the exact web ``ResultPage`` shape (``itrix-web/src/types/result.types.ts``):
 
-    leadId, tier, scoreBreakdown, productRoute, licensePathway,
+    leadId, productRoute, licensePathway,
     primaryTechnologies[], problemMirror, diagnosis[], alphaFitSummary,
     kpiPreview[], proofPreview[], recommendedNextStep
 
@@ -19,8 +19,26 @@ from apps.result_page.models import ResultPage
 
 
 class ResultPageSerializer(serializers.ModelSerializer):
+    """
+    The PUBLIC result page (AllowAny, reached by capability token).
+
+    ── ``tier`` AND ``scoreBreakdown`` WERE REMOVED IN PHASE 3 ──────────────
+    Both are on the §10.5 list of fields that must not appear in ANY payload on the
+    anonymous or client plane. They were being served here to unidentified visitors —
+    a visitor could read the tier we had assigned them and the breakdown of how we
+    scored them, which is precisely what §4 PERSONALIZATION WITHOUT PROFILING forbids:
+
+        Personalization means the framing, the emphasis and the chosen pathway are
+        tailored. It NEVER means telling the visitor what we think we know about them.
+
+    The page's CONTENT is still tailored by tier and score — the routing that produced
+    it used both. What changed is that the visitor is no longer shown the machinery.
+
+    Surface 2 reads the same record through a team-gated serializer where these fields
+    legitimately appear.
+    """
+
     leadId = serializers.CharField(source="lead_id", read_only=True)
-    scoreBreakdown = serializers.JSONField(source="score_breakdown")
     productRoute = serializers.CharField(source="product_route")
     licensePathway = serializers.SerializerMethodField()
     primaryTechnologies = serializers.ListField(
@@ -37,8 +55,6 @@ class ResultPageSerializer(serializers.ModelSerializer):
         model = ResultPage
         fields = [
             "leadId",
-            "tier",
-            "scoreBreakdown",
             "productRoute",
             "licensePathway",
             "primaryTechnologies",

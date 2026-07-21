@@ -69,3 +69,32 @@ def build_system_prompt(
             ),
         ]
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0: fenced untrusted attachment content (§4.5, §19.7 rule 5)
+# ─────────────────────────────────────────────────────────────────────────────
+def with_attachment_context(system_prompt: str, thread=None, query: str = "") -> str:
+    """
+    Append the visitor's attachment excerpts, FENCED as untrusted data.
+
+    The fence carries a standing instruction that the enclosed content is DATA TO BE
+    ANALYSED and never instructions to be followed.
+
+    BE CLEAR ABOUT WHAT THIS BUYS. The fence is the weaker half of the pair. Injection
+    defense is an ASSEMBLY-LAYER property: what actually holds is that the decisions
+    worth attacking — disclosure ceiling, retrieval context, journey state, pricing,
+    gating — are all made DETERMINISTICALLY OUTSIDE the model. An injected instruction
+    has nothing to subvert because the model never held those decisions.
+    """
+    if thread is None:
+        return system_prompt
+    try:
+        from apps.attachments.services import excerpts, fencing
+
+        items = excerpts.for_context(thread, query)
+        if not items:
+            return system_prompt
+        return f"{system_prompt}\n\n{fencing.fence_many(items)}"
+    except Exception:  # noqa: BLE001 - attachments are flag-gated and optional
+        return system_prompt

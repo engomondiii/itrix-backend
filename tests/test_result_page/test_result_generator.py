@@ -16,10 +16,16 @@ from tests.factories.scoring_factory import EXECUTION_ANSWERS, REPRESENTATION_AN
 
 pytestmark = pytest.mark.django_db
 
+# ── UPDATED IN PHASE 3 ───────────────────────────────────────────────────────
+# ``tier`` and ``scoreBreakdown`` were REMOVED from this public payload. Both are on the
+# §10.5 list of fields that must not appear on the anonymous or client plane, and this
+# endpoint is AllowAny — an unidentified visitor could read the tier we had assigned them
+# and the breakdown of how we scored them.
+#
+# The page's CONTENT is still tailored by tier and score; the visitor is simply no longer
+# shown the machinery. Surface 2 reads the same record through a team-gated serializer.
 WEB_RESULT_KEYS = {
     "leadId",
-    "tier",
-    "scoreBreakdown",
     "productRoute",
     "licensePathway",
     "primaryTechnologies",
@@ -141,3 +147,20 @@ def test_unknown_lead_returns_404(api_client):
 
     resp = api_client.get(f"/api/v1/result-page/{_uuid.uuid4()}/")
     assert resp.status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3 regression: the public page must not expose internal scoring
+# ─────────────────────────────────────────────────────────────────────────────
+def test_the_public_result_page_exposes_no_tier_or_score():
+    """
+    THE REGRESSION. This endpoint is AllowAny; these fields are §10.5 internal-only.
+
+    Pinned as its own test rather than only as a key-set comparison, so the intent
+    survives even if someone later relaxes the exact-match assertion above.
+    """
+    from apps.result_page.serializers import ResultPageSerializer
+
+    fields = set(ResultPageSerializer.Meta.fields)
+    for forbidden in ("tier", "scoreBreakdown", "score", "score_breakdown"):
+        assert forbidden not in fields, f"{forbidden} is exposed on the public result page"

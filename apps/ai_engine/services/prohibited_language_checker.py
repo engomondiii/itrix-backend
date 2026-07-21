@@ -116,3 +116,49 @@ def scrub(text: str) -> str:
     for pattern, repl in CANONICAL_SUBSTITUTIONS:
         out = re.sub(pattern, repl, out, flags=re.IGNORECASE)
     return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 3: the commercial-reply-to-support-question pattern
+# ─────────────────────────────────────────────────────────────────────────────
+# §19.5 and Playbook §12D: a support question can NEVER be answered with a commercial
+# claim. "A support reply helps with the problem and stops. It does not mention another
+# workload, an expansion, a renewal, or a next agreement — NO MATTER HOW NATURAL THE
+# SEGUE SEEMS."
+#
+# Defined HERE so the set stays SINGLE-SOURCED (§11.1): ``stream_guard`` imports from this
+# module, so a pattern added here is enforced mid-stream AND at settle. Defining it in the
+# guard instead would enforce it while streaming and miss it on a non-streamed reply.
+COMMERCIAL_IN_SUPPORT_PATTERNS = [
+    r"\bexpan(?:d|sion|ding)\b",
+    r"\bupgrade\b",
+    r"\brenewal\b",
+    r"\bnext agreement\b",
+    r"\banother workload\b",
+    r"\badditional workload\b",
+    r"\bwhile we(?:\'re| are) (?:here|at it)\b",
+    r"\bhave you considered\b",
+    r"\bwould also benefit\b",
+    r"\bcross[- ]?sell\b",
+    r"\bupsell\b",
+    r"\blicen[cs]e (?:extension|expansion)\b",
+    r"\bnew contract\b",
+    r"\bextend(?:ing)? (?:your|the) (?:licen[cs]e|agreement|contract|scope)\b",
+    r"\bgood (?:time|moment) to (?:discuss|talk about)\b",
+]
+
+_COMMERCIAL_IN_SUPPORT_RE = re.compile(
+    "|".join(COMMERCIAL_IN_SUPPORT_PATTERNS), re.IGNORECASE
+)
+
+
+def has_commercial_in_support(text: str) -> bool:
+    """True when a reply intended for a support thread carries a commercial move."""
+    return bool(text and _COMMERCIAL_IN_SUPPORT_RE.search(text))
+
+
+def find_commercial_in_support(text: str) -> list[str]:
+    """The matched commercial phrases, for the cockpit."""
+    if not text:
+        return []
+    return sorted({m.group(0).lower() for m in _COMMERCIAL_IN_SUPPORT_RE.finditer(text)})

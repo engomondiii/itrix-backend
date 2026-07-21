@@ -164,3 +164,102 @@ def pattern_set_fingerprint() -> str:
 
     payload = json.dumps(shared_pattern_set(), sort_keys=True).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:16]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2: governance covers artifacts and generated questions too
+# ─────────────────────────────────────────────────────────────────────────────
+# §Phase 2: the claim checker "governs artifacts and generated questions, not only
+# messages". Everything outbound goes through the same gate — a brief that asserts what
+# a message may not assert would simply move the problem.
+
+# The commercial-in-support pattern set is SINGLE-SOURCED in
+# ``prohibited_language_checker`` (§11.1), so it is enforced identically here at settle
+# and mid-stream by the guard. Do not restate the patterns in this module.
+
+
+def check_support_reply(text: str) -> GovernanceDecision:
+    """
+    A support question is NEVER answered with a commercial answer (§19.5).
+
+        A support reply helps with the problem and stops. It does not mention another
+        workload, an expansion, a renewal, or a next agreement — NO MATTER HOW NATURAL
+        THE SEGUE SEEMS.
+
+    Enforced in the claim checker rather than by prompt wording, because "no matter how
+    natural the segue seems" is precisely the judgement a helpful model gets wrong.
+    """
+    from apps.ai_engine.services.prohibited_language_checker import (
+        find_commercial_in_support,
+        has_commercial_in_support,
+    )
+
+    decision = check(text, claim_level=1, context="support")
+    if decision.status == GOV_BLOCKED:
+        return decision
+
+    if has_commercial_in_support(text):
+        matched = find_commercial_in_support(text)
+        return GovernanceDecision(
+            status=GOV_BLOCKED,
+            text=decision.text,
+            claim_level=decision.claim_level,
+            violations=[*decision.violations,
+                        *(f"commercial_in_support:{m}" for m in matched)],
+            reason="A support reply may not mention a commercial next step.",
+        )
+    return decision
+
+
+def check_generated_question(text: str) -> GovernanceDecision:
+    """
+    A generated question may ASK, never ASSERT (§5.4).
+
+    Bound to Claim-Card level 1, so anything above auto-approve is refused outright
+    rather than queued — a question is not worth a human approval round trip; we ask the
+    approved bank version instead.
+
+    ── WHY THIS DELEGATES TO THE GENERATOR'S GUARD ─────────────────────────
+    The prohibited-language checker SCRUBS: it rewrites "guaranteed" into softer wording
+    and then auto-approves the result. That is right for a message, where the scrubbed
+    text is still a usable answer. It is WRONG for a question — a question that had to be
+    scrubbed should not be asked at all, because the approved bank version is right there
+    and costs nothing.
+
+    So the question-specific rules live in ONE place (``question_generator.check_candidate``)
+    and this function calls them, rather than restating them and drifting.
+    """
+    try:
+        from apps.agents.services.question_generator import check_candidate
+
+        reason = check_candidate(text)
+        if reason:
+            return GovernanceDecision(
+                status=GOV_BLOCKED,
+                text=text,
+                claim_level=1,
+                violations=[reason],
+                reason=f"A generated question must ask, never assert ({reason}).",
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("question guard unavailable; refusing conservatively")
+        return GovernanceDecision(
+            status=GOV_BLOCKED, text=text, claim_level=1,
+            reason="question guard unavailable",
+        )
+
+    decision = check(text, claim_level=1, context="public")
+    if decision.status != GOV_AUTO_APPROVED:
+        return GovernanceDecision(
+            status=GOV_BLOCKED,
+            text=decision.text,
+            claim_level=1,
+            violations=decision.violations,
+            reason="A generated question must clear governance at claim level 1.",
+        )
+    return decision
+
+
+def check_artifact(payload_text: str, *, claim_level: int = 2) -> GovernanceDecision:
+    """Govern an artifact's text exactly like a message."""
+    return check(payload_text, claim_level=claim_level, context="public")

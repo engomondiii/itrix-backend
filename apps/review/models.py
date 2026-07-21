@@ -58,6 +58,15 @@ class ReviewSession(BaseModel):
     # Placeholder lead reference (Phase 1). Phase 2 replaces with the real Lead id.
     placeholder_lead_id = models.UUIDField(null=True, blank=True)
 
+    # ── v6.0 Phase 3: why the question loop stopped ──────────────────────────
+    # Persisted so the cockpit can audit an unproductive loop (§5.3). A spike in
+    # ``question_budget_exhausted`` means we run out of budget before understanding;
+    # a spike in ``visitor_declined`` means the questions are unwelcome. Without the
+    # column those two look identical.
+    #
+    # INTERNAL-ONLY (§10.5) — never on a client-plane payload.
+    stop_reason = models.CharField(max_length=40, blank=True, default="", db_index=True)
+
     class Meta:
         ordering = ["-created_at"]
         verbose_name = "Review session"

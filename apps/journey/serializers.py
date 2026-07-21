@@ -19,6 +19,9 @@ class JourneyStateSerializer(serializers.Serializer):
     valueDelivered = serializers.BooleanField()
     accountInviteAvailable = serializers.BooleanField()
     reveals = serializers.ListField(child=serializers.DictField(), default=list)
+    # v6.0 Phase 3: the NBA and every other ask arrive as INLINE CARDS. The rails fields
+    # are gone — see apps/conversations/serializers_thread.py RETIRED_FIELDS.
+    cards = serializers.ListField(child=serializers.DictField(), default=list)
 
 
 class JourneyTransitionSerializer(serializers.ModelSerializer):

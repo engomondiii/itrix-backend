@@ -168,6 +168,7 @@ def advance(
         event,
     )
 
+    _phase2_hooks(lead, event=event, to_state=target, thread=thread)
     _fan_out(lead, from_state=current, to_state=target, event=event)
 
     return AdvanceResult(
@@ -180,6 +181,69 @@ def advance(
         transition=transition,
         journey_number=number,
     )
+
+
+def _phase2_hooks(lead, *, event: str, to_state: str, thread=None) -> None:
+    """
+    v6.0 Phase 2 side effects (Backend v6.0 §Phase 2).
+
+        FIRST_PAYMENT      -> overlay.activate()      (R16 — success at first payment)
+        CONTRACT_EXECUTED  -> ceiling -> customer_contract
+        LOOP_CLOSED        -> artifacts.generate()    (§5.5 — the stop-rule handoff)
+
+    Every hook is best-effort. A transition that has already been written must never be
+    rolled back because a downstream artifact failed to render.
+    """
+    if event == JourneyEvent.FIRST_PAYMENT.value or to_state == JourneyState.ASSESSMENT.value:
+        _activate_success_overlay(lead)
+
+    if event == JourneyEvent.CONTRACT_EXECUTED.value:
+        _mark_contracted(lead)
+
+    if event == JourneyEvent.LOOP_CLOSED.value and thread is not None:
+        _generate_qualification_artifacts(thread)
+
+
+def _activate_success_overlay(lead) -> None:
+    """Reveal 5. Idempotent — a retried transition must not duplicate the team."""
+    try:
+        from apps.clients.models import Client
+        from apps.customer_success.services import overlay
+
+        client = getattr(lead, "client", None) or Client.objects.filter(lead=lead).first()
+        if client is not None:
+            overlay.activate(client)
+    except Exception:  # noqa: BLE001
+        logger.exception("success overlay activation failed for lead %s", getattr(lead, "id", "?"))
+
+
+def _mark_contracted(lead) -> None:
+    """Reveal 6 — the ceiling rises to customer_contract."""
+    try:
+        from apps.clients.models import Client
+
+        client = getattr(lead, "client", None) or Client.objects.filter(lead=lead).first()
+        if client is not None and (client.contract_state or "") not in {"executed", "active"}:
+            client.contract_state = "executed"
+            client.save(update_fields=["contract_state", "updated_at"])
+    except Exception:  # noqa: BLE001
+        logger.exception("contract state update failed for lead %s", getattr(lead, "id", "?"))
+
+
+def _generate_qualification_artifacts(thread) -> None:
+    """
+    §5.5: reflection, then the pitch room, then advance. NO FURTHER QUESTION IS ASKED.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, "ENABLE_ADAPTIVE_QUESTIONS", False):
+        return
+    try:
+        from tasks.artifact_tasks import generate_qualification_artifacts
+
+        generate_qualification_artifacts(str(thread.id))
+    except Exception:  # noqa: BLE001
+        logger.exception("qualification artifact generation failed")
 
 
 def _fan_out(lead, *, from_state: str, to_state: str, event: str = "") -> None:

@@ -134,12 +134,21 @@ def expansion_allowed(lead) -> bool:
     if client is None:
         return False
 
-    # Health signals arrive with the Phase-2 customer-success domain. Until then the
-    # honest answer is "unknown", and unknown must not authorize a sales motion.
-    health = getattr(client, "customer_health", None)
-    if health is None:
+    # ── UNKNOWN HEALTH REFUSES ───────────────────────────────────────────────
+    # The field defaults to "" (empty string), NOT None — so a None check alone silently
+    # passes every customer whose health has never been computed, which is exactly the
+    # failure this gate exists to prevent: a brand-new customer with an empty workspace
+    # receiving an expansion CTA on their first visit.
+    #
+    # Treat empty, None and whitespace identically: all of them mean WE HAVE NOT
+    # MEASURED, and unmeasured must never authorize a sales motion.
+    health = (getattr(client, "customer_health", "") or "").strip().lower()
+    if not health:
         return False
-    if str(health).lower() in {"at_risk", "critical", "degraded", "off_plan"}:
+    if health != "stable":
+        # Anything that is not an explicit, measured "stable" refuses. An allow-list
+        # rather than a deny-list: a new health class added later defaults to refusing
+        # rather than to selling.
         return False
 
     if _has_blocking_support_issue(client):

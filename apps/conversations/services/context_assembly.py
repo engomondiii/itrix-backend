@@ -242,3 +242,34 @@ def summarize_thread_state(thread, state_key: str) -> str:
         .order_by("seq", "created_at")
     )
     return summarize_closed_state(list(messages))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2: attachment excerpts enter the budget at PRIORITY 5
+# ─────────────────────────────────────────────────────────────────────────────
+def attachment_excerpts_for(thread, query: str = "") -> list[str]:
+    """
+    Fenced attachment excerpts, ready to pass to ``assemble(attachment_excerpts=...)``.
+
+    They enter at priority 5 — BELOW the visitor's current turn. A large upload should
+    inform the answer, never displace the question being asked.
+
+    Each excerpt arrives already fenced as untrusted content (§4.5).
+    """
+    try:
+        from apps.attachments.services import excerpts, fencing
+
+        items = excerpts.for_context(thread, query)
+        if not items:
+            return []
+        return [
+            fencing.fence(
+                item.get("text", ""),
+                filename=item.get("filename", ""),
+                handler=item.get("handler", ""),
+                metadata_only=bool(item.get("metadata_only")),
+            )
+            for item in items
+        ]
+    except Exception:  # noqa: BLE001 - attachments are flag-gated
+        return []

@@ -273,3 +273,55 @@ def broadcast_halted(group_name: str, payload: dict) -> None:
 def broadcast_question_suggested(group_name: str, payload: dict) -> None:
     """Push ``question.suggested`` — the primary question plus up to three chips."""
     _group_send(group_name, {"type": "question.suggested", "payload": payload})
+
+
+def broadcast_artifact_ready(artifact) -> None:
+    """
+    Push ``artifact.ready`` — a new governed payload is available IN THE THREAD.
+
+    Carries the type and disclosure level but NOT the payload: the client fetches it
+    through the authorized endpoint, so every read is re-checked server-side rather than
+    trusting whatever arrived over the socket.
+    """
+    if artifact is None:
+        return
+    thread = getattr(artifact, "thread", None)
+    _group_send(
+        getattr(thread, "group_name", f"thread.{getattr(artifact, 'thread_id', '')}"),
+        {
+            "type": "artifact.ready",
+            "payload": {
+                "threadId": str(getattr(artifact, "thread_id", "")),
+                "artifactId": str(getattr(artifact, "id", "")),
+                "type": getattr(artifact, "type", ""),
+                "version": getattr(artifact, "version", 1),
+                "disclosureLevel": getattr(artifact, "disclosure_level", "public"),
+                "pinned": bool(getattr(artifact, "pinned", False)),
+            },
+        },
+    )
+
+
+def broadcast_attachment_status(attachment) -> None:
+    """
+    Push ``attachment.status`` — the tray updates IN PLACE.
+
+    Never carries risk flags: those are team-plane only (§10.5). The visitor sees the
+    status and, where relevant, the honest note about a format we could not read.
+    """
+    if attachment is None:
+        return
+    thread = getattr(attachment, "thread", None)
+    _group_send(
+        getattr(thread, "group_name", f"thread.{getattr(attachment, 'thread_id', '')}"),
+        {
+            "type": "attachment.status",
+            "payload": {
+                "attachmentId": str(getattr(attachment, "id", "")),
+                "threadId": str(getattr(attachment, "thread_id", "")),
+                "filename": getattr(attachment, "filename", ""),
+                "status": getattr(attachment, "status", ""),
+                "note": getattr(attachment, "visitor_note", ""),
+            },
+        },
+    )

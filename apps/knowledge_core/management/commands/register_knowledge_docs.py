@@ -29,8 +29,31 @@ FOLDER_DISCLOSURE = {
     "public": "public",
     "controlled_public": "controlled_public",
     "nda_only": "nda_only",
+    # ── v6.0 Phase 2: the sixth tier ─────────────────────────────────────────
+    # Scoped PER CUSTOMER and never cross-served. The folder decides the tier; the
+    # per-customer scope is applied separately by the disclosure filter.
+    "customer_contract": "customer_contract",
     "internal_only": "internal_only",
 }
+
+# ── THE ATTACHMENT STORE IS NEVER A KNOWLEDGE SOURCE (§8.2) ──────────────────
+# Visitor attachments are session-scoped context for the thread that owns them. They are
+# not embedded into the shared index, not indexed, and not cross-served. This command
+# walks knowledge_docs/ ONLY, and the assertion below makes that explicit so a future
+# refactor pointing it at a different root fails loudly rather than silently publishing
+# every upload a visitor ever made.
+FORBIDDEN_ROOTS = ("private_blobs", "attachments", "media")
+
+
+def assert_not_attachment_store(base) -> None:
+    """Refuse to register documents from anywhere that could hold visitor uploads."""
+    resolved = str(base.resolve()).lower()
+    for forbidden in FORBIDDEN_ROOTS:
+        if f"/{forbidden}" in resolved or resolved.endswith(forbidden):
+            raise RuntimeError(
+                f"Refusing to register knowledge documents from {base!r}: the attachment "
+                f"store is never a Knowledge Core source (Backend v6.0 §8.2)."
+            )
 
 
 def namespace_for(filename: str) -> str:

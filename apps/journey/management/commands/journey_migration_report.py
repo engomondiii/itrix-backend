@@ -13,6 +13,16 @@ shows a different distribution.
 
 This command runs the SAME classification logic as the migration and changes nothing.
 
+── WHY IT SELECTS COLUMNS EXPLICITLY ────────────────────────────────────────
+This command must run BEFORE ``migrate``, which means the Lead TABLE does not yet have
+``journey_number``, ``state_key``, ``persona_id``, ``first_thread_id`` or
+``attachment_count`` — but the Lead MODEL already does. A plain ``Lead.objects.filter()``
+would emit ``SELECT ... journey_number ...`` and fail with UndefinedColumn.
+
+So every query here names its columns with ``.values()``, restricted to fields that exist
+in BOTH the pre- and post-migration schema. That makes the report runnable at the only
+moment it is actually useful, and still correct afterwards.
+
     manage.py journey_migration_report              # summary
     manage.py journey_migration_report --detail     # one line per lead
     manage.py journey_migration_report --json       # machine-readable, for the cockpit
@@ -42,20 +52,26 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from apps.leads.models import Lead
 
+        # Only columns that exist in BOTH schemas. See the module docstring.
+        engaged = Lead.objects.filter(journey_state=ENGAGED).values(
+            "id", "company", "status"
+        )
+
         rows = []
-        for lead in Lead.objects.filter(journey_state=ENGAGED).iterator():
+        for lead in engaged.iterator():
             target, evidence = self._classify(lead)
             rows.append(
                 {
-                    "lead_id": str(lead.id),
-                    "company": lead.company or "",
-                    "status": lead.status,
+                    "lead_id": str(lead["id"]),
+                    "company": lead["company"] or "",
+                    "status": lead["status"],
                     "from_state": ENGAGED,
                     "to_state": target,
                     "evidence": evidence,
                 }
             )
 
+        # count() emits SELECT COUNT(*), which touches no columns, so it is safe either way.
         client_count = Lead.objects.filter(journey_state=CLIENT).count()
 
         if options["json"]:
@@ -134,17 +150,24 @@ class Command(BaseCommand):
 
     @staticmethod
     def _classify(lead) -> tuple[str, str]:
-        """Mirror of the migration's classifier, returning the evidence that decided it."""
-        status = (lead.status or "").strip()
+        """
+        Mirror of the migration's classifier, returning the evidence that decided it.
+
+        ``lead`` is a values() DICT, not a model instance — see the module docstring.
+        Evidence lookups filter on ``lead_id`` and use ``.exists()``, which emits a
+        bare EXISTS query and therefore never selects a column that may not be there.
+        """
+        lead_id = lead["id"]
+        status = (lead.get("status") or "").strip()
         if status in {"Licensed", "Negotiation"}:
             return INTEGRATION, f"lead status = {status}"
 
         try:
             from apps.pocs.models import PoC
 
-            if PoC.objects.filter(lead=lead, status="completed").exists():
+            if PoC.objects.filter(lead_id=lead_id, status="completed").exists():
                 return INTEGRATION, "completed PoC record"
-            if PoC.objects.filter(lead=lead).exists():
+            if PoC.objects.filter(lead_id=lead_id).exists():
                 return POC, "PoC record"
         except Exception:  # noqa: BLE001
             pass
@@ -152,7 +175,7 @@ class Command(BaseCommand):
         try:
             from apps.evaluations.models import Evaluation
 
-            if Evaluation.objects.filter(lead=lead).exists():
+            if Evaluation.objects.filter(lead_id=lead_id).exists():
                 return ASSESSMENT, "Evaluation record"
         except Exception:  # noqa: BLE001
             pass

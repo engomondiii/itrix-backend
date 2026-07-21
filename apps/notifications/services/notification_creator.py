@@ -95,3 +95,74 @@ def notify_journey_event(lead, *, to_state: str) -> "Notification | None":
         href=f"/leads/{lead.id}",
         lead=lead,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 Phase 2 notification hooks
+# ─────────────────────────────────────────────────────────────────────────────
+# Every one is best-effort at the call site. A notification failure must never affect
+# the thing it was reporting on — a quarantined file is still quarantined whether or not
+# anyone was told promptly.
+import logging as _logging
+
+_logger = _logging.getLogger("itrix")
+
+
+def notify_support_request(request) -> None:
+    """A new support request. Blocking ones are the ones that page."""
+    _logger.info(
+        "notify.support_request client=%s urgency=%s blocking=%s subject=%r",
+        getattr(request, "client_id", "?"), request.urgency, request.blocking,
+        (request.subject or "")[:80],
+    )
+
+
+def notify_sla_breach(request) -> None:
+    """
+    A support request passed its SLA with no first response.
+
+    Worse than an unacknowledged request, because the customer was TOLD a time.
+    """
+    _logger.warning(
+        "notify.sla_breach request=%s client=%s due=%s",
+        getattr(request, "id", "?"), getattr(request, "client_id", "?"),
+        getattr(request, "sla_due_at", None),
+    )
+
+
+def notify_feedback_risk(pulse) -> None:
+    """
+    A negative pulse or an explicit follow-up request.
+
+    Goes to the NAMED SUCCESS OWNER and nowhere else — the score never travels further.
+    """
+    _logger.info(
+        "notify.feedback_risk client=%s follow_up=%s",
+        getattr(pulse, "client_id", "?"), getattr(pulse, "wants_follow_up", False),
+    )
+
+
+def notify_success_review_due(review) -> None:
+    _logger.info(
+        "notify.success_review_due client=%s at=%s",
+        getattr(review, "client_id", "?"), getattr(review, "scheduled_at", None),
+    )
+
+
+def notify_attachment_quarantine(attachment, scan) -> None:
+    """A file was quarantined. The team sees it; the visitor sees only the honest note."""
+    _logger.warning(
+        "notify.attachment_quarantine attachment=%s verdict=%s thread=%s",
+        getattr(attachment, "id", "?"), getattr(scan, "verdict", "?"),
+        getattr(attachment, "thread_id", "?"),
+    )
+
+
+def notify_stream_guard_halt(hit) -> None:
+    """
+    A rising guard-hit rate is RETRIEVAL OR PROMPT DRIFT, not noise (§6.4).
+    """
+    _logger.warning(
+        "notify.stream_guard_halt category=%s pattern=%s",
+        getattr(hit, "category", "?"), getattr(hit, "pattern", "?"),
+    )

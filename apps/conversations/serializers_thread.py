@@ -109,9 +109,8 @@ class ThreadDetailSerializer(serializers.ModelSerializer):
         """
         The shell contract for this thread.
 
-        ``left_rail`` / ``right_rail`` are ABSENT here by design — see
-        ``deprecated_rail_stub()`` for the one-release compatibility shim, which lives
-        on the journey payload rather than being baked into this shape.
+        ``left_rail`` / ``right_rail`` are ABSENT — the rails contract was retired in
+        Phase 3. ``sidebar_sections`` and ``conversation_header`` replace them.
         """
         from apps.journey.services import shell
 
@@ -185,17 +184,36 @@ class ThreadCreateSerializer(serializers.Serializer):
 class ThreadRenameSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE RAILS CONTRACT IS RETIRED (Backend v6.0 §Phase 3, §3.1)
+# ─────────────────────────────────────────────────────────────────────────────
+# ``left_rail`` and ``right_rail`` were emitted as ``[]`` / ``null`` deprecation stubs
+# through Phases 1-2, giving both frontends a full release to migrate. Phase 3 removes
+# them.
+#
+# They are now ABSENT from every payload, and a client that SENDS them receives 400 —
+# see ``reject_rail_fields`` below. Silently accepting a field we no longer honour would
+# leave a frontend believing it still controls something it does not.
+RETIRED_FIELDS = ("left_rail", "right_rail", "leftRail", "rightRail")
 
-def deprecated_rail_stub() -> dict:
+
+class RailFieldsRetired(Exception):
+    """Raised when a request carries a retired rails field. Maps to HTTP 400."""
+
+
+def reject_rail_fields(data) -> None:
     """
-    The one-release compatibility shim for the retired rails contract.
+    Refuse a request that still speaks the rails contract.
 
-    Backend v6.0 §3.1: ``left_rail`` and ``right_rail`` are emitted as ``[]`` / ``null``
-    with a deprecation header for ONE release; after that they are absent and a client
-    that sends them receives 400.
-
-    Emitting empty rather than omitting is deliberate: a v4.0 frontend that reads
-    ``payload.left_rail.map(...)`` keeps working (it maps an empty list) instead of
-    crashing on undefined during the migration window.
+    Explicit rather than ignored: a 400 naming the field tells the frontend author what
+    to change, where silence would let a stale client ship believing it still works.
     """
-    return {"left_rail": [], "right_rail": None}
+    if not isinstance(data, dict):
+        return
+    present = [field for field in RETIRED_FIELDS if field in data]
+    if present:
+        raise RailFieldsRetired(
+            f"The rails contract was retired in Backend v6.0. "
+            f"Remove {', '.join(present)} and read `sidebar_sections` and "
+            f"`conversation_header` from the shell contract instead."
+        )

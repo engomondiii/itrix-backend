@@ -226,6 +226,36 @@ class Participant(BaseModel):
         return f"Participant({self.kind}, conv={self.conversation_id})"
 
 
+class MessageAttachment(BaseModel):
+    """
+    Links an attachment to the turn it was sent with (Backend v6.0 §Phase 2).
+
+    ``attachment_id`` is a plain char field rather than a FK so ``conversations`` does
+    not gain a hard dependency on ``attachments``. The attachments app is flag-gated; a
+    deployment running with ENABLE_ATTACHMENTS off should not be forced to install its
+    tables to send a message.
+    """
+
+    message = models.ForeignKey(
+        "conversations.Message", on_delete=models.CASCADE, related_name="attachment_links"
+    )
+    attachment_id = models.CharField(max_length=64, db_index=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "created_at"]
+        verbose_name = "Message attachment"
+        verbose_name_plural = "Message attachments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "attachment_id"], name="uniq_attachment_per_message"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"MessageAttachment({self.message_id} -> {self.attachment_id})"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Message length (Backend v6.0 §2.3)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -280,6 +310,7 @@ __all__ = [
     "ConversationContext",
     "GovernanceStatus",
     "Message",
+    "MessageAttachment",
     "Participant",
     "SenderKind",
     "StreamingStatus",

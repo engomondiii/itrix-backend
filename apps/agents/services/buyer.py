@@ -6,6 +6,11 @@ champion, economic buyer, technical evaluator, and blockers — plus the approva
 Claim level L2 internal. Deterministic fallback builds a sensible generic map from role.
 """
 
+# SECURITY INVARIANT 2 (Backend v6.0 §Phase 1): retrieval context is DERIVED from the
+# identity plane via ``ctx.retrieval_context``. This agent previously passed a literal
+# ``context="internal"``, which meant an anonymous visitor could be answered from
+# internal_only chunks. Never pass a literal here.
+
 from __future__ import annotations
 
 import logging
@@ -35,7 +40,7 @@ class BuyerAgent(BaseAgent):
         try:
             system = build_system_prompt(
                 product_route=ctx.product_route, license_pathway=ctx.license_pathway,
-                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context="internal",
+                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context=ctx.retrieval_context,
             )
             role = (ctx.extra or {}).get("role", "")
             raw = ClaudeClient().complete(system=system, user=f"Lead role/org: {role}\nProblem:\n{ctx.prompt}\n\n{_JSON}", max_tokens=700)

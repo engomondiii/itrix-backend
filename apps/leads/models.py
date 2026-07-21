@@ -183,6 +183,36 @@ class Lead(BaseModel):
     gate_decision = models.CharField(max_length=16, blank=True, default="")
     gate_decision_reason = models.CharField(max_length=255, blank=True, default="")
 
+    # ── v6.0: denormalised ladder position ───────────────────────────────────
+    # ``journey_state`` remains authoritative and has exactly one writer
+    # (journey.advance). These two are DERIVED and kept in lockstep by advance() so no
+    # reader has to recompute them and no report has to hard-code the ladder order.
+    # journey_number is NULL for DORMANT, which is off-ladder by design.
+    journey_number = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    state_key = models.CharField(max_length=20, blank=True, default="", db_index=True)
+
+    # The persona hypothesis. NULLABLE and INTERNAL-ONLY: it is on the §10.5 list of
+    # fields that must not appear on the anonymous or client plane, at any state.
+    # A match changes which pitch room renders; it never becomes a sentence.
+    persona = models.ForeignKey(
+        "personas.Persona",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leads",
+    )
+
+    # The thread this lead was born in — the conversation they started as a visitor.
+    first_thread = models.ForeignKey(
+        "conversations.Thread",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="originated_leads",
+    )
+    # Count only. The attachments themselves are thread-scoped and never lead-scoped.
+    attachment_count = models.PositiveIntegerField(default=0)
+
     submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -194,6 +224,7 @@ class Lead(BaseModel):
             models.Index(fields=["status", "submitted_at"]),
             models.Index(fields=["owner", "status"]),
             models.Index(fields=["journey_state"]),
+            models.Index(fields=["journey_number"]),
         ]
 
     def __str__(self) -> str:

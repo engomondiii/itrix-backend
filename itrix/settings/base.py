@@ -82,6 +82,8 @@ LOCAL_APPS = [
     "apps.journey",
     "apps.clients",
     "apps.agents",
+    # ── Phase 1 (v6.0) — target-account persona registry (INTERNAL-ONLY) ────
+    "apps.personas",
     # ── Phase 2 (v4.0) — Conversation & Realtime ────────────────────────────
     "apps.conversations",
     "apps.realtime",
@@ -320,6 +322,65 @@ ENABLE_CELERY = env_bool("ENABLE_CELERY", False)
 ENABLE_AGENTS = env_bool("ENABLE_AGENTS", False)
 ENABLE_CLIENT_PORTAL = env_bool("ENABLE_CLIENT_PORTAL", False)
 ENABLE_REALTIME = env_bool("ENABLE_REALTIME", False)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 capability flags — ALL DEFAULT FALSE
+# ─────────────────────────────────────────────────────────────────────────────
+# With every flag off the backend behaves EXACTLY like the shipped build, except for the
+# four security corrections, which are UNCONDITIONAL BY DESIGN. They are corrections,
+# not features — a flag that can turn a security fix back off is not a fix.
+#
+# Ordering rule (Architecture v2.6 Appendix B.1): a FRONTEND flag may only be enabled
+# once its backend counterpart is on. Enabling NEXT_PUBLIC_ENABLE_ATTACHMENTS against a
+# backend without ENABLE_ATTACHMENTS presents an attach control that cannot succeed,
+# which is worse than not offering it.
+ENABLE_TEN_STATE_JOURNEY = env_bool("ENABLE_TEN_STATE_JOURNEY", False)
+ENABLE_CONVERSATION_SURFACE = env_bool("ENABLE_CONVERSATION_SURFACE", False)
+ENABLE_ANONYMOUS_STREAMING = env_bool("ENABLE_ANONYMOUS_STREAMING", False)
+# Phase 2 flags — declared here so settings are complete and a deploy cannot half-know
+# about them. The subsystems themselves land in Phase 2.
+ENABLE_ATTACHMENTS = env_bool("ENABLE_ATTACHMENTS", False)
+ENABLE_ADAPTIVE_QUESTIONS = env_bool("ENABLE_ADAPTIVE_QUESTIONS", False)
+ENABLE_CUSTOMER_SUCCESS = env_bool("ENABLE_CUSTOMER_SUCCESS", False)
+CUSTOMER_CONTRACT_TIER_ENABLED = env_bool("CUSTOMER_CONTRACT_TIER_ENABLED", False)
+ENABLE_CUSTOMER_FIRST_NBA = env_bool("ENABLE_CUSTOMER_FIRST_NBA", False)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 conversation spine limits
+# ─────────────────────────────────────────────────────────────────────────────
+# THERE IS NO USER-FACING CHARACTER LIMIT (R28). MAX_MESSAGE_CHARS is a SERVER SAFETY
+# CAP that returns a specific, recoverable 413. Long threads are handled by the context
+# budget, never by refusing the visitor's problem.
+MAX_MESSAGE_CHARS = int(env("MAX_MESSAGE_CHARS", "100000"))
+CONTEXT_BUDGET_CHARS = int(env("CONTEXT_BUDGET_CHARS", "120000"))
+
+# Anonymous thread retention. A thread that is never claimed expires on its own.
+ANON_THREAD_RETENTION_DAYS = int(env("ANON_THREAD_RETENTION_DAYS", "90"))
+
+# Anonymous-plane abuse controls. Ceilings, not product limits — the message shown when
+# one is hit is deterministic and non-punitive.
+ANON_TURNS_PER_HOUR = int(env("ANON_TURNS_PER_HOUR", "60"))
+ANON_CONNECTS_PER_HOUR = int(env("ANON_CONNECTS_PER_HOUR", "120"))
+# Blank means NO ceiling. Over the ceiling a turn DOWNGRADES to non-streaming rather
+# than being refused: the conversation still works, it just does not stream.
+ANON_GENERATION_COST_CEILING = env("ANON_GENERATION_COST_CEILING", "")
+
+# Phase 2 attachment policy — declared now so the policy table has one home.
+MAX_ATTACHMENT_BYTES = int(env("MAX_ATTACHMENT_BYTES", "104857600"))
+MAX_ATTACHMENT_BYTES_PER_TURN = int(env("MAX_ATTACHMENT_BYTES_PER_TURN", "524288000"))
+MAX_ATTACHMENTS_PER_SESSION = int(env("MAX_ATTACHMENTS_PER_SESSION", "200"))
+PRE_NDA_ATTACHMENT_RETENTION_DAYS = int(env("PRE_NDA_ATTACHMENT_RETENTION_DAYS", "30"))
+QUESTION_BUDGET_PER_STATE = int(env("QUESTION_BUDGET_PER_STATE", "3"))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Streaming governance
+# ─────────────────────────────────────────────────────────────────────────────
+# The token-level guard defaults ON. Turning it off means streaming unguarded text to
+# unidentified visitors, so it exists as a switch only for controlled testing.
+STREAM_GUARD_ENABLED = env_bool("STREAM_GUARD_ENABLED", True)
+
+# Support SLA badge shown from State 7 (the first PAID rung) onward.
+SUPPORT_SLA_DEFAULT_HOURS = int(env("SUPPORT_SLA_DEFAULT_HOURS", "4"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

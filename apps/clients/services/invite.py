@@ -53,6 +53,7 @@ def claim_invite(
     full_name: str = "",
     organization: str = "",
     role: str = "",
+    visitor_session: str = "",
 ) -> tuple[Client, bool]:
     """
     Consume a capability token → create the Client (reveal ③).
@@ -86,32 +87,33 @@ def claim_invite(
     if lead is None:
         raise InviteError("Unknown invite subject.")
 
-    # ── Recovery path ────────────────────────────────────────────────────────
-    # If a Client already exists for this lead, the workspace was already created (a
-    # refresh, a double-submit, or a prior attempt). Do NOT dead-end the visitor at
-    # "we'll be in touch" — log them straight in. Apply any newly-supplied
-    # password/profile (e.g. they set a password after an earlier email-only pass).
-    existing = Client.objects.filter(lead=lead).select_related("credential").first()
-    if existing is not None:
-        _apply_recovery_details(
-            existing,
-            email=email,
-            password=password,
-            full_name=full_name,
-            organization=organization,
-            role=role,
-        )
-        credential = getattr(existing, "credential", None)
-        requires_password_set = not (credential and credential.has_password)
-        return existing, requires_password_set
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECURITY INVARIANT 1 — ORDER IS THE SECURITY PROPERTY
+    # ─────────────────────────────────────────────────────────────────────────
+    # Backend v6.0 §Phase 1: reorder to GATE -> NONCE BURN -> RECOVERY.
+    #
+    # The v4.0 build ran the recovery path FIRST, which meant a single-use invite token
+    # could be replayed indefinitely: every replay found the existing Client and
+    # returned early, before reaching the nonce burn. The token was single-use in name
+    # only.
+    #
+    # It also let that unauthenticated recovery path SET A PASSWORD on an existing
+    # account. Anyone holding a copy of the invite link could take over the workspace.
+    #
+    # The rule, restated: a single-use token MUST be consumed BEFORE any code path that
+    # can return a subject, and NO unauthenticated claim path may set a credential on an
+    # existing account.
+    # ─────────────────────────────────────────────────────────────────────────
 
-    # The journey must permit an invite (gate re-checked at claim time). This is the
-    # security boundary that makes accepting the client_page token safe.
-    if not account_invite_allowed(lead):
+    # 1) GATE. The journey must permit an invite. Re-checked at claim time regardless of
+    #    which token type was presented — this is what makes accepting the long-lived
+    #    client_page token safe.
+    existing = Client.objects.filter(lead=lead).select_related("credential").first()
+    if existing is None and not account_invite_allowed(lead):
         raise InviteError("This lead is no longer eligible for a workspace invite.")
 
-    # Consume the single-use nonce atomically — only for genuine single-use invite
-    # tokens. A client_page token is long-lived and must not be burned here.
+    # 2) BURN. Consume the single-use nonce atomically, BEFORE anything can return a
+    #    subject — including the recovery path below. A replayed token dies here.
     if payload.single_use and payload.typ == ct.TOKEN_ACCOUNT_INVITE:
         from apps.clients.models_consumed import ConsumedInvite
 
@@ -119,6 +121,22 @@ def claim_invite(
             ConsumedInvite.objects.create(nonce=payload.nonce, lead_id=str(lead.id))
         except IntegrityError as exc:
             raise InviteError("This invite has already been used.") from exc
+
+    # 3) RECOVERY. Only now may we return an existing workspace. A refresh or a
+    #    double-submit still logs the visitor in rather than dead-ending them at
+    #    "we'll be in touch" — but a REPLAY has already been stopped at step 2.
+    if existing is not None:
+        _apply_recovery_details(
+            existing,
+            email=email,
+            full_name=full_name,
+            organization=organization,
+            role=role,
+        )
+        credential = getattr(existing, "credential", None)
+        requires_password_set = not (credential and credential.has_password)
+        _claim_session_threads(lead, existing, visitor_session)
+        return existing, requires_password_set
 
     client, created = create_client_for_lead(
         lead,
@@ -129,6 +147,10 @@ def claim_invite(
         role=role,
     )
 
+    # Migrate the visitor's anonymous threads INSIDE this transaction, after the burn
+    # (Backend v6.0 §2.2). Every turn, artifact and attachment follows them in.
+    _claim_session_threads(lead, client, visitor_session)
+
     credential = getattr(client, "credential", None)
     requires_password_set = not (credential and credential.has_password)
     return client, requires_password_set
@@ -138,20 +160,22 @@ def _apply_recovery_details(
     client,
     *,
     email: str | None,
-    password: str | None,
     full_name: str,
     organization: str,
     role: str,
 ) -> None:
     """
-    Fill in details on an already-existing client during invite recovery.
+    Fill in missing profile details on an already-existing client during recovery.
 
-    Only sets fields that are currently empty (never clobbers existing data), and only
-    sets a password if the client doesn't have one yet — turning a prior email-only
-    account into a fully-credentialed one on this pass.
+    SECURITY: this function DOES NOT SET A PASSWORD, and it must never be given the
+    ability to. Setting a credential here would mean an unauthenticated caller holding a
+    copy of an invite link could take over an existing workspace.
+
+    A client who needs a password gets one through the authenticated set-password flow
+    (``apps.clients.services.set_password``), which proves control of the mailbox first.
+
+    Only ever fills fields that are currently EMPTY — never clobbers existing data.
     """
-    from apps.clients.models import ClientCredential
-
     changed: list[str] = []
     if email and not client.email:
         client.email = email.strip()
@@ -169,12 +193,19 @@ def _apply_recovery_details(
         changed.append("updated_at")
         client.save(update_fields=changed)
 
-    if password:
-        credential = getattr(client, "credential", None)
-        if credential is None:
-            credential = ClientCredential(client=client)
-        if not credential.has_password:
-            credential.set_password(password)
-            credential.set_password_token = ""
-            credential.set_password_expires_at = None
-            credential.save()
+
+def _claim_session_threads(lead, client, visitor_session: str) -> None:
+    """
+    Migrate the visitor's anonymous threads to the new Client.
+
+    Runs inside the caller's transaction, AFTER the nonce burn. Best-effort by design:
+    a visitor who never spoke has no threads, and that is normal rather than an error.
+    """
+    if not visitor_session:
+        return
+    try:
+        from apps.conversations.services.claim import claim_threads
+
+        claim_threads(visitor_session=visitor_session, client=client, lead=lead)
+    except Exception:  # noqa: BLE001 - never fail a workspace creation on thread claim
+        logger.exception("thread claim failed for client %s", getattr(client, "id", "?"))

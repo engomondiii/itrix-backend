@@ -18,7 +18,8 @@ def test_create_client_links_lead_and_advances_journey():
     lead.refresh_from_db()
     assert created is True
     assert client.lead_id == lead.id
-    assert lead.journey_state == JourneyState.CLIENT
+    # v6.0: CLIENT was renamed to NDA_REVIEW (state 6).
+    assert lead.journey_state == JourneyState.NDA_REVIEW
     assert lead.client_account == client  # reverse 1:1 accessor
 
 

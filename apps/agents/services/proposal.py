@@ -7,6 +7,11 @@ finalizes. Because default_claim_level = 5, the runtime queues it and it can nev
 auto-deliver.
 """
 
+# SECURITY INVARIANT 2 (Backend v6.0 §Phase 1): retrieval context is DERIVED from the
+# identity plane via ``ctx.retrieval_context``. This agent previously passed a literal
+# ``context="internal"``, which meant an anonymous visitor could be answered from
+# internal_only chunks. Never pass a literal here.
+
 from __future__ import annotations
 
 import logging
@@ -40,7 +45,7 @@ class ProposalAgent(BaseAgent):
         try:
             system = build_system_prompt(
                 product_route=ctx.product_route, license_pathway=ctx.license_pathway,
-                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context="internal",
+                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context=ctx.retrieval_context,
             )
             raw = ClaudeClient().complete(system=system, user=f"Draft a {doc_type} OUTLINE for:\n{ctx.prompt}\n\n{_JSON}", max_tokens=1200)
         except AIEngineDisabled:

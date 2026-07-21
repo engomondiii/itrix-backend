@@ -154,3 +154,52 @@ class ApprovalRequest(BaseModel):
     @property
     def is_resolved(self) -> bool:
         return self.status in (ApprovalStatus.APPROVED, ApprovalStatus.EDITED, ApprovalStatus.REJECTED)
+
+
+class StreamGuardHit(BaseModel):
+    """
+    One stream-guard halt or envelope downgrade, recorded for cockpit reporting
+    (Backend v6.0 §6.4, Surface 2 v5.0 §5.2).
+
+    A rising guard-hit rate is treated as RETRIEVAL OR PROMPT DRIFT, not as noise. That
+    is only possible if every hit is durable and countable — a log line is not something
+    you can chart, alert on, or hand an operator.
+
+    Everything on this model is INTERNAL-ONLY. ``matched_text`` in particular is the
+    prohibited wording itself: it exists so an operator can see what the model tried to
+    say, and it must never appear on the anonymous or client plane (§10.5).
+    """
+
+    class Kind(models.TextChoices):
+        HALT = "halt", "Stream halted"
+        ENVELOPE_DOWNGRADE = "envelope_downgrade", "Envelope downgrade (did not stream)"
+        SETTLE_REPLACEMENT = "settle_replacement", "Replaced at settle"
+
+    kind = models.CharField(
+        max_length=24, choices=Kind.choices, default=Kind.HALT, db_index=True
+    )
+    thread_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    message_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    agent_key = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    plane = models.CharField(max_length=16, blank=True, default="")
+    journey_state = models.CharField(max_length=20, blank=True, default="")
+
+    pattern = models.CharField(max_length=200, blank=True, default="")
+    category = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    # INTERNAL ONLY — the prohibited wording itself.
+    matched_text = models.CharField(max_length=200, blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+    discarded_chars = models.PositiveIntegerField(default=0)
+    meta = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Stream guard hit"
+        verbose_name_plural = "Stream guard hits"
+        indexes = [
+            models.Index(fields=["kind", "-created_at"]),
+            models.Index(fields=["category", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"StreamGuardHit({self.kind}, {self.category}:{self.pattern})"

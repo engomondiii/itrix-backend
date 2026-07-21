@@ -56,12 +56,22 @@ def test_idempotent_reapply_is_noop():
 
 
 def test_full_happy_path_to_engaged():
+    """
+    UPDATED FOR v6.0. The v4.0 ladder ended CLIENT -> ENGAGED. v6.0 renames CLIENT to
+    NDA_REVIEW (state 6) and splits ENGAGED into ASSESSMENT / POC / INTEGRATION, so this
+    path now ends at ASSESSMENT (state 7).
+
+    ``ENGAGE`` is retained as a backward-compatible alias for ``FIRST_PAYMENT`` so a
+    caller that has not yet migrated still lands somewhere coherent — that alias is
+    exactly what this test now pins.
+    """
     lead = LeadFactory(journey_state="IN_REVIEW", tier=1)
     mark_diagnosed(lead)
     reveal_client_page(lead)
     advance(lead, JourneyEvent.GATE_INVITE)
     assert lead.journey_state == JourneyState.INVITED
     advance(lead, JourneyEvent.ACCEPT_INVITE)
-    assert lead.journey_state == JourneyState.CLIENT
+    assert lead.journey_state == JourneyState.NDA_REVIEW
     advance(lead, JourneyEvent.ENGAGE)
-    assert lead.journey_state == JourneyState.ENGAGED
+    assert lead.journey_state == JourneyState.ASSESSMENT
+    assert lead.journey_number == 7

@@ -25,12 +25,13 @@ def test_mint_requires_gate():
 
 
 def test_claim_creates_client_and_advances():
+    """UPDATED FOR v6.0: accepting an invite now lands on NDA_REVIEW (was CLIENT)."""
     lead = _invited_lead()
     token = mint_invite(lead)
     client, needs_pw = claim_invite(token, email="x@y.com")
     lead.refresh_from_db()
     assert client.email == "x@y.com"
-    assert lead.journey_state == JourneyState.CLIENT
+    assert lead.journey_state == JourneyState.NDA_REVIEW
     assert needs_pw is True
 
 

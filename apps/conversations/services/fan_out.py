@@ -193,3 +193,83 @@ def govern_and_broadcast(message) -> str:
 
     broadcast_message(message)
     return message.governance_status
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v6.0 events
+# ─────────────────────────────────────────────────────────────────────────────
+def broadcast_shell_update(group_name: str, contract: dict) -> None:
+    """
+    Push ``shell.update`` — the event that REPLACES ``rail.update``.
+
+    Carries the sidebar sections, the conversation header and the composer label so an
+    open conversation re-renders its shell WITHOUT a navigation. ``rail.update`` is
+    removed; a client still listening for it simply never hears one.
+    """
+    if not contract:
+        return
+    _group_send(
+        group_name,
+        {
+            # Channels handler name (dots -> underscores): shell_update
+            "type": "shell.update",
+            "payload": {
+                "journeyState": contract.get("journey_state"),
+                "stateKey": contract.get("state_key"),
+                "sidebarSections": contract.get("sidebar_sections", []),
+                "conversationHeader": _camel_header(contract.get("conversation_header") or {}),
+                "composerLabel": contract.get("composer_label"),
+                "questionLoopOpen": bool(contract.get("question_loop_open")),
+                "attachmentsEnabled": bool(contract.get("attachments_enabled")),
+                "identityState": contract.get("identity_state"),
+                # disclosure_ceiling is safe to send: it tells the client what tier it
+                # may DISPLAY, not what it may fetch. Every fetch is re-authorized
+                # server-side regardless.
+                "disclosureCeiling": contract.get("disclosure_ceiling"),
+            },
+        },
+    )
+
+
+def _camel_header(header: dict) -> dict:
+    return {
+        "title": header.get("title"),
+        "stateLabel": header.get("state_label"),
+        "humanOwner": header.get("human_owner"),
+        "supportSla": header.get("support_sla"),
+        "quickHelp": bool(header.get("quick_help")),
+    }
+
+
+def broadcast_thread_updated(thread) -> None:
+    """Push ``thread.updated`` — title, state or ownership changed."""
+    if thread is None:
+        return
+    _group_send(
+        getattr(thread, "group_name", f"thread.{getattr(thread, 'id', '')}"),
+        {
+            "type": "thread.updated",
+            "payload": {
+                "threadId": str(getattr(thread, "id", "")),
+                "title": getattr(thread, "title", "") or "",
+                "state": getattr(thread, "state_at_creation", "") or "",
+                "claimed": getattr(thread, "claimed_at", None) is not None,
+            },
+        },
+    )
+
+
+def broadcast_halted(group_name: str, payload: dict) -> None:
+    """
+    Push ``message.halted``.
+
+    The payload carries NO partial text — the client DISCARDS what it has rendered. That
+    is the difference between a halt and a correction: a corrected message admits the
+    reader saw the original.
+    """
+    _group_send(group_name, {"type": "message.halted", "payload": payload})
+
+
+def broadcast_question_suggested(group_name: str, payload: dict) -> None:
+    """Push ``question.suggested`` — the primary question plus up to three chips."""
+    _group_send(group_name, {"type": "question.suggested", "payload": payload})

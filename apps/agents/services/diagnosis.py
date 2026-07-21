@@ -65,10 +65,18 @@ class DiagnosisAgent(BaseAgent):
 
     @staticmethod
     def _retrieval_context(ctx: AgentContext) -> str:
-        # The retriever's context arg is the disclosure context label; map planes to it.
-        if ctx.context_label in {"client_page", "portal"} and ctx.nda_signed:
-            return "nda"
-        return "public"
+        """
+        SECURITY INVARIANT 2 — delegate, never derive locally.
+
+        This previously derived the retrieval context from ``context_label``, which is a
+        DISPLAY label rather than an identity plane. An anonymous visitor holding a
+        client_page capability token has ``context_label == "client_page"`` while still
+        being on the PUBLIC plane — so the old rule could hand nda_only chunks to an
+        unidentified visitor.
+
+        ``ctx.retrieval_context`` is derived from the plane and nothing else.
+        """
+        return ctx.retrieval_context
 
     def run_ai(self, ctx: AgentContext, *, top_k: int = 8) -> AgentOutput:
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient

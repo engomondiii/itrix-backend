@@ -225,3 +225,5 @@ itrix-backend-fix.zip
 
 # itriX patch safety backups
 .patch-backup-*/
+.v6-phase1-backup-*/
+itrix-backend-v6-phase1/

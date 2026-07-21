@@ -22,8 +22,13 @@ from apps.core.models import BaseModel
 
 class ConversationContext(models.TextChoices):
     REVIEW = "review", "Review (anonymous)"
+    # v6.0 fifth context (Architecture v2.6 §14.2): an unidentified visitor talking to
+    # the Concierge on the public plane. Public ceiling, HARD-CAPPED; the stream guard
+    # is mandatory; no commitment cards until value has been delivered.
+    ANONYMOUS_REVIEW = "anonymous_review", "Anonymous review (public plane)"
     CLIENT_PAGE = "client_page", "Client page"
     PORTAL = "portal", "Portal (client)"
+    CUSTOMER_SUCCESS = "customer_success", "Customer success"
     CONSOLE = "console", "Team console"
 
 
@@ -90,12 +95,54 @@ class Conversation(BaseModel):
         return f"conv.{self.id}"
 
 
+class StreamingStatus(models.TextChoices):
+    """
+    Where a message sits in the three-part streaming governance model (§19.8).
+
+        pending      queued, nothing streamed yet
+        streaming    tokens are being emitted under the stream guard
+        settled      generation finished and the full Claim-Card pipeline passed
+        halted       the stream guard matched a prohibited pattern and hard-stopped;
+                     the partial text was discarded from the client
+        under_review the settle-time gate rejected it; approved wording replaced it
+    """
+
+    PENDING = "pending", "Pending"
+    STREAMING = "streaming", "Streaming"
+    SETTLED = "settled", "Settled"
+    HALTED = "halted", "Halted"
+    UNDER_REVIEW = "under_review", "Under review"
+
+
 class Message(BaseModel):
     """One turn in a conversation."""
 
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE, related_name="messages"
     )
+    # ── v6.0 conversation spine ──────────────────────────────────────────────
+    thread = models.ForeignKey(
+        "conversations.Thread",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="messages",
+    )
+    # Monotonic per thread. Every message.delta carries this so a client that detects a
+    # gap re-fetches rather than rendering a hole, and a reconnect resumes from the last
+    # acknowledged seq (Architecture v2.6 §14.4).
+    seq = models.PositiveIntegerField(default=0, db_index=True)
+    streaming_status = models.CharField(
+        max_length=16,
+        choices=StreamingStatus.choices,
+        default=StreamingStatus.SETTLED,
+        db_index=True,
+    )
+    # When this message is a rolling summary, the (inclusive) seq range it replaces.
+    summary_of = models.JSONField(null=True, blank=True)
+    # What could NOT be considered for this turn. Never silently dropped: if material
+    # content did not fit the context budget, the turn says so plainly (§12.5).
+    context_note = models.TextField(blank=True, default="")
     sender_kind = models.CharField(max_length=16, choices=SenderKind.choices, db_index=True)
     # Optional concrete sender references (only one is set, by kind).
     sender_client = models.ForeignKey(
@@ -177,3 +224,71 @@ class Participant(BaseModel):
 
     def __str__(self) -> str:
         return f"Participant({self.kind}, conv={self.conversation_id})"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Message length (Backend v6.0 §2.3)
+# ─────────────────────────────────────────────────────────────────────────────
+# There is NO user-facing limit. MAX_MESSAGE_CHARS is a server SAFETY cap that returns
+# 413 with a specific, actionable message. Long threads are handled by the context
+# budget (services/context_assembly.py), never by refusing the visitor's problem.
+
+
+class MessageTooLong(Exception):
+    """Raised when a turn exceeds the server safety cap. Maps to HTTP 413."""
+
+    def __init__(self, length: int, limit: int):
+        self.length = length
+        self.limit = limit
+        super().__init__(
+            f"That message is {length:,} characters, which is longer than we can accept "
+            f"in one turn ({limit:,}). Splitting it into two messages will work, and "
+            f"nothing you have already written is lost."
+        )
+
+
+def max_message_chars() -> int:
+    from django.conf import settings
+
+    return int(getattr(settings, "MAX_MESSAGE_CHARS", 100_000))
+
+
+def validate_message_length(body: str) -> str:
+    """Raise ``MessageTooLong`` above the safety cap; otherwise return the body."""
+    text = body or ""
+    limit = max_message_chars()
+    if len(text) > limit:
+        raise MessageTooLong(len(text), limit)
+    return text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The v6.0 conversation spine
+# ─────────────────────────────────────────────────────────────────────────────
+# Thread / ThreadParticipant live in ``models_thread.py`` for review clarity but MUST be
+# imported here so Django registers them under the ``conversations`` app label.
+from apps.conversations.models_thread import (  # noqa: E402,F401  (re-export)
+    Thread,
+    ThreadContext,
+    ThreadOwnerKind,
+    ThreadParticipant,
+    ThreadTitleSource,
+)
+
+__all__ = [
+    "Conversation",
+    "ConversationContext",
+    "GovernanceStatus",
+    "Message",
+    "Participant",
+    "SenderKind",
+    "StreamingStatus",
+    "Thread",
+    "ThreadContext",
+    "ThreadOwnerKind",
+    "ThreadParticipant",
+    "ThreadTitleSource",
+    "max_message_chars",
+    "MessageTooLong",
+    "validate_message_length",
+]

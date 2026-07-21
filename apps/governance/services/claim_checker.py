@@ -118,3 +118,49 @@ def check(text: str, *, claim_level: int = 1, context: str = "public") -> Govern
         violations=violations,
         reason="Claim level exceeds auto-approve threshold.",
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The shared pattern set (Backend v6.0 §11.1)
+# ─────────────────────────────────────────────────────────────────────────────
+# THE PROHIBITED-PATTERN SET HAS EXACTLY ONE DEFINITION.
+#
+# It is consumed by BOTH ``prohibited_language_checker`` (at settle) and
+# ``governance.services.stream_guard`` (mid-stream), so a pattern cannot be enforced at
+# settle but missed mid-stream. Surface 2 renders this same set in
+# ``governance/streaming`` precisely so a divergence would be VISIBLE.
+#
+# If you add a pattern, add it to ``prohibited_language_checker`` and both paths pick it
+# up. Do not restate patterns in the guard.
+
+
+def shared_pattern_set() -> dict:
+    """
+    The single pattern set, exposed for the stream guard and for cockpit display.
+
+    Returns the raw pattern strings by category. Compilation happens in the guard (once
+    per process); this function is the source of truth for WHAT is enforced, not HOW.
+    """
+    from apps.ai_engine.services import prohibited_language_checker as plc
+
+    return {
+        "hard_block": list(plc.HARD_BLOCK_PATTERNS),
+        "prohibited_claims": list(plc.PROHIBITED_CLAIMS),
+        "canonical_substitutions": [raw for raw, _ in plc.CANONICAL_SUBSTITUTIONS],
+        "risky": list(plc._RISKY_PATTERNS),
+    }
+
+
+def pattern_set_fingerprint() -> str:
+    """
+    A stable fingerprint of the shared set.
+
+    The cockpit displays this alongside the guard's own fingerprint. If they ever differ,
+    the two enforcement paths have drifted apart and the discrepancy is visible rather
+    than silent — which is the entire point of displaying the set.
+    """
+    import hashlib
+    import json
+
+    payload = json.dumps(shared_pattern_set(), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:16]

@@ -1,13 +1,28 @@
 """
 journey.advance — the single entry point for every journey transition.
 
-    advance(lead, event, *, actor=None, meta=None) -> AdvanceResult
+    advance(lead, event, *, actor=None, meta=None, thread=None) -> AdvanceResult
 
 It validates the transition against ``ALLOWED_TRANSITIONS``, writes the new state onto
-the Lead, records an append-only ``JourneyTransition`` (audit + timeline), computes any
-reveal descriptor for the resulting state, and triggers downstream fan-out
-(notifications / SLA tasks) best-effort. Views MUST NOT set ``lead.journey_state``
-directly — they call this.
+the Lead (including its denormalised ``journey_number`` / ``state_key``), records an
+append-only ``JourneyTransition``, computes any reveal, emits ``journey.reveal`` +
+``shell.update``, and triggers downstream fan-out best-effort.
+
+Views MUST NOT set ``lead.journey_state`` directly — they call this. State has EXACTLY
+ONE WRITER (Architecture v2.6 §11.9).
+
+── v6.0: TRANSITIONS ARE DRIVEN BY CONVERSATION EVENTS ──────────────────────
+In v2.5 a transition was triggered by a route arrival. In v2.6 it is triggered by
+something that happened IN THE THREAD:
+
+    first turn posted on an empty thread   -> 1 → 2   (``on_first_turn``)
+    stop rule fires for qualification band -> 2 → 3   (``on_loop_closed``)
+    NDA signed                             -> reveal 4, ceiling raised
+    first payment recorded                 -> reveal 5, overlay activated, 6 → 7
+    contract executed                      -> reveal 6, 9 → 10
+
+A transition NEVER navigates the visitor. It appends to the thread and updates the
+shell contract.
 
 Invalid transitions raise ``InvalidTransition`` rather than silently mutating state, so
 callers can distinguish "already there" (idempotent no-op) from "not allowed".
@@ -23,12 +38,20 @@ from django.utils import timezone
 
 from apps.journey.models import (
     ALLOWED_TRANSITIONS,
+    EVENT_REVEAL,
+    STATE_REVEAL,
     JourneyEvent,
     JourneyState,
     JourneyTransition,
-    STATE_REVEAL,
+    journey_number,
+    normalize_state,
 )
-from apps.journey.services.reveal import reveal_for_state
+from apps.journey.services.reveal import (
+    emit_reveal,
+    emit_shell_update,
+    reveal_for_event,
+    reveal_for_state,
+)
 
 logger = logging.getLogger("itrix")
 
@@ -46,6 +69,7 @@ class AdvanceResult:
     changed: bool
     reveal: dict | None
     transition: JourneyTransition | None
+    journey_number: int | None = None
 
 
 def _resolve_target(from_state: str, event: str) -> str | None:
@@ -53,17 +77,31 @@ def _resolve_target(from_state: str, event: str) -> str | None:
 
 
 @transaction.atomic
-def advance(lead, event: str, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+def advance(
+    lead,
+    event: str,
+    *,
+    actor=None,
+    meta: dict | None = None,
+    thread=None,
+) -> AdvanceResult:
     """Validate + apply one journey transition for ``lead`` driven by ``event``."""
-    meta = meta or {}
-    current = lead.journey_state or JourneyState.ARRIVED
+    meta = dict(meta or {})
+    if thread is not None:
+        meta.setdefault("thread_id", str(getattr(thread, "id", "")))
+
+    # Read the RAW stored value so a deprecated row still resolves its own transitions,
+    # but normalise for everything downstream.
+    raw_current = getattr(lead, "journey_state", None) or JourneyState.ARRIVED.value
+    current = raw_current if raw_current in ALLOWED_TRANSITIONS else normalize_state(raw_current)
     target = _resolve_target(current, event)
 
     if target is None:
         # Idempotent tolerance: if the event's usual target equals the current state,
         # treat it as a satisfied no-op rather than an error (safe for retries).
-        for _from, mapping in ALLOWED_TRANSITIONS.items():
-            if mapping.get(event) == current:
+        normalized_current = normalize_state(current)
+        for mapping in ALLOWED_TRANSITIONS.values():
+            if normalize_state(mapping.get(event) or "") == normalized_current and mapping.get(event):
                 return AdvanceResult(
                     lead=lead,
                     from_state=current,
@@ -72,31 +110,44 @@ def advance(lead, event: str, *, actor=None, meta: dict | None = None) -> Advanc
                     changed=False,
                     reveal=reveal_for_state(lead, current),
                     transition=None,
+                    journey_number=journey_number(current),
                 )
         raise InvalidTransition(
             f"Event {event!r} is not allowed from state {current!r} (lead {lead.id})."
         )
 
-    # Apply the new state.
+    # A self-transition (e.g. NDA_SIGNED inside NDA_REVIEW) is a real, audited event
+    # even though the state value does not move.
+    state_moved = target != current
+
     lead.journey_state = target
+    update_fields = ["journey_state", "updated_at"]
+
+    # Denormalised ladder fields — kept in lockstep so no reader has to recompute them.
+    number = journey_number(target)
+    if hasattr(lead, "journey_number"):
+        lead.journey_number = number
+        update_fields.append("journey_number")
+    if hasattr(lead, "state_key"):
+        lead.state_key = target
+        update_fields.append("state_key")
 
     # Stamp value_delivered_at the first time we reach DIAGNOSED (value has been given).
-    update_fields = ["journey_state", "updated_at"]
-    if target == JourneyState.DIAGNOSED and getattr(lead, "value_delivered_at", None) is None:
+    if target == JourneyState.DIAGNOSED.value and getattr(lead, "value_delivered_at", None) is None:
         lead.value_delivered_at = timezone.now()
         update_fields.append("value_delivered_at")
 
     lead.save(update_fields=update_fields)
 
-    reveal = reveal_for_state(lead, target)
-    # Phase 2: push the reveal over the subject's WS channel (no-op when realtime off).
-    try:
-        from apps.journey.services.reveal import emit_reveal
+    # A reveal may be fired by the RESULTING STATE or by the EVENT itself (reveal 4).
+    reveal = reveal_for_event(lead, event, target) or (
+        reveal_for_state(lead, target) if state_moved else None
+    )
+    reveal_surface = EVENT_REVEAL.get(event) or (STATE_REVEAL.get(target, "") if state_moved else "")
 
-        emit_reveal(lead, reveal)
-    except Exception:  # noqa: BLE001
-        pass
-    reveal_surface = STATE_REVEAL.get(target, "")
+    # Push the reveal AND the shell update so the open transcript reacts live.
+    emit_reveal(lead, reveal)
+    emit_shell_update(lead, thread=thread)
 
     transition = JourneyTransition.objects.create(
         lead=lead,
@@ -108,43 +159,53 @@ def advance(lead, event: str, *, actor=None, meta: dict | None = None) -> Advanc
         meta=meta,
     )
 
-    logger.info("journey.advance lead=%s %s→%s on %s", lead.id, current, target, event)
+    logger.info(
+        "journey.advance lead=%s %s->%s (#%s) on %s",
+        lead.id,
+        current,
+        target,
+        number,
+        event,
+    )
 
-    _fan_out(lead, from_state=current, to_state=target)
+    _fan_out(lead, from_state=current, to_state=target, event=event)
 
     return AdvanceResult(
         lead=lead,
         from_state=current,
         to_state=target,
         event=event,
-        changed=True,
+        changed=state_moved,
         reveal=reveal,
         transition=transition,
+        journey_number=number,
     )
 
 
-def _fan_out(lead, *, from_state: str, to_state: str) -> None:
+def _fan_out(lead, *, from_state: str, to_state: str, event: str = "") -> None:
     """
-    Best-effort downstream fan-out on key states (Backend v4 §Phase 2 wires the real
-    notification/SLA creators). In Phase 1 this is a safe hook that logs and never
-    raises, so the funnel is unaffected whether or not those apps react.
+    Best-effort downstream fan-out on key states. Both hooks are wrapped so a
+    notification hiccup never breaks a transition.
     """
     if to_state not in {
-        JourneyState.DIAGNOSED,
-        JourneyState.INVITED,
-        JourneyState.CLIENT,
-        JourneyState.ENGAGED,
+        JourneyState.DIAGNOSED.value,
+        JourneyState.INVITED.value,
+        JourneyState.NDA_REVIEW.value,
+        JourneyState.ASSESSMENT.value,
+        JourneyState.POC.value,
+        JourneyState.INTEGRATION.value,
+        JourneyState.CUSTOMER_SUCCESS.value,
     }:
         return
 
-    # Phase 2: real fan-out — team notification + (for later states) an SLA follow-up
-    # task. Both are best-effort so a notification hiccup never breaks a transition.
     try:
         from apps.notifications.services.notification_creator import notify_journey_event
 
         notify_journey_event(lead, to_state=to_state)
     except Exception:  # noqa: BLE001
-        logger.exception("journey notification fan-out failed for lead %s", getattr(lead, "id", "?"))
+        logger.exception(
+            "journey notification fan-out failed for lead %s", getattr(lead, "id", "?")
+        )
 
     try:
         from apps.follow_up.services.task_creator import create_journey_task
@@ -157,14 +218,62 @@ def _fan_out(lead, *, from_state: str, to_state: str) -> None:
 # ── Convenience wrappers for the common transitions ──────────────────────────
 def mark_diagnosed(lead, *, meta: dict | None = None) -> AdvanceResult:
     """ARRIVED/IN_REVIEW → DIAGNOSED (value delivered)."""
-    return advance(lead, JourneyEvent.QUALIFY, meta=meta)
+    return advance(lead, JourneyEvent.QUALIFY.value, meta=meta)
 
 
 def reveal_client_page(lead, *, meta: dict | None = None) -> AdvanceResult:
-    """DIAGNOSED → CLIENT_PAGE (reveal ①)."""
-    return advance(lead, JourneyEvent.REVEAL_CLIENT_PAGE, meta=meta)
+    """DIAGNOSED → CLIENT_PAGE (reveal 1)."""
+    return advance(lead, JourneyEvent.REVEAL_CLIENT_PAGE.value, meta=meta)
 
 
 def accept_invite(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
-    """INVITED → CLIENT (reveal ③, client created)."""
-    return advance(lead, JourneyEvent.ACCEPT_INVITE, actor=actor, meta=meta)
+    """INVITED → NDA_REVIEW (reveal 3, client created)."""
+    return advance(lead, JourneyEvent.ACCEPT_INVITE.value, actor=actor, meta=meta)
+
+
+# ── v6.0 conversation-driven entry points ────────────────────────────────────
+def on_first_turn(lead, *, thread=None, meta: dict | None = None) -> AdvanceResult:
+    """
+    A turn was posted on an empty thread: 1 → 2.
+
+    Idempotent — a second turn on an already-IN_REVIEW thread is a satisfied no-op, not
+    an error, because ingest calls this on every turn without tracking whether it is the
+    first.
+    """
+    return advance(lead, JourneyEvent.FIRST_TURN.value, meta=meta, thread=thread)
+
+
+def on_loop_closed(lead, *, thread=None, meta: dict | None = None) -> AdvanceResult:
+    """
+    The deterministic stop rule fired for the qualification band: 2 → 3.
+
+    Phase 2 hangs artifact generation off this transition (``artifacts.generate(thread,
+    "reflection")``); Phase 1 records the state move so the shell contract is already
+    correct when that lands.
+    """
+    return advance(lead, JourneyEvent.LOOP_CLOSED.value, meta=meta, thread=thread)
+
+
+def on_nda_signed(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+    """NDA signed — reveal 4, ceiling raised. The state does not move."""
+    return advance(lead, JourneyEvent.NDA_SIGNED.value, actor=actor, meta=meta)
+
+
+def on_first_payment(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+    """First payment recorded — reveal 5, overlay activated: 6 → 7."""
+    return advance(lead, JourneyEvent.FIRST_PAYMENT.value, actor=actor, meta=meta)
+
+
+def on_poc_start(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+    """PoC started: 7 → 8."""
+    return advance(lead, JourneyEvent.POC_START.value, actor=actor, meta=meta)
+
+
+def on_integration_start(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+    """Integration started: 8 → 9."""
+    return advance(lead, JourneyEvent.INTEGRATION_START.value, actor=actor, meta=meta)
+
+
+def on_contract_executed(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
+    """Contract executed — reveal 6, ceiling → customer_contract: 9 → 10."""
+    return advance(lead, JourneyEvent.CONTRACT_EXECUTED.value, actor=actor, meta=meta)

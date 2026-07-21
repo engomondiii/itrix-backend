@@ -68,7 +68,8 @@ class ConciergeAgent(BaseAgent):
         return _ROUTE_TO_NAMESPACE.get(ctx.product_route, "general")
 
     def _retrieval_context(self, ctx: AgentContext) -> str:
-        return "nda" if (ctx.context_label in {"client_page", "portal"} and ctx.nda_signed) else "public"
+        """SECURITY INVARIANT 2 — the plane sets the ceiling, not the display label."""
+        return ctx.retrieval_context
 
     def _question(self, ctx: AgentContext) -> str:
         return (ctx.extra or {}).get("message", "") or ctx.prompt
@@ -108,9 +109,37 @@ class ConciergeAgent(BaseAgent):
 
     def stream_reply(self, ctx: AgentContext) -> Iterator[str]:
         """
-        Yield the concierge reply as plain-text deltas (real-time). Yields nothing when the
-        AI engine is off/unavailable so the caller can use the deterministic fallback.
+        Yield the concierge reply as plain-text deltas, BOUND TO A PRE-FLIGHT ENVELOPE.
+
+        ── STREAMING GOVERNANCE, PART 1 (Backend v6.0 §6.1) ──────────────────
+        Before a single token is yielded, the turn is bound to a claim ceiling derived
+        from the plane, the state and the retrieved chunks. A turn that would require
+        LEVEL-4 OR LEVEL-5 APPROVAL DOES NOT STREAM AT ALL — this generator yields
+        nothing and the caller sends the approved under-review wording immediately.
+
+        Nothing about a high-risk claim is ever rendered provisionally. A level-5 claim
+        that streams for two seconds and is then retracted has already been read.
+
+        Part 2 (the token-level stream guard) is applied by the CONSUMER as it forwards
+        each token, because only the consumer can actually halt the socket. Part 3
+        (settle) runs on the completed message.
+
+        Yields nothing when the AI engine is off/unavailable either, so the caller can
+        fall back to the deterministic reply.
         """
+        from apps.governance.services import stream_envelope
+
+        envelope = stream_envelope.for_context(
+            ctx, intended_claim_level=self.default_claim_level
+        )
+        if not envelope.may_stream:
+            logger.info(
+                "concierge: envelope refused streaming (%s); caller must send "
+                "the approved under-review wording",
+                envelope.reason,
+            )
+            return
+
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
         from apps.ai_engine.services.system_prompt_builder import build_system_prompt

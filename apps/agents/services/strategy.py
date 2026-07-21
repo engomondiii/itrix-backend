@@ -7,6 +7,11 @@ INTERNAL (team plane) analysis: given a lead's signals, it produces a go-to-mark
 deterministic fallback derives a sound read from tier + route + intent.
 """
 
+# SECURITY INVARIANT 2 (Backend v6.0 §Phase 1): retrieval context is DERIVED from the
+# identity plane via ``ctx.retrieval_context``. This agent previously passed a literal
+# ``context="internal"``, which meant an anonymous visitor could be answered from
+# internal_only chunks. Never pass a literal here.
+
 from __future__ import annotations
 
 import logging
@@ -43,11 +48,11 @@ class StrategyAgent(BaseAgent):
         from apps.ai_engine.services.system_prompt_builder import build_system_prompt
 
         ns = _ROUTE_TO_NAMESPACE.get(ctx.product_route, "general")
-        chunks = KnowledgeRetriever().retrieve(ctx.prompt or "strategy", namespace=ns, top_k=6, context="internal")
+        chunks = KnowledgeRetriever().retrieve(ctx.prompt or "strategy", namespace=ns, top_k=6, context=ctx.retrieval_context)
         try:
             system = build_system_prompt(
                 product_route=ctx.product_route, license_pathway=ctx.license_pathway,
-                tier=ctx.tier, pressures=ctx.pressures, chunks=chunks, context="internal",
+                tier=ctx.tier, pressures=ctx.pressures, chunks=chunks, context=ctx.retrieval_context,
             )
             raw = ClaudeClient().complete(system=system, user=f"Lead context:\n{ctx.prompt}\n\n{_JSON}", max_tokens=800)
         except AIEngineDisabled:

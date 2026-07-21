@@ -64,6 +64,8 @@ def api_index(_request):
                 "portal",
                 "client-page",
                 "conversations",
+                "threads",
+                "personas",
                 "governance",
                 "console",
                 "cockpit",
@@ -89,6 +91,9 @@ urlpatterns = [
     path("client-page/<str:token>/chat/", ResultPageClientChatView.as_view(), name="client-page-chat"),  # PUBLIC token
     path("client-page/<str:token>/", ResultPageClientView.as_view(), name="client-page"),                # PUBLIC token
     path("conversations/", include("apps.conversations.urls")),   # TEAM console reads
+    # ── Phase 1 (v6.0) — the conversation spine ──────────────────────────────
+    path("threads/", include("apps.conversations.urls_thread")),  # PUBLIC session-scoped
+    path("personas/", include("apps.personas.urls")),             # TEAM internal-only
     # ── Phase 3 (v4.0) — Governance, Console & Cockpit ───────────────────────
     path("governance/", include("apps.governance.urls")),        # TEAM claim-cards + audit
     path("console/conversations/", ConsoleConversationListView.as_view(), name="console-conversations"),

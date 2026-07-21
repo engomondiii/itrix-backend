@@ -79,6 +79,64 @@ def select_pitch_type(ctx: AgentContext) -> str:
     return "solution"
 
 
+
+def resolve_persona_room(ctx: AgentContext, *, ceiling: str = "public") -> dict:
+    """
+    Resolve the persona-keyed pitch room for this context.
+
+    Returns the generic room when the personas app is unavailable or nothing matched —
+    never raises, because a missing registry must degrade to the safe generic pitch
+    rather than failing the turn.
+    """
+    try:
+        from apps.personas.services.pitch_room_resolver import GENERIC_ROOM, resolve_for_lead
+        from apps.leads.models import Lead
+
+        if not ctx.lead_id:
+            return {**GENERIC_ROOM, "match_path": "generic", "persona_id": None,
+                    "slides_withheld": 0}
+        lead = Lead.objects.filter(id=ctx.lead_id).first()
+        if lead is None:
+            return {**GENERIC_ROOM, "match_path": "generic", "persona_id": None,
+                    "slides_withheld": 0}
+        example_key = (ctx.extra or {}).get("example_key", "")
+        return resolve_for_lead(lead, ceiling=ceiling, example_key=example_key)
+    except Exception:  # noqa: BLE001 - registry optional; never fail a pitch on it
+        logger.debug("persona room resolution unavailable; using generic template")
+        try:
+            from apps.personas.services.pitch_room_resolver import GENERIC_ROOM
+
+            return {**GENERIC_ROOM, "match_path": "generic", "persona_id": None,
+                    "slides_withheld": 0}
+        except Exception:  # noqa: BLE001
+            return {"pitch_room_id": "PR-GENERIC-01", "title": "", "slides": [],
+                    "match_path": "generic", "persona_id": None, "slides_withheld": 0}
+
+
+
+def _blueprint_hint(persona_room: dict) -> str:
+    """
+    Turn the resolved room into guidance for the model.
+
+    Passes the room's SLIDE STRUCTURE and framing, never the persona label. The model is
+    told how to frame the argument; it is never told who it thinks it is talking to,
+    because a model that knows the inferred identity will eventually say it out loud.
+    """
+    slides = persona_room.get("slides") or []
+    if not slides:
+        return ""
+    lines = [
+        "Use this approved slide structure as the shape of the brief. Adapt the wording "
+        "to the visitor's own problem, keep every claim qualitative, and do NOT mention "
+        "or imply any assumption about the visitor's company, department or role:",
+    ]
+    for slide in slides[:7]:
+        title = (slide or {}).get("title", "")
+        body = (slide or {}).get("body", "")
+        lines.append(f"  - {title}: {body[:220]}")
+    return "\n".join(lines) + "\n\n"
+
+
 class PitchAgent(BaseAgent):
     key = "pitch"
     name = "Pitch agent"
@@ -93,7 +151,19 @@ class PitchAgent(BaseAgent):
         from apps.ai_engine.services.system_prompt_builder import build_system_prompt
 
         pitch_type = select_pitch_type(ctx)
-        retrieval_context = "nda" if (ctx.context_label in {"client_page", "portal"} and ctx.nda_signed) else "public"
+        # SECURITY INVARIANT 2 — derived from the identity plane, never from the
+        # display label. A client_page label on the public plane is still public.
+        retrieval_context = ctx.retrieval_context
+
+        # ── v6.0: persona-aware template resolution ──────────────────────────
+        # exact persona -> functional family -> generic. The chosen path is recorded on
+        # the AgentRun so the cockpit can tell a tailored room from a fallback.
+        #
+        # PERSONALIZATION WITHOUT PROFILING: the resolved room changes the FRAMING and
+        # the EMPHASIS. It never produces a sentence that names the match, the company,
+        # the department or the score. persona_id and pitch_room_id are internal-only
+        # (§10.5) and are stripped before any client-plane payload.
+        persona_room = resolve_persona_room(ctx, ceiling=retrieval_context)
         chunks = KnowledgeRetriever().retrieve(
             ctx.prompt or pitch_type, namespace=self._namespace(ctx), top_k=8, context=retrieval_context
         )
@@ -106,8 +176,10 @@ class PitchAgent(BaseAgent):
                 chunks=chunks,
                 context=retrieval_context,
             )
+            blueprint = _blueprint_hint(persona_room)
             user = (
                 f"Lead problem:\n{ctx.prompt}\n\nLead pitch type to lead with: {pitch_type}\n\n"
+                f"{blueprint}"
                 f"{_PITCH_JSON_INSTRUCTION}"
             )
             raw = ClaudeClient().complete(system=system, user=user, max_tokens=1400)
@@ -117,6 +189,14 @@ class PitchAgent(BaseAgent):
         payload = self._parse(raw, fallback_type=pitch_type)
         if not payload.get("slides"):
             return self.run_fallback(ctx)
+
+        # Record WHICH resolution path produced this room. Internal-only: the cockpit
+        # needs to tell a tailored room from a fallback, and without this they look
+        # identical in the data.
+        payload["_match_path"] = persona_room.get("match_path", "generic")
+        payload["_persona_id"] = persona_room.get("persona_id")
+        payload["_pitch_room_id"] = persona_room.get("pitch_room_id")
+
         return AgentOutput(
             payload=payload,
             chunk_ids=[c.get("chunk_id", "") for c in chunks if c.get("chunk_id")],

@@ -18,12 +18,16 @@ from __future__ import annotations
 
 from django.urls import path
 
+from apps.realtime.consumers.dispatch import ReviewDispatchConsumer
 from apps.realtime.consumers.portal import PortalConsumer
-from apps.realtime.consumers.review import ClientPageConsumer, ReviewConsumer
+from apps.realtime.consumers.review import ClientPageConsumer, ReviewConsumer  # noqa: F401
 from apps.realtime.consumers.team_console import TeamConsoleConsumer
 
 websocket_urlpatterns = [
-    path("ws/review/<str:session>/", ReviewConsumer.as_asgi()),
+    # v6.0: the segment is resolved at connect time — a Thread owned by the calling
+    # session routes to ThreadConsumer, anything else falls through to the shipped
+    # ReviewConsumer. See apps/realtime/consumers/dispatch.py for why.
+    path("ws/review/<str:session>/", ReviewDispatchConsumer.as_asgi()),
     path("ws/client-page/<str:token>/", ClientPageConsumer.as_asgi()),
     path("ws/portal/", PortalConsumer.as_asgi()),
     path("ws/console/", TeamConsoleConsumer.as_asgi()),

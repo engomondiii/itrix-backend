@@ -6,6 +6,11 @@ agenda). Claim level L2. Deterministic fallback assembles a standard discovery-c
 from the lead's route + pressures.
 """
 
+# SECURITY INVARIANT 2 (Backend v6.0 §Phase 1): retrieval context is DERIVED from the
+# identity plane via ``ctx.retrieval_context``. This agent previously passed a literal
+# ``context="internal"``, which meant an anonymous visitor could be answered from
+# internal_only chunks. Never pass a literal here.
+
 from __future__ import annotations
 
 import logging
@@ -35,7 +40,7 @@ class MeetingAgent(BaseAgent):
         try:
             system = build_system_prompt(
                 product_route=ctx.product_route, license_pathway=ctx.license_pathway,
-                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context="internal",
+                tier=ctx.tier, pressures=ctx.pressures, chunks=[], context=ctx.retrieval_context,
             )
             raw = ClaudeClient().complete(system=system, user=f"Prep a discovery meeting kit for:\n{ctx.prompt}\n\n{_JSON}", max_tokens=900)
         except AIEngineDisabled:

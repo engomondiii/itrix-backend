@@ -51,6 +51,9 @@ class InviteClaimView(APIView):
                 full_name=data.get("full_name", ""),
                 organization=data.get("organization", ""),
                 role=data.get("role", ""),
+                # v6.0 §2.2: the visitor's anonymous threads follow them into the
+                # workspace, claimed inside the same transaction as the nonce burn.
+                visitor_session=_visitor_session_from(request),
             )
         except InviteError as exc:
             # 404 to avoid leaking whether a given token ever existed.
@@ -380,3 +383,18 @@ class PortalSettingsView(APIView):
                 setattr(client, field_attr, value)
         client.save(update_fields=["full_name", "organization", "role", "updated_at"])
         return Response(PortalSettingsSerializer(client).data)
+
+
+def _visitor_session_from(request) -> str:
+    """
+    Read the signed visitor-session id from the request.
+
+    Checked in header-then-cookie order so a server-side proxy can forward it explicitly
+    without depending on cookie passthrough. Returns "" when absent — a visitor who
+    never had a session simply has no threads to claim, which is not an error.
+    """
+    header = request.META.get("HTTP_X_ITRIX_SESSION", "") or ""
+    if header.strip():
+        return header.strip()[:64]
+    cookie = request.COOKIES.get("itrix_visitor_session", "") or ""
+    return cookie.strip()[:64]

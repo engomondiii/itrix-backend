@@ -230,3 +230,17 @@ itrix-backend-v6-phase1/
 
 # Visitor attachments — never committed.
 private_blobs/
+
+# ── v6.0 install artefacts (never committed) ─────────────────────────────────
+itrix-backend-v6-phase*/
+itrix-backend-v6-phase*.zip
+.v6-phase*-backup-*/
+.v6-hotfix*-backup-*/
+
+# Visitor attachments
+private_blobs/
+
+# Local env and DB
+.env
+.env.orig
+db.sqlite3

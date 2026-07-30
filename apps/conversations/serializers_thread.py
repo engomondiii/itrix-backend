@@ -212,8 +212,14 @@ def reject_rail_fields(data) -> None:
         return
     present = [field for field in RETIRED_FIELDS if field in data]
     if present:
+        # v7.1 PHASE 3: the replacement named here CHANGED. This message used to point at
+        # `sidebar_sections`, which Phase 3 removed — so the guidance sent to a frontend
+        # author was telling them to migrate onto a field that no longer exists. An error
+        # message is part of the contract, and a stale one costs the support round trip it
+        # was written to avoid.
         raise RailFieldsRetired(
             f"The rails contract was retired in Backend v6.0. "
-            f"Remove {', '.join(present)} and read `sidebar_sections` and "
-            f"`conversation_header` from the shell contract instead."
+            f"Remove {', '.join(present)} and read `conversation_rail_sections`, "
+            f"`content_pane_sections` and `conversation_header` from the shell contract "
+            f"instead. (`sidebar_sections` was the v6.0 alias and was removed in v7.1.)"
         )

@@ -320,6 +320,75 @@ class ThreadShellView(APIView):
         )
         return Response(contract, status=status.HTTP_200_OK)
 
+
+class ThreadPaneView(APIView):
+    """
+    GET threads/{id}/pane/ — the content pane's CONTENTS (v7.1 Phase 2).
+
+    ── WHY THIS IS A SEPARATE ENDPOINT FROM shell/ ─────────────────────────
+    ``shell/`` authorizes the pane's SECTION LIST — which tabs a subject may see. That is
+    enough to stop a visitor at State 2 seeing an ``outcomes`` tab, and it is cheap enough
+    to poll.
+
+    It is NOT enough to stop that visitor reading a State 10 artifact whose id they guessed,
+    because the artifact read is a different request. So the contents are authorized
+    separately, by ``cockpit.services.pane_authorization``, which applies three rules in
+    order of how badly each fails:
+
+        1. GOVERNANCE FIRST — not `approved`, not rendered. Whatever its level, whatever
+           section asked for it. Under review means a human has not finished deciding.
+        2. THE CEILING NEXT — at or below the subject's effective ceiling, which is the
+           more restrictive of the plane's cap and the state's. The plane always wins.
+        3. THE SECTION LAST — the weakest rule, and deliberately last. If the first two
+           hold the content is already safe; this one is presentation.
+
+    Ordering them this way means a bug in the section mapping produces a MISSING artifact
+    rather than a leaked one.
+
+    ── AND IT IS SESSION-SCOPED, LIKE EVERY OTHER thread/ ROUTE ────────────
+    ``get_for_session`` is the same ownership check the transcript uses. A thread id is not
+    a credential: guessing one gets a 404, not a payload.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def get(self, request, thread_id):
+        thread = thread_svc.get_for_session(thread_id, visitor_session_from(request))
+        if thread is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from apps.cockpit.services import pane_authorization
+        from apps.journey.services import shell
+
+        contract = (
+            shell.for_subject(thread.lead, thread=thread)
+            if thread.lead_id
+            else shell.for_anonymous_thread(thread)
+        )
+
+        sections = contract.get("content_pane_sections") or []
+        artifacts = pane_authorization.authorized_artifacts(
+            thread,
+            disclosure_ceiling=contract.get("disclosure_ceiling") or "public",
+            sections=sections,
+        )
+
+        return Response(
+            {
+                "thread_id": str(thread.id),
+                "content_pane_sections": sections,
+                "artifacts": artifacts,
+                # Recomputed from the AUTHORIZED list rather than taken from the shell
+                # contract: if the default pointed at something the three rules above just
+                # removed, honouring it would open the pane onto nothing.
+                "content_pane_default_artifact_id": pane_authorization.default_artifact_id(
+                    artifacts
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Assistant generation on the HTTP path (v6.0 delivery fix)
 # ─────────────────────────────────────────────────────────────────────────────

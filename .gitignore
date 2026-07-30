@@ -249,3 +249,8 @@ db.sqlite3
 itrix-backend-v6-*/
 itrix-backend-v6-*.zip
 .v6-*-backup-*/
+
+# itriX Backend v7.1 Phase 1 installer artefacts
+itrix-backend-v7-phase*/
+itrix-backend-v7-phase*.zip
+.v7-phase*-backup-*/

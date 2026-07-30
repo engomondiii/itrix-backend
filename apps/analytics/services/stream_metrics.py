@@ -113,29 +113,52 @@ def drift_signal(*, window_days: int = 7, baseline_days: int = 28) -> dict:
     }
 
 
-def recent_hits(*, limit: int = 50) -> list[dict]:
+def recent_hits(*, limit: int = 50, may_see_matched_text: bool = False) -> list[dict]:
     """
     Recent halts for the cockpit. TEAM PLANE ONLY.
 
-    Includes ``matchedText`` — the prohibited wording itself. It exists so an operator can
-    see what the model tried to say, and it must never appear anywhere else.
+    ── v7.1 PHASE 1 FIXES A LIVE LEAK ──────────────────────────────────────
+    This function used to include ``matchedText`` UNCONDITIONALLY, and
+    ``analytics/streaming/`` calls it for any authenticated team member. So a VIEWER — the
+    read-only role — was receiving the platform's own prohibited wording in plain text,
+    against the decision of 21 July that limits it to ADMIN and ASSESSMENT.
+
+    It was not visible in the dashboard, because no VIEWER-facing component rendered it.
+    That is exactly why it mattered: the bytes were in the JSON, in the browser cache, and
+    in anything that logged the response. A field that is only hidden by the absence of a
+    component is not access-controlled.
+
+    The parameter DEFAULTS TO FALSE, so any caller that has not been updated fails closed.
+    ``may_see_matched_text`` is passed in by the view after checking the requester's role;
+    this module never reads a request, because a service that could be called without one
+    would have to guess.
+
+    For a caller without permission the key is ABSENT rather than empty — an empty string
+    reads as "nothing was matched", which is false and would make an operator think the
+    halt was spurious.
     """
     from apps.governance.models import StreamGuardHit
 
-    return [
-        {
+    rows: list[dict] = []
+    for hit in StreamGuardHit.objects.order_by("-created_at")[:limit]:
+        row = {
             "id": str(hit.id),
             "kind": hit.kind,
             "category": hit.category,
+            # The pattern IDENTIFIER is safe for every team role: it names which rule fired
+            # without reproducing the wording that fired it.
             "pattern": hit.pattern,
-            "matchedText": hit.matched_text,
             "agentKey": hit.agent_key,
             "plane": hit.plane,
             "threadId": hit.thread_id,
             "at": hit.created_at.isoformat(),
         }
-        for hit in StreamGuardHit.objects.order_by("-created_at")[:limit]
-    ]
+        if may_see_matched_text:
+            row["matchedText"] = hit.matched_text
+            # The label travels WITH the data so a UI cannot render the text without it.
+            row["matchedTextNotice"] = "Never sent to the visitor."
+        rows.append(row)
+    return rows
 
 
 def summary() -> dict:

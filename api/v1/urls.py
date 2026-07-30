@@ -36,7 +36,9 @@ def api_index(_request):
         {
             "service": "itrix-backend",
             "version": "v1",
-            "phase": 3,
+            # v7.1 Phase 1. The number is the BACKEND phase, not the product version.
+            "phase": 4,
+            "backendVersion": "7.1",
             "live_groups": [
                 "auth",
                 "team",
@@ -73,6 +75,8 @@ def api_index(_request):
                 "governance",
                 "console",
                 "cockpit",
+                "cockpit-resources",
+                "legal",
                 "analytics-pitch",
             ],
             "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture", "client-page", "accounts"],
@@ -101,7 +105,16 @@ urlpatterns = [
     # ── Phase 2 (v6.0) — attachments + the State 10 customer-success surface ─
     path("attachments/", include("apps.attachments.urls")),       # PUBLIC session-scoped
     path("portal/success/", include("apps.customer_success.urls")),  # CLIENT plane
-    # ── Phase 3 (v6.0) — cockpit aggregates (TEAM plane only) ────────────────
+    # ── Phase 3 (v7.1) — the legal instruments and the assent record ─────────
+    # `legal/instruments/` is PUBLIC: a visitor must always be able to read what governs
+    # their use. `portal/legal/assent/` is CLIENT plane. Both come from apps.legal.urls,
+    # which keeps them in separate lists so neither can end up behind the other's
+    # permissions by accident.
+    path("", include("apps.legal.urls")),
+    # ── Phase 1 (v7.1) — cockpit ROW-LEVEL resources (TEAM plane only) ───────
+    # The four v6.0 aggregate mounts are gone from here: they live under analytics/,
+    # which is where they already were. See api/v1/cockpit_urls.py for the rule and the
+    # deploy-order note.
     path("cockpit/", include("api.v1.cockpit_urls")),
     # ── Phase 3 (v4.0) — Governance, Console & Cockpit ───────────────────────
     path("governance/", include("apps.governance.urls")),        # TEAM claim-cards + audit

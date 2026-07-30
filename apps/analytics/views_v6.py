@@ -12,6 +12,17 @@ EVERY ONE IS INTERNAL-ONLY. The aggregates here read fields on the §10.5 list �
 ``customer_health``, ``coverage_map``, ``stop_reason``, ``attachment_risk_flags``,
 ``stream_guard_hits``. There is no client-plane mount for any of them and there must
 never be one.
+
+── v7.1 PHASE 1: THESE ARE THE AGGREGATES, AND THEY LIVE ONLY HERE ─────────
+v6.0 also mounted four of them at ``cockpit/``, which made ``cockpit/threads/`` return
+thread METRICS while the dashboard asked it for a thread LIST. Those second mounts are
+gone (see api/v1/cockpit_urls.py); the row-level resources own the ``cockpit/`` names now.
+
+    AGGREGATES under analytics/         distributions, counts, trends   <- this file
+    ROW-LEVEL RESOURCES under cockpit/   individual threads, customers, halts
+
+One further change: ``analytics/streaming/`` now role-filters ``matchedText``. It was
+returning the platform's own prohibited wording to any team member, VIEWER included.
 """
 
 from __future__ import annotations
@@ -88,5 +99,18 @@ class StreamingAnalyticsView(_TeamAnalyticsView):
 
     def get(self, request):
         from apps.analytics.services import stream_metrics
+        from apps.cockpit.permissions import may_see_matched_text
 
-        return Response({**stream_metrics.summary(), "recent": stream_metrics.recent_hits()})
+        # v7.1 Phase 1. `recent_hits` used to return `matchedText` to any team member,
+        # including VIEWER. The role check happens here, and the service defaults to the
+        # restrictive answer so an un-updated caller fails closed.
+        allowed = may_see_matched_text(request.user)
+        return Response(
+            {
+                **stream_metrics.summary(),
+                "recent": stream_metrics.recent_hits(may_see_matched_text=allowed),
+                # Stated in the payload so the dashboard labels the column honestly rather
+                # than inferring from a missing key.
+                "matchedTextVisible": allowed,
+            }
+        )

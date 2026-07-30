@@ -36,13 +36,34 @@ class JourneyTransitionSerializer(serializers.ModelSerializer):
 
 
 class JourneyLeadSerializer(serializers.Serializer):
-    """Team-facing (Surface 2) view of a lead's journey + its transition history."""
+    """
+    Team-facing (Surface 2) view of a lead's journey + its transition history.
+
+    ── v7.1 PHASE 1: THIS PAYLOAD NOW CARRIES ``shell`` ────────────────────
+    THE HIGHEST-PRIORITY CORRECTION IN THIS PHASE, and it is a production crash rather
+    than a missing feature.
+
+    The dashboard's lead-detail page renders a shell-contract panel. It reads
+    ``payload.shell`` and, finding nothing, threw. It does NOT derive the contract
+    locally, and that is deliberate rather than an oversight: the dashboard authenticates
+    on its own team-JWT, so anything it derived would be its own opinion of what a visitor
+    may see rather than the server's. An oversight panel that shows a contract the visitor
+    is not actually on is worse than a panel that shows nothing.
+
+    So the fix belongs here. ``shell`` is the same structure Surface 1 receives, built by
+    the same ``services/shell.py`` — one builder, one answer, whoever is asking.
+
+    It is ``allow_null`` because a Lead with no thread has no shell to describe, and a
+    null is honest where an invented empty contract would not be.
+    """
 
     leadId = serializers.CharField()
     state = serializers.CharField()
     valueDelivered = serializers.BooleanField()
     accountInviteAvailable = serializers.BooleanField()
     transitions = JourneyTransitionSerializer(many=True)
+    # v7.1 Phase 1 — see the note above. Not derived by the client, ever.
+    shell = serializers.DictField(allow_null=True, required=False)
 
 
 class AdvanceRequestSerializer(serializers.Serializer):

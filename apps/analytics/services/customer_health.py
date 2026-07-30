@@ -40,6 +40,20 @@ def board(*, limit: int = 200) -> list[dict]:
 
     Each row carries the REASONS, not just the class. A health class an operator cannot
     explain is a number they will learn to ignore.
+
+    ── v7.1 PHASE 1: THIS FUNCTION IS NOW THE LEGACY SHAPE ─────────────────
+    The ROW-LEVEL read moved to ``apps.cockpit.services.customers.results()``, which
+    applies the 21 July renames: ``organization`` -> ``company`` and ``health`` ->
+    ``healthClass``.
+
+    This function keeps its old keys ON PURPOSE. It is still reached through
+    ``analytics/customers/``, which a deployed chart reads today, and renaming the keys
+    here would break that chart for no gain — the aggregate's audience is a distribution
+    widget, not the board.
+
+    Two shapes for two audiences is normally a smell. It is correct here because the two
+    have different consumers and different lifetimes: this one is frozen, the cockpit one
+    is the shape that will evolve. If you are adding a field, add it there.
     """
     from apps.clients.models import Client
     from apps.customer_success.services.health_calculator import calculate

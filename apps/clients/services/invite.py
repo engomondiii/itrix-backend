@@ -54,6 +54,10 @@ def claim_invite(
     organization: str = "",
     role: str = "",
     visitor_session: str = "",
+    record_assent: bool = True,
+    assent_path: str = "invite_claim",
+    assent_ip: str | None = None,
+    assent_user_agent: str = "",
 ) -> tuple[Client, bool]:
     """
     Consume a capability token → create the Client (reveal ③).
@@ -68,6 +72,19 @@ def claim_invite(
 
     Returns ``(client, requires_password_set)``. Raises ``InviteError`` on an invalid,
     expired, wrong-typed, or already-consumed token, or if the lead may not be invited.
+
+    ── v7.1 PHASE 3: ASSENT IS RECORDED IN THIS TRANSACTION ────────────────
+    "A Client never exists without the assent that created it" (Architecture v2.8 §19.10).
+
+    Not "the view records it just afterwards" — a view that crashed between the two would
+    leave an account whose basis nobody can produce, and that state cannot be repaired later
+    by guessing what the person read. So the record is written HERE, inside the same atomic
+    block as the nonce burn, the thread claim and the Client itself.
+
+    ``record_assent`` defaults to True. A caller that does not want it has to say so, and the
+    only legitimate reason is the RECOVERY path — a refresh or double-submit, where the Client
+    already exists and already has a record. Making the safe behaviour the default means a new
+    caller added later gets the gate without knowing it exists.
     """
     # Accept either token type. Verify signature+expiry once we know which it is.
     payload = None
@@ -146,6 +163,31 @@ def claim_invite(
         organization=organization,
         role=role,
     )
+
+    # ── v7.1 PHASE 3: THE ASSENT RECORD, IN THIS TRANSACTION ────────────────
+    # Immediately after the Client and before anything that could return. If this raises,
+    # the Client does not survive either — which is the whole point (§19.10).
+    #
+    # It is NOT wrapped in a try/except. Everything else in this function that is
+    # best-effort says so; this one is not, because an account without a recorded basis is
+    # precisely the state the rule exists to prevent and a silent failure here would be
+    # indistinguishable from success.
+    if record_assent:
+        from apps.legal.services import assent as assent_svc
+
+        try:
+            assent_svc.record_in_transaction(
+                client=client,
+                email=email or getattr(client, "email", "") or "",
+                path=assent_path,
+                ip_address=assent_ip,
+                user_agent=assent_user_agent,
+            )
+        except assent_svc.AssentRefused as exc:
+            # Surfaced as an InviteError so the caller's existing error handling reports it,
+            # and the transaction unwinds. A workspace that could not record its own basis is
+            # a workspace that must not be created.
+            raise InviteError(f"Could not record legal assent: {exc}") from exc
 
     # Migrate the visitor's anonymous threads INSIDE this transaction, after the burn
     # (Backend v6.0 §2.2). Every turn, artifact and attachment follows them in.

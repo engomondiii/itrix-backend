@@ -214,6 +214,25 @@ class StreamGuardHit(BaseModel):
     # INTERNAL ONLY — the prohibited wording itself.
     matched_text = models.CharField(max_length=200, blank=True, default="")
     position = models.PositiveIntegerField(default=0)
+
+    # v7.1 Phase 2 — WHICH MATCHER PASS CAUGHT IT (Architecture v2.8 §19.9 rule 5).
+    #
+    # The two mean different things, and the difference is what makes this field worth a
+    # column rather than a log line:
+    #
+    #   raw         a model said a prohibited thing plainly.
+    #   normalised  a model said it INSIDE MARKUP — `gua*ran*tee`, `` `$3M` ``,
+    #               `[guarantee](#)`. Either a coincidence of formatting or an evasion,
+    #               and either way the one to investigate first.
+    #
+    # Defaults to "raw" so every row written before this migration reads correctly: they
+    # were all raw, because the second pass did not exist.
+    matcher_pass = models.CharField(
+        max_length=16,
+        choices=[("raw", "Raw buffer"), ("normalised", "Marker-normalised buffer")],
+        default="raw",
+        db_index=True,
+    )
     discarded_chars = models.PositiveIntegerField(default=0)
     meta = models.JSONField(default=dict, blank=True)
 

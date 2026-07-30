@@ -76,7 +76,12 @@ def test_the_thread_shell_has_no_rails():
     shell = ThreadDetailSerializer(thread).data["shell"]
     for field in RAIL_FIELDS:
         assert field not in shell
-    assert "sidebar_sections" in shell
+    # v7.1 PHASE 3: `sidebar_sections` was the v6.0 alias of the rail and is now GONE too.
+    # Both surfaces read the two zone fields, so the alias had no readers left — and keeping
+    # it would only invite a new one.
+    assert "sidebar_sections" not in shell
+    assert "conversation_rail_sections" in shell
+    assert "content_pane_sections" in shell
     assert "conversation_header" in shell
 
 
@@ -105,5 +110,8 @@ def test_the_error_names_the_replacement():
     try:
         reject_rail_fields({"left_rail": []})
     except RailFieldsRetired as exc:
-        assert "sidebar_sections" in str(exc)
+        # The message must name the fields that EXIST NOW. It pointed at `sidebar_sections`
+        # until v7.1 Phase 3 removed that field, which made the guidance itself stale.
+        assert "conversation_rail_sections" in str(exc)
+        assert "content_pane_sections" in str(exc)
         assert "conversation_header" in str(exc)

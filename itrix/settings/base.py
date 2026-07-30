@@ -92,6 +92,18 @@ LOCAL_APPS = [
     "apps.realtime",
     # ── Phase 3 (v4.0) — Governance fabric ──────────────────────────────────
     "apps.governance",
+    # ── Phase 3 (v7.1) — the legal instruments and the assent record ─────────
+    # Its own app because an assent record is EVIDENCE and has to outlive the account: a
+    # dispute about what someone agreed to does not become moot because they closed their
+    # workspace. The FK is SET_NULL for the same reason.
+    "apps.legal",
+    # ── Phase 1 (v7.1) — cockpit ROW-LEVEL resources ─────────────────────────
+    # No models and no migrations, deliberately: a cockpit resource that owned data would
+    # be a second source of truth for something another app already owns. It exists as an
+    # app so the naming rule is structural — aggregates under analytics/, rows under
+    # cockpit/ — and a future developer adding a distribution here has to notice they are
+    # in the wrong place.
+    "apps.cockpit",
     # ── Phase 2 — Intelligence Core ──────────────────────────────────────────
     "apps.knowledge_core",
     "apps.ai_engine",
@@ -400,6 +412,37 @@ ATTACHMENT_EXTRACTION_TIMEOUT_SECONDS = int(env("ATTACHMENT_EXTRACTION_TIMEOUT_S
 ATTACHMENT_EXTRACTION_MEMORY_MB = int(env("ATTACHMENT_EXTRACTION_MEMORY_MB", "512"))
 ATTACHMENT_MAX_EXTRACTED_CHARS = int(env("ATTACHMENT_MAX_EXTRACTED_CHARS", "400000"))
 ATTACHMENT_RETENTION_DAYS = int(env("ATTACHMENT_RETENTION_DAYS", "365"))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Legal instruments (v7.1 Phase 3 — Architecture v2.8 §19.10)
+# ─────────────────────────────────────────────────────────────────────────────
+# ── THE VERSIONS LIVE HERE, NOT IN A MODULE ─────────────────────────────────
+# A version is a DEPLOYMENT FACT: the running build serves a particular text, and the assent
+# record has to name the version that build showed. Hard-coding it in Python means a hotfix
+# to the wording ships without the version moving, and every assent recorded afterwards
+# points at a document nobody read.
+#
+# THESE MUST MATCH itrix-web/src/lib/content/legalCopy.ts. When they do not,
+# `GET legal/instruments/` and the frontend disagree, `useLegalAssent` warns in development,
+# and `audit_assent` reports it — because the mismatch means every assent being recorded is
+# attached to a version the visitor did not read.
+LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", "1.1")
+LEGAL_TERMS_EFFECTIVE = env("LEGAL_TERMS_EFFECTIVE", "")
+LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", "1.1")
+LEGAL_PRIVACY_EFFECTIVE = env("LEGAL_PRIVACY_EFFECTIVE", "")
+LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.1")
+LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "")
+LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.1")
+LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "")
+
+# Whether counsel has signed the instruments off.
+#
+# DEFAULTS FALSE, and the routes still answer with it false — a visitor must always be able to
+# read what governs their use. What changes is that the payload says `published: false`, and
+# itrix-web renders a draft banner and a noindex. An unreviewed Terms of Service presented as
+# authoritative is worse than a delayed one.
+LEGAL_PUBLISHED = env("LEGAL_PUBLISHED", "False").lower() == "true"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # v6.0 Phase 3

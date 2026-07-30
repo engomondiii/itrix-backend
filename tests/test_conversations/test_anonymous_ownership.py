@@ -72,7 +72,10 @@ def test_the_shell_contract_is_returned_with_the_thread():
     client.cookies["itrix_visitor_session"] = "sess-owner"
     shell = client.get(f"/api/v1/threads/{thread.id}/").data["shell"]
     assert shell["journey_state"] == 1
-    assert "sidebar_sections" in shell
+    # v7.1 Phase 3: the v6.0 alias is gone; the two zone fields are what clients read.
+    assert "sidebar_sections" not in shell
+    assert "conversation_rail_sections" in shell
+    assert "content_pane_sections" in shell
     assert "left_rail" not in shell
     assert "right_rail" not in shell
 

@@ -95,7 +95,26 @@ class JourneyByTokenView(APIView):
 
 
 class JourneyLeadView(APIView):
-    """GET journey/leads/{id}/ — TEAM. A lead's journey + transition history."""
+    """
+    GET journey/leads/{id}/ — TEAM. A lead's journey, its transitions, and its shell.
+
+    ── v7.1 PHASE 1: ``shell`` IS NOW RETURNED (production crash fix) ──────
+    The dashboard's lead-detail page renders a shell-contract panel from ``payload.shell``
+    and threw when it was absent. The dashboard deliberately does not derive the contract
+    itself — it authenticates on a team-JWT, so anything it derived would be its own
+    opinion of what a visitor may see rather than the server's, and an oversight panel
+    showing the wrong contract is worse than one showing nothing.
+
+    The contract is built by the SAME ``services/shell.py`` Surface 1 uses. One builder,
+    one answer, whoever is asking — which is the only way the panel can be trusted as
+    oversight.
+
+    ── AND THE PLANE DOES NOT CHANGE BECAUSE A TEAM MEMBER IS LOOKING ──────
+    ``identity_state`` is derived from the SUBJECT, not from the requester. A specialist
+    viewing an anonymous visitor's lead sees the anonymous visitor's shell, suppressed
+    sections and all. This endpoint answers "what is this visitor seeing?", and it would
+    be useless — and misleading in an audit — if it answered "what would I see?"
+    """
 
     permission_classes = [IsDashboardUser]
 
@@ -109,8 +128,42 @@ class JourneyLeadView(APIView):
             "valueDelivered": getattr(lead, "value_delivered_at", None) is not None,
             "accountInviteAvailable": account_invite_allowed(lead),
             "transitions": lead.journey_transitions.all(),
+            "shell": self._shell_for(lead),
         }
         return Response(JourneyLeadSerializer(payload).data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _shell_for(lead):
+        """
+        The subject's shell contract, or None.
+
+        Never raises. A shell that cannot be built must not take down a lead-detail page
+        that also carries the journey and the transitions — the panel degrades to "not
+        available" and the rest of the page still answers. That is the opposite trade from
+        the one that caused this bug, where the missing field took the whole page with it.
+        """
+        from apps.journey.services import shell as shell_svc
+
+        try:
+            thread = None
+            try:
+                from apps.conversations.models import Thread
+
+                # Thread has no ``is_active`` flag and no ``last_message_at`` column: a
+                # deleted conversation is deleted, and the activity column is
+                # ``last_activity_at``.
+                thread = (
+                    Thread.objects.filter(lead_id=lead.id)
+                    .order_by("-last_activity_at", "-created_at")
+                    .first()
+                )
+            except Exception:  # noqa: BLE001 - conversations app optional at import time
+                thread = None
+
+            return shell_svc.for_subject(lead, thread=thread)
+        except Exception:  # noqa: BLE001
+            logger.exception("journey.lead_shell_failed lead=%s", lead.id)
+            return None
 
 
 class JourneyOverviewView(APIView):

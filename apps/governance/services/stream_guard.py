@@ -25,6 +25,34 @@ add it THERE and both paths pick it up.
 Tokens arrive in fragments: "3", "0", "%", " faster" is four tokens and one violation.
 Matching per-token would never see it. The guard therefore accumulates and matches over
 a trailing window, so a pattern split across token boundaries is still caught.
+
+── v7.1 PHASE 2: EVERY BUFFER IS MATCHED TWICE ──────────────────────────────
+Once RAW, once MARKER-NORMALISED (Architecture v2.8 §19.9 rule 5).
+
+A sliding window catches a pattern split across TOKEN boundaries. It does not catch a
+pattern split by MARKUP, and from v6.0 the surface renders Markdown:
+
+    gua*ran*tee     renders as: guarantee
+    `$3M`           renders as: $3M
+    [guarantee](#)  renders as: guarantee
+    | 40 | % |      renders as: 40 %
+
+Each of those is the exact string the guard exists to stop, and each passes a raw-text
+match. The visitor reads the prohibited claim; the guard reports clean.
+
+So the second pass runs over ``marker_normalise.normalise_markers(window)`` whenever
+normalisation changed anything — which is a cheap string comparison, so plain prose pays
+one comparison rather than a second pattern sweep.
+
+THIS PASS IS THE PRECONDITION FOR ``NEXT_PUBLIC_ENABLE_MARKDOWN_TURNS``. Enabling
+Markdown rendering before it is live widens what a prohibited pattern can hide behind,
+and the widening is invisible because the guard keeps reporting clean.
+
+Positions from the normalised pass do not map back to the raw buffer — normalisation is
+not length-preserving. A normalised hit therefore reports the position it can defend
+(the window start) and records WHICH PASS matched, so the cockpit can tell an operator
+whether the model wrote the claim plainly or wrapped it in markup. The second is the more
+worrying signal.
 """
 
 from __future__ import annotations
@@ -42,6 +70,14 @@ logger = logging.getLogger("itrix")
 WINDOW_CHARS = 400
 
 
+# Which matcher pass caught a hit. Recorded because the two mean different things: a RAW
+# hit is a model saying a prohibited thing; a NORMALISED hit is a model saying it inside
+# markup, which is either a coincidence of formatting or an evasion, and either way it is
+# the one worth investigating first.
+PASS_RAW = "raw"
+PASS_NORMALISED = "normalised"
+
+
 @dataclass
 class GuardHit:
     """One prohibited-pattern match, recorded for the cockpit."""
@@ -50,6 +86,8 @@ class GuardHit:
     matched_text: str
     position: int
     category: str = "prohibited"
+    # v7.1 Phase 2. Defaults to "raw" so every existing construction stays correct.
+    matcher_pass: str = PASS_RAW
 
 
 @dataclass
@@ -205,25 +243,51 @@ def inspect(state: GuardState, token: str) -> GuardHit | None:
     window_start = max(0, previous_len - WINDOW_CHARS)
     window = state.accumulated[window_start:]
 
+    # ── PASS 1: RAW ──────────────────────────────────────────────────────────
+    hit = _match_window(window, window_start, PASS_RAW)
+
+    # ── PASS 2: MARKER-NORMALISED (v7.1 Phase 2, §19.9 rule 5) ───────────────
+    # Only when normalisation actually changed something. Plain prose — the
+    # overwhelming majority of tokens — pays one string comparison rather than a second
+    # full pattern sweep.
+    if hit is None:
+        from apps.governance.services.marker_normalise import normalise_markers
+
+        normalised = normalise_markers(window)
+        if normalised != window:
+            # The position is the WINDOW START, not a mapped offset: normalisation is not
+            # length-preserving, so any offset into the normalised text would be a
+            # confident lie about where the claim sits in the real buffer.
+            hit = _match_window(normalised, window_start, PASS_NORMALISED)
+
+    if hit is None:
+        return None
+
+    state.halted = True
+    state.hits.append(hit)
+    state.discarded_chars = len(state.accumulated)
+    logger.warning(
+        "stream_guard HALT pass=%s pattern=%s category=%s matched=%r",
+        hit.matcher_pass,
+        hit.pattern,
+        hit.category,
+        hit.matched_text,
+    )
+    return hit
+
+
+def _match_window(text: str, window_start: int, matcher_pass: str) -> GuardHit | None:
+    """One matcher sweep over ``text``. Returns the first hit, or None."""
     for name, compiled, category in _patterns():
-        match = compiled.search(window)
+        match = compiled.search(text)
         if match:
-            hit = GuardHit(
+            return GuardHit(
                 pattern=name,
                 matched_text=match.group(0)[:120],
-                position=window_start + match.start(),
+                position=window_start + (match.start() if matcher_pass == PASS_RAW else 0),
                 category=category,
+                matcher_pass=matcher_pass,
             )
-            state.halted = True
-            state.hits.append(hit)
-            state.discarded_chars = len(state.accumulated)
-            logger.warning(
-                "stream_guard HALT pattern=%s category=%s matched=%r",
-                name,
-                category,
-                hit.matched_text,
-            )
-            return hit
     return None
 
 
@@ -254,6 +318,7 @@ def scan(text: str) -> list[GuardHit]:
     hits: list[GuardHit] = []
     if not text or not enabled():
         return hits
+
     for name, compiled, category in _patterns():
         for match in compiled.finditer(text):
             hits.append(
@@ -262,8 +327,39 @@ def scan(text: str) -> list[GuardHit]:
                     matched_text=match.group(0)[:120],
                     position=match.start(),
                     category=category,
+                    matcher_pass=PASS_RAW,
                 )
             )
+
+    # v7.1 Phase 2. The settle stage runs BOTH passes too, for the same reason the stream
+    # does: a claim wrapped in markup is still a claim. Settle is where a halt becomes an
+    # `under_review` replacement rather than a discard, so missing it here would let the
+    # claim through on the non-streaming HTTP path — which is the path used whenever the
+    # socket handshake fails.
+    from apps.governance.services.marker_normalise import normalise_markers
+
+    normalised = normalise_markers(text)
+    if normalised != text:
+        seen = {(h.pattern, h.matched_text) for h in hits}
+        for name, compiled, category in _patterns():
+            for match in compiled.finditer(normalised):
+                key = (name, match.group(0)[:120])
+                if key in seen:
+                    # Already reported from the raw pass. Recording it twice would double
+                    # the halt count and make the drift signal in §6.4 read high for a
+                    # reason that has nothing to do with drift.
+                    continue
+                seen.add(key)
+                hits.append(
+                    GuardHit(
+                        pattern=name,
+                        matched_text=match.group(0)[:120],
+                        position=0,
+                        category=category,
+                        matcher_pass=PASS_NORMALISED,
+                    )
+                )
+
     return hits
 
 
@@ -315,6 +411,10 @@ def record_hits(
                 category=hit.category,
                 matched_text=hit.matched_text,
                 position=hit.position,
+                # v7.1 Phase 2. Lets the cockpit tell an operator whether the model wrote
+                # the claim plainly or wrapped it in markup — the second is the more
+                # worrying signal, and without this column the two are indistinguishable.
+                matcher_pass=getattr(hit, "matcher_pass", PASS_RAW),
                 discarded_chars=state.discarded_chars,
             )
     except Exception:  # noqa: BLE001

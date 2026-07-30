@@ -93,14 +93,49 @@ def test_the_drift_report_states_the_interpretation():
     assert "drift, not noise" in stream_metrics.drift_signal()["interpretation"]
 
 
-def test_recent_hits_carry_the_matched_text_for_the_operator():
+def test_recent_hits_carry_the_matched_text_for_a_permitted_operator():
     """
-    ``matchedText`` is the prohibited wording itself. It exists so an operator can see
-    what the model tried to say — and it must never leave the team plane.
+    ``matchedText`` is the prohibited wording itself. It exists so an operator can see what
+    the model tried to say — and it must never leave the team plane.
+
+    ── v7.1 PHASE 1 NARROWED THIS FROM "the team plane" TO "two roles" ──────
+    This test used to call ``recent_hits()`` with no argument and assert the field was
+    present. It was, for everyone — and ``analytics/streaming/`` calls this function for any
+    authenticated team member, so a VIEWER was receiving the platform's own prohibited
+    wording in plain text, against the decision of 21 July that limits it to ADMIN and
+    ASSESSMENT.
+
+    Nothing rendered it, which is precisely why it went unnoticed: the bytes were in the
+    JSON, in the browser cache, and in anything that logged the response. A field hidden
+    only by the absence of a component is not access-controlled.
+
+    So the assertion now names the permission it depends on.
+    """
+    _hit(matched_text="30% faster")
+    recent = stream_metrics.recent_hits(may_see_matched_text=True)
+    assert recent and recent[0]["matchedText"] == "30% faster"
+    # The label travels WITH the data, so a UI cannot render the text without it.
+    assert recent[0]["matchedTextNotice"] == "Never sent to the visitor."
+
+
+def test_recent_hits_default_to_withholding_the_matched_text():
+    """
+    THE DEFAULT IS THE GUARD.
+
+    The leak was a function that included the field unconditionally, so the fix has to be
+    safe for a caller nobody remembered to update. The key is ABSENT rather than empty — an
+    empty string reads as "nothing was matched", which is false and would make an operator
+    think the halt was spurious.
+
+    The pattern IDENTIFIER is still returned to every role: it names which rule fired
+    without reproducing the wording that fired it.
     """
     _hit(matched_text="30% faster")
     recent = stream_metrics.recent_hits()
-    assert recent and recent[0]["matchedText"] == "30% faster"
+    assert recent
+    assert "matchedText" not in recent[0]
+    assert "matchedTextNotice" not in recent[0]
+    assert recent[0]["pattern"] == r"\d+% faster"
 
 
 def test_the_endpoint_is_team_gated():

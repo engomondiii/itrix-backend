@@ -25,6 +25,7 @@ conversation, so the realtime layer must serve UNAUTHENTICATED principals safely
     client -> server   turn.submit    { thread_id, body, attachment_ids[] }
                        turn.cancel    { thread_id, message_id }
                        resume         { last_seq }
+    server -> client   message.stage        { threadId, messageId, stage }
     server -> client   message.delta        { thread_id, message_id, token, seq }
                        message.final        { message_id, body, cited_chunk_ids, governance_status }
                        message.under_review { message_id, replacement_body }
@@ -134,9 +135,24 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
 
     async def _stream_assistant_turn(self, body: str):
         from apps.governance.services import stream_guard
+        from apps.realtime.services import stage_events
 
         thread_id = str(self.thread.id)
         message_id = f"a-{_uuid.uuid4().hex[:12]}"
+
+        # v7.1 PHASE 2 — ``message.stage`` (§14.3).
+        #
+        # Three stages, emitted at REAL pipeline transitions and never on a timer. The
+        # emitter deduplicates and refuses a backward move, so an agent that re-queries
+        # retrieval mid-generation does not make the indicator look like it has lost its
+        # place. If a stage cannot be determined, nothing is sent and the client holds its
+        # current label — which is the documented behaviour, not a degraded one.
+        stages = stage_events.StageEmitter(
+            self.send_json, thread_id=thread_id, message_id=message_id
+        )
+
+        # RETRIEVING: before the context is built, because building it is the retrieval.
+        await stages.emit(stage_events.STAGE_RETRIEVING)
 
         ctx = await database_sync_to_async(_build_agent_context)(self.thread, body)
         guard = stream_guard.new_state()
@@ -148,6 +164,10 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
             from apps.agents.services.concierge import ConciergeAgent
 
             agent = ConciergeAgent()
+
+            # COMPOSING: the generation call is about to be made.
+            await stages.emit(stage_events.STAGE_COMPOSING)
+
             async for token in _aiter(agent.stream_reply, ctx):
                 hit = stream_guard.inspect(guard, token)
                 if hit is not None:
@@ -187,6 +207,11 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
 
         if halted:
             return
+
+        # CHECKING: the settle pipeline is starting. This is the last stage and the one a
+        # visitor is most likely to see, because settle is where the Claim-Card re-run
+        # happens — so it is the stage where saying something true matters most.
+        await stages.emit(stage_events.STAGE_CHECKING)
 
         # 3) SETTLE. The full Claim-Card pipeline runs on the completed message.
         result = await database_sync_to_async(_settle)(
@@ -237,6 +262,26 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
 
     async def message_delta(self, event):
         await self.send_json({"type": "message.delta", "payload": event.get("payload", {})})
+
+    async def message_stage(self, event):
+        """
+        v7.1 Phase 2. A stage announced from OUTSIDE this consumer.
+
+        The streaming path above emits directly, which is cheaper and ordered. This handler
+        exists so a worker or the HTTP turn path can announce a stage to a socket that is
+        already open — without it, a visitor whose generation runs on the HTTP path would
+        see the indicator hold at its first label for the whole turn.
+
+        The stage is validated here as well as at the emitter: a channel-layer message can
+        arrive from any process in the deployment, and an unknown stage would leave the
+        client with a label it has no string for.
+        """
+        from apps.realtime.services import stage_events
+
+        payload = event.get("payload", {}) or {}
+        if not stage_events.is_stage(payload.get("stage")):
+            return
+        await self.send_json({"type": "message.stage", "payload": payload})
 
     async def message_under_review(self, event):
         await self.send_json({"type": "message.under_review", "payload": event.get("payload", {})})

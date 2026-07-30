@@ -36,6 +36,37 @@ def send_email(
     """Build + (optionally) send an email, always returning the EmailLog record."""
     sender = from_email or getattr(settings, "EMAIL_FROM", "") or "team@itrix.example"
 
+    # ── v7.2 — CONFIRMATION GATE, AT THE ONLY CHOKE-POINT (R66 item 1) ──────
+    # No non-transactional email goes to an address that belongs to an unconfirmed
+    # workspace. It is enforced HERE rather than in each builder because this function is
+    # documented as "the single choke-point for outbound email" — and a rule placed anywhere
+    # else is a rule every future builder has to remember.
+    #
+    # It still writes an EmailLog row, marked failed with the reason. A refusal that left no
+    # trace would be indistinguishable from a mail that was never attempted.
+    try:
+        from apps.clients.services.verification import may_send
+
+        allowed, reason = may_send(kind, to_email)
+    except Exception:  # noqa: BLE001 - the gate must never take out the mail path
+        allowed, reason = True, ""
+    if not allowed:
+        logger.info("[email-blocked-unconfirmed] %s -> %s | %s", kind, to_email, subject)
+        return EmailLog.objects.create(
+            kind=kind,
+            to_email=to_email,
+            from_email=sender,
+            subject=subject,
+            body=body,
+            lead=lead,
+            cc=cc or [],
+            attachments=attachments or [],
+            scheduled_at=scheduled_at,
+            status=EmailLog.Status.FAILED,
+            error=reason,
+        )
+
+
     log = EmailLog.objects.create(
         kind=kind,
         to_email=to_email,

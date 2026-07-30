@@ -503,6 +503,46 @@ CAPABILITY_TOKEN_SECRET = env("CAPABILITY_TOKEN_SECRET", SECRET_KEY)
 CLIENT_JWT_SIGNING_KEY = env("CLIENT_JWT_SIGNING_KEY", SECRET_KEY)
 # Single-use account-invite token lifetime (reveal ② → ③).
 ACCOUNT_INVITE_TTL_HOURS = int(env("ACCOUNT_INVITE_TTL_HOURS", "72"))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.2 Phase 4 — open registration, confirmation and credentials
+# ─────────────────────────────────────────────────────────────────────────────
+# ENABLE_OPEN_SIGNUP DEFAULTS TRUE. It is retired as a product gate and kept as a KILL
+# SWITCH (Architecture v2.9 §22.1): an unset variable now has to mean "registration is
+# available", and `env_bool` already supports that by taking the default when unset.
+#
+# RELEASE ORDER IS NOT NEGOTIABLE (§15.9):
+#   1  manage.py audit_client_emails    must come back clean
+#   2  migrate clients                  adds the uniqueness constraint
+#   3  ENABLE_OPEN_SIGNUP=True          only now
+# Shipping this on before the constraint means accepting registrations into a schema that
+# cannot keep its one-address-one-account promise.
+ENABLE_OPEN_SIGNUP = env_bool("ENABLE_OPEN_SIGNUP", True)
+ENABLE_PASSWORD_RESET = env_bool("ENABLE_PASSWORD_RESET", True)
+
+# Confirmation gates three things and only three: any non-transactional email, putting an
+# NDA in place, and being named on a commercial document (R66). It does NOT gate signing in,
+# posting a turn, or receiving an answer. Off exists for a deployment with no working mail,
+# not as a product option.
+REQUIRE_EMAIL_VERIFICATION = env_bool("REQUIRE_EMAIL_VERIFICATION", True)
+VERIFICATION_TOKEN_TTL_HOURS = int(env("VERIFICATION_TOKEN_TTL_HOURS", "48"))
+RESET_TOKEN_TTL_MINUTES = int(env("RESET_TOKEN_TTL_MINUTES", "60"))
+
+# ONE number, and this is the one that binds. Terms §3A, Security §3A and
+# Surface 1 v8.0 §16.7 all state it too; if they ever differ, this is the truth
+# (Legal Instruments v1.2 §A.3).
+PASSWORD_MIN_LENGTH = int(env("PASSWORD_MIN_LENGTH", "12"))
+
+# Server-side, per address and per IP, surfacing as a stated wait rather than a silent
+# failure. AUTH_RATE_LIMIT_ENABLED exists so `tests/conftest.py` can switch it off with the
+# DRF defaults; production keeps it on.
+AUTH_RATE_LIMIT_ENABLED = env_bool("AUTH_RATE_LIMIT_ENABLED", True)
+AUTH_RATE_LIMIT_PER_IP = env("AUTH_RATE_LIMIT_PER_IP", "20/hour")
+AUTH_RATE_LIMIT_PER_ADDRESS = env("AUTH_RATE_LIMIT_PER_ADDRESS", "5/hour")
+
+# An account opened and then never used at all — no conversation, no confirmed address, no
+# sign-in — is purged after this window (Privacy v1.2 §8). One number, two places.
+ABANDONED_ACCOUNT_DAYS = int(env("ABANDONED_ACCOUNT_DAYS", "180"))
 # Agent output at/below this claim level auto-delivers; above it queues for human
 # approval (Backend v4 §5.2 governance).
 AGENT_AUTO_APPROVE_MAX_LEVEL = int(env("AGENT_AUTO_APPROVE_MAX_LEVEL", "2"))

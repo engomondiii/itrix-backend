@@ -78,8 +78,32 @@ def commitment_allowed(lead, ask: str) -> bool:
     if getattr(lead, "value_delivered_at", None) is None:
         return False  # value MUST precede the ask
     if ask == "account_creation":
+        # ── R67: NOBODY IS ASKED TO CREATE WHAT THEY HAVE (v7.2 §15.6) ──────
+        # A person who registered on arrival, conversed, and reached State 5 must not be
+        # served a card offering the workspace they are already sitting inside. That is not
+        # cosmetic: it is the platform announcing it does not know who it is talking to, on
+        # the screen where it has just claimed to have read them closely.
+        #
+        # Suppressed HERE, at the gate every other commitment ask runs through, rather than
+        # by a surface declining to render — a frontend that remembers is a frontend that
+        # can forget.
+        if _has_client(lead):
+            return False
         return account_invite_allowed(lead)
     return True
+
+
+def _has_client(lead) -> bool:
+    """Whether this subject already holds an account. Fail-open on any lookup problem."""
+    try:
+        from apps.clients.models import Client
+
+        return Client.objects.filter(lead=lead).exists()
+    except Exception:  # noqa: BLE001
+        # An unavailable clients app must not silently start offering workspaces again; but
+        # it must not crash the gate either. False here means "we could not tell", and the
+        # invite gate below still applies.
+        return False
 
 
 def success_overlay_allowed(lead) -> bool:

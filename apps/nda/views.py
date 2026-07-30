@@ -105,6 +105,23 @@ class NDAViewSet(
             return Response(
                 {"detail": "A signer email is required to send the NDA"}, status=400
             )
+
+        # ── v7.2 — CONFIRMATION GATE (Architecture v2.9 R66 item 2) ─────────
+        # An NDA is not put in front of a workspace whose email address has never been
+        # confirmed. Terms §3A and Security §3A both publish that commitment, and a promise
+        # nobody enforces is marketing.
+        #
+        # It FAILS OPEN when the lead has no account at all: a team-created NDA for a lead
+        # with no workspace is a normal operational case and has nothing to verify. It fails
+        # closed only for a real account with an unconfirmed address, and only while
+        # REQUIRE_EMAIL_VERIFICATION is on.
+        #
+        # 409, with a reason and an instruction. Not 403: this is a state that can be
+        # resolved in a minute by resending a link, and an operator needs to be told which
+        # minute's work will fix it.
+        allowed, reason = _confirmation_allows_nda(nda)
+        if not allowed:
+            return Response({"detail": reason}, status=409)
         nda.signer_email = signer_email
         signer_name = data.get("signerName")
         if signer_name is not None:
@@ -148,3 +165,21 @@ class NDAViewSet(
         nda.status = NDAStatus.EXPIRED
         nda.save(update_fields=["status", "updated_at"])
         return Response(NDARecordSerializer(nda).data)
+
+
+def _confirmation_allows_nda(nda) -> tuple[bool, str]:
+    """
+    Whether this NDA may be sent, given the account's confirmation state.
+
+    Fail-open on any lookup problem. A verification check that took out the NDA queue would
+    be a worse outcome than an NDA reaching an unconfirmed address, and the gate is a second
+    lock on a door the disclosure ceiling already holds shut.
+    """
+    try:
+        from apps.clients.models import Client
+        from apps.clients.services.verification import nda_allowed
+
+        client = Client.objects.filter(lead_id=getattr(nda, "lead_id", None)).first()
+        return nda_allowed(client)
+    except Exception:  # noqa: BLE001
+        return True, ""

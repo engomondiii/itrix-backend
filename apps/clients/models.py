@@ -19,8 +19,28 @@ from __future__ import annotations
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 
 from apps.core.models import BaseModel
+
+
+class AccountOrigin(models.TextChoices):
+    """
+    How this ACCOUNT was opened (v7.2, Architecture v2.9 §15.7).
+
+    Two provenance fields rather than one: `Lead.lead_source` says how the SUBJECT entered
+    the system, this says how the ACCOUNT was opened. A self-serve account that later
+    receives a proper invitation for a second engagement keeps `self_serve`, and that is
+    correct — the account was not earned, and the record should not be rewritten to say it
+    was.
+
+    INTERNAL-ONLY. It is a fact about how we acquired somebody, which puts it on the §10.5
+    list beside persona, tier and score.
+    """
+
+    INVITED = "invited", "Invited"
+    SELF_SERVE = "self_serve", "Self-serve registration"
 
 
 class Client(BaseModel):
@@ -44,6 +64,22 @@ class Client(BaseModel):
 
     is_active = models.BooleanField(default=True)
     last_login_at = models.DateTimeField(null=True, blank=True)
+
+    # ── v7.2: open registration, confirmation, and session invalidation ──────
+    account_origin = models.CharField(
+        max_length=16,
+        choices=AccountOrigin.choices,
+        default=AccountOrigin.INVITED,
+        db_index=True,
+    )
+    # NULL means the address has not been confirmed. Confirmation gates three things and
+    # only three: any non-transactional email, putting an NDA in place, and being named on
+    # a commercial document (Architecture v2.9 R66). It does NOT gate signing in, posting a
+    # turn, or receiving an answer.
+    email_verified_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Stamped on every password change. A client-JWT minted BEFORE this moment is refused,
+    # which is how a stateless token gets invalidated (services/session_invalidation.py).
+    password_changed_at = models.DateTimeField(null=True, blank=True)
 
     # ── v6.0 Phase 2: the customer lifecycle ─────────────────────────────────
     # A Client becomes a CUSTOMER when a contract is executed. The distinction matters
@@ -76,6 +112,26 @@ class Client(BaseModel):
         indexes = [
             models.Index(fields=["email"]),
             models.Index(fields=["is_active"]),
+        ]
+        constraints = [
+            # ── ONE ADDRESS, ONE ACCOUNT (v7.2 §15.9, R63) ──────────────────
+            # Enforced in the DATABASE rather than checked in a view, because
+            # `authenticate_client()` resolves a login with
+            # `filter(email__iexact=...).first()`. Two rows sharing an address made which
+            # one you signed into arbitrary; with the constraint there is only ever one row
+            # to pick, and that `.first()` becomes deterministic.
+            #
+            # Lower(): the lookup is case-insensitive, and a constraint that disagreed with
+            # the lookup would not be a constraint.
+            # is_active: closing an account must not permanently burn an address.
+            # non-empty: the column permits '' (no blank=True is a FORM rule, not a database
+            #            one) and several legacy rows may hold it, so a plain unique index
+            #            would refuse the second one.
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=Q(is_active=True) & ~Q(email=""),
+                name="uniq_active_client_email_ci",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -136,3 +192,9 @@ class ClientCredential(BaseModel):
 
 # Import the single-use invite ledger so it is registered with this app's models.
 from apps.clients.models_consumed import ConsumedInvite  # noqa: E402,F401
+
+# v7.2 — the two single-use credential tokens. Imported here for the same reason: a model in
+# a module nobody imports is a model Django never registers, and the migration that creates
+# its table would then never be generated.
+from apps.clients.models_reset import PasswordResetToken  # noqa: E402,F401
+from apps.clients.models_verification import EmailVerificationToken  # noqa: E402,F401

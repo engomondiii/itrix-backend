@@ -66,10 +66,12 @@ class Command(BaseCommand):
         self._policy_snapshot()
         threads = self._threads(dry, verify)
         attachments = self._attachments(dry, verify)
+        tokens = self._credential_tokens(dry)
+        accounts = self._abandoned_accounts(dry, verify)
         self._assent_note()
 
         self.stdout.write("")
-        total = threads + attachments
+        total = threads + attachments + tokens + accounts
         if dry:
             self.stdout.write(
                 self.style.WARNING(f"  {total} subject(s) are past their retention window.")
@@ -94,6 +96,10 @@ class Command(BaseCommand):
             "ANON_THREAD_RETENTION_DAYS",
             "PRE_NDA_ATTACHMENT_RETENTION_DAYS",
             "ATTACHMENT_RETENTION_DAYS",
+            # v7.2 — both quoted in Privacy §8. One number, two places.
+            "ABANDONED_ACCOUNT_DAYS",
+            "RESET_TOKEN_TTL_MINUTES",
+            "VERIFICATION_TOKEN_TTL_HOURS",
         ):
             self.stdout.write(f"    {name} = {getattr(settings, name, '(unset)')}")
         self.stdout.write("")
@@ -199,3 +205,94 @@ class Command(BaseCommand):
             "    Evidence of what a customer agreed to has to outlive the account "
             "(Architecture v2.8 §19.10)."
         )
+
+    def _credential_tokens(self, dry: bool) -> int:
+        """
+        Purge reset and confirmation tokens that can no longer authorise anything.
+
+        Consumed, superseded or expired. A row that cannot authorise anything is a row worth
+        deleting, and these rows are hashes of bearer credentials — keeping them costs
+        nothing and buys nothing.
+
+        Not counted as a "subject" in the retention sense: nobody's work is being deleted.
+        They are reported separately so the sweep's subject count stays meaningful.
+        """
+        from django.utils import timezone
+
+        from apps.clients.models_reset import PasswordResetToken
+        from apps.clients.models_verification import EmailVerificationToken
+
+        now = timezone.now()
+        total = 0
+        for model, label in ((PasswordResetToken, "reset"), (EmailVerificationToken, "confirmation")):
+            dead = model.objects.filter(consumed_at__isnull=False) | model.objects.filter(
+                invalidated_at__isnull=False
+            ) | model.objects.filter(expires_at__lt=now)
+            count = dead.distinct().count()
+            total += count
+            self.stdout.write(f"  {label} tokens no longer usable: {count}")
+            if count and not dry:
+                dead.distinct().delete()
+        self.stdout.write("")
+        return total
+
+    def _abandoned_accounts(self, dry: bool, verify: bool) -> int:
+        """
+        Purge accounts that were opened and then never used at all.
+
+        No conversation, no confirmed address, no sign-in, older than ABANDONED_ACCOUNT_DAYS.
+        Open registration makes this population real: before it, every account arrived
+        attached to a conversation.
+
+        ── THE THREE CONDITIONS ARE AND-ED, DELIBERATELY ───────────────────
+        Any one of them alone would delete a real customer. Somebody who signed in but never
+        confirmed is a customer. Somebody who conversed but never signed in again is a
+        customer. Only the account with NONE of the three has never been used at all.
+
+        ── AND THE ASSENT RECORD SURVIVES ──────────────────────────────────
+        `AssentRecord.client` is SET_NULL and the address is denormalised on the record, so
+        deleting the Client leaves the evidence intact. `_assent_note()` says so; this says it
+        too, because this is the sweep most likely to make somebody wonder.
+        """
+        from django.conf import settings
+        from django.utils import timezone
+
+        from apps.clients.models import AccountOrigin, Client
+
+        days = int(getattr(settings, "ABANDONED_ACCOUNT_DAYS", 180))
+        cutoff = timezone.now() - timezone.timedelta(days=days)
+
+        candidates = (
+            Client.objects.filter(
+                account_origin=AccountOrigin.SELF_SERVE,
+                email_verified_at__isnull=True,
+                last_login_at__isnull=True,
+                created_at__lt=cutoff,
+            )
+            .exclude(threads__isnull=False)
+            .distinct()
+        )
+        count = candidates.count()
+        self.stdout.write(f"  abandoned self-serve accounts (>{days}d, never used): {count}")
+        if not count:
+            self.stdout.write("")
+            return 0
+
+        ids = list(candidates.values_list("id", flat=True))
+        if dry:
+            for cid in ids[:20]:
+                self.stdout.write(f"    - {cid}")
+            self.stdout.write("")
+            return count
+
+        candidates.delete()
+        if verify:
+            remaining = Client.objects.filter(id__in=ids).count()
+            if remaining:
+                self.stdout.write(
+                    self.style.ERROR(f"  VERIFY FAILED: {remaining} account(s) still present.")
+                )
+            else:
+                self.stdout.write(self.style.SUCCESS("  verified: all purged accounts are gone."))
+        self.stdout.write("")
+        return count

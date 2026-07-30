@@ -23,6 +23,13 @@ def _disable_throttling(settings):
         "DEFAULT_THROTTLE_CLASSES": [],
         "DEFAULT_THROTTLE_RATES": {},
     }
+    # v7.2 — the authentication views declare `throttle_classes` EXPLICITLY, so wiping the
+    # DRF defaults above does not reach them. Without this line a test that posts to
+    # sign-in or register twice would trip a real rate limit and fail for a reason that has
+    # nothing to do with what it was testing.
+    #
+    # `test_auth_rate_limit.py` turns it back on to prove the control works.
+    settings.AUTH_RATE_LIMIT_ENABLED = False
 
 
 @pytest.fixture

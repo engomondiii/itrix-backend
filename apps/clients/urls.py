@@ -14,6 +14,15 @@ from __future__ import annotations
 
 from django.urls import path
 
+from apps.clients.views_auth import (
+    ClientPasswordChangeView,
+    InviteLookupView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RegisterView,
+    VerifyEmailConfirmView,
+    VerifyEmailResendView,
+)
 from apps.clients.views import (
     PortalNextBestActionView,
     ClientLoginView,
@@ -34,6 +43,19 @@ from apps.clients.views import (
 app_name = "clients"
 
 urlpatterns = [
+    # ── v7.2 Phase 4 — the authentication surface (PUBLIC) ───────────────────
+    # Mounted under `auth/` to match the proxies `itrix-web` Phase 4 already calls. The
+    # shipped `client/auth/*` names below are NOT renamed: a rename would break a deployed
+    # surface to satisfy a document (Backend v7.2 §14).
+    path("auth/register/", RegisterView.as_view(), name="auth-register"),
+    path("auth/password-reset/request/", PasswordResetRequestView.as_view(), name="auth-reset-request"),
+    path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="auth-reset-confirm"),
+    path("auth/invite/lookup/", InviteLookupView.as_view(), name="auth-invite-lookup"),
+    path("auth/verify-email/confirm/", VerifyEmailConfirmView.as_view(), name="auth-verify-confirm"),
+    path("auth/verify-email/resend/", VerifyEmailResendView.as_view(), name="auth-verify-resend"),
+    # CLIENT plane — the authenticated change. Distinct from `client/auth/password/set/`,
+    # which redeems a single-use first-time token.
+    path("client/auth/password/", ClientPasswordChangeView.as_view(), name="client-password-change"),
     # Invite claim (PUBLIC — the token is the credential)
     path("accounts/invite/<str:token>/claim/", InviteClaimView.as_view(), name="invite-claim"),
     # Client auth (client-JWT plane)

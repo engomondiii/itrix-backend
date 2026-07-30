@@ -30,6 +30,61 @@ class InviteError(Exception):
     """Raised when an invite cannot be minted or claimed."""
 
 
+def lookup_invite(code: str) -> tuple[bool, str]:
+    """
+    Is this code usable, and if so where should the visitor be sent (§15.4)?
+
+    ── IT DOES NOT CONSUME ANYTHING ────────────────────────────────────────
+    A lookup that burned the nonce would mean checking a code destroyed it. So this verifies
+    the signature and expiry, checks the consumed ledger, and re-checks the journey gate —
+    and leaves the token exactly as it found it. The burn happens at claim time, before
+    anything can return a subject.
+
+    ── AND IT RETURNS TWO THINGS, BECAUSE EVERYTHING IT RETURNS IS A ───────
+    ── DISCLOSURE TO AN UNAUTHENTICATED PARTY ─────────────────────────────
+    No Lead, no organisation, no persona, no journey state, no email, and no hint of WHICH of
+    the three failure causes applied. Unknown, consumed and expired are one answer: an
+    operator can tell them apart in the dashboard, and the public endpoint cannot.
+    """
+    token = (code or "").strip()
+    if not token:
+        return False, ""
+
+    payload = None
+    for expected in (ct.TOKEN_ACCOUNT_INVITE, ct.TOKEN_CLIENT_PAGE):
+        try:
+            payload = ct.verify(token, expected_typ=expected)
+            break
+        except ct.CapabilityTokenError:
+            continue
+    if payload is None:
+        return False, ""
+
+    from apps.leads.models import Lead
+
+    lead = Lead.objects.filter(id=payload.sub).first()
+    if lead is None:
+        return False, ""
+
+    # Already claimed? The Client exists, so the code has done its work. Reported as
+    # unusable rather than as "you already have an account" — that second answer is a fact
+    # about the account.
+    if Client.objects.filter(lead=lead).exists():
+        return False, ""
+
+    if payload.single_use and payload.typ == ct.TOKEN_ACCOUNT_INVITE:
+        from apps.clients.models_consumed import ConsumedInvite
+
+        if ConsumedInvite.objects.filter(nonce=payload.nonce).exists():
+            return False, ""
+
+    if not account_invite_allowed(lead):
+        return False, ""
+
+    base = (getattr(settings, "FRONTEND_WEB_URL", "") or "").rstrip("/")
+    return True, f"{base}/c/{token}/create-account" if base else f"/c/{token}/create-account"
+
+
 def mint_invite(lead) -> str:
     """Mint a single-use account_invite token for a gate-passing lead."""
     if not account_invite_allowed(lead):
@@ -56,6 +111,7 @@ def claim_invite(
     visitor_session: str = "",
     record_assent: bool = True,
     assent_path: str = "invite_claim",
+    assent_versions=None,
     assent_ip: str | None = None,
     assent_user_agent: str = "",
 ) -> tuple[Client, bool]:
@@ -176,6 +232,11 @@ def claim_invite(
         from apps.legal.services import assent as assent_svc
 
         try:
+            # v7.2 — `assent_versions` is what the SURFACE rendered. The server stores its
+            # OWN versions and uses these only for a mismatch check: a difference means the
+            # visitor read something other than what binds them, which is worth a loud log
+            # rather than a silent acceptance.
+            _warn_on_version_mismatch(assent_versions)
             assent_svc.record_in_transaction(
                 client=client,
                 email=email or getattr(client, "email", "") or "",
@@ -251,3 +312,35 @@ def _claim_session_threads(lead, client, visitor_session: str) -> None:
         claim_threads(visitor_session=visitor_session, client=client, lead=lead)
     except Exception:  # noqa: BLE001 - never fail a workspace creation on thread claim
         logger.exception("thread claim failed for client %s", getattr(client, "id", "?"))
+
+
+def _warn_on_version_mismatch(claimed) -> None:
+    """
+    Log loudly when the surface rendered different instrument versions than we serve.
+
+    Never adapts and never refuses: reconciling the two is a human decision, and refusing
+    would turn a documentation drift into an outage on the account-creation path. But a
+    silent mismatch means every assent recorded here is attached to a version the visitor
+    did not read, so it must not pass quietly.
+    """
+    if not claimed:
+        return
+    try:
+        from apps.legal.services import instruments as instruments_svc
+
+        for entry in claimed:
+            slug = (entry or {}).get("slug") if isinstance(entry, dict) else getattr(entry, "slug", None)
+            version = (entry or {}).get("version") if isinstance(entry, dict) else getattr(entry, "version", None)
+            if not slug or not version:
+                continue
+            ours = instruments_svc.version_of(slug)
+            if ours and ours != version:
+                logger.warning(
+                    "legal.assent_version_mismatch slug=%s surface=%s server=%s "
+                    "(the visitor read a different version than the one being recorded)",
+                    slug,
+                    version,
+                    ours,
+                )
+    except Exception:  # noqa: BLE001 - a mismatch CHECK must never break a claim
+        logger.debug("assent version mismatch check skipped")

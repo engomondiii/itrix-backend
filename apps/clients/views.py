@@ -54,6 +54,10 @@ class InviteClaimView(APIView):
                 # v6.0 §2.2: the visitor's anonymous threads follow them into the
                 # workspace, claimed inside the same transaction as the nonce burn.
                 visitor_session=_visitor_session_from(request),
+                # v7.2 — checked against the versions this deployment serves. A mismatch is
+                # logged loudly: it means the visitor read something other than what binds
+                # them (R62).
+                assent_versions=data.get("assent") or [],
             )
         except InviteError as exc:
             # 404 to avoid leaking whether a given token ever existed.

@@ -22,6 +22,14 @@ class EmailLog(BaseModel):
         VISITOR = "visitor", "Visitor (generic)"
         CLIENT_PAGE_REVEAL = "client_page_reveal", "Client page reveal"
         ACCOUNT_INVITE = "account_invite", "Account invite"
+        # ── v7.2 — the three TRANSACTIONAL kinds ─────────────────────────────
+        # These are the only kinds that may reach an UNCONFIRMED address, because confirming
+        # it is what they are for (verification.TRANSACTIONAL_EMAIL_KINDS, R66). The values
+        # are kept short deliberately: `kind` is max_length=20, and "signup_address_in_use"
+        # would not fit.
+        PASSWORD_RESET = "password_reset", "Password reset"
+        EMAIL_VERIFICATION = "email_verification", "Email verification"
+        ADDRESS_IN_USE = "address_in_use", "Address already in use"
 
     class Status(models.TextChoices):
         STUBBED = "stubbed", "Stubbed (delivery disabled)"

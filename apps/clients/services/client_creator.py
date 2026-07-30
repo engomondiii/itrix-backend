@@ -33,12 +33,28 @@ def create_client_for_lead(
     organization: str = "",
     role: str = "",
     password: str | None = None,
+    advance_journey: bool = True,
 ) -> tuple[Client, bool]:
     """
     Create (or fetch) the Client for ``lead``. Returns ``(client, created)``.
 
     Advances the journey INVITED → CLIENT via ``journey.advance`` on first creation
     (best-effort — a failed advance never orphans the client).
+
+    ── ``advance_journey`` (v7.2, R61) ──────────────────────────────────────
+    DEFAULTS TRUE, so the invite path is unchanged and a future caller who forgets the
+    parameter gets the old behaviour rather than a silently stateless account.
+
+    Open registration passes FALSE. ``ACCEPT_INVITE`` is legal only from ``INVITED`` in
+    ``ALLOWED_TRANSITIONS``, so calling it for a self-serve Lead at ``ARRIVED`` would log a
+    failed advance on every signup — and if that table were ever loosened, would put a
+    silent account at State 6 with an ``nda_only`` state ceiling. A registered subject moves
+    for exactly one reason: somebody says something.
+
+    THIS IS THE ONLY FUNCTION THAT CREATES A ``Client``. Registration orchestrates around it
+    and passes one flag; a second creator would be a second place for the credential
+    invariants and the portal bootstrap to drift, and the drift would be invisible until a
+    customer could not log in (§11.7).
     """
     existing = Client.objects.filter(lead=lead).first()
     if existing:
@@ -74,12 +90,13 @@ def create_client_for_lead(
 
     # The 1:1 link is the Client.lead FK itself (reverse accessor: lead.client_account).
     # No extra stamping needed. Advance the journey INVITED → CLIENT (reveal ③).
-    try:
-        from apps.journey.services.advance import accept_invite
+    if advance_journey:
+        try:
+            from apps.journey.services.advance import accept_invite
 
-        accept_invite(lead, meta={"client_id": str(client.id)})
-    except Exception:  # noqa: BLE001 - journey advance is best-effort here
-        logger.exception("journey advance to CLIENT failed for lead %s", lead.id)
+            accept_invite(lead, meta={"client_id": str(client.id)})
+        except Exception:  # noqa: BLE001 - journey advance is best-effort here
+            logger.exception("journey advance to CLIENT failed for lead %s", lead.id)
 
     # Phase 2: bootstrap the portal context — create the client's primary portal
     # conversation + participant so the portal has a thread the moment they log in.

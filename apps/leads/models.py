@@ -27,6 +27,24 @@ from django.db import models
 from apps.core.models import BaseModel
 
 
+class LeadSource(models.TextChoices):
+    """
+    How this SUBJECT entered the system (v7.2, Architecture v2.9 §15.7).
+
+    `conversation` is the default and the historical case: somebody described a problem and
+    Layer 1 qualified them. `self_serve` is new with open registration — somebody arrived,
+    opened a workspace, and may not have said anything yet.
+
+    R70: a self-serve subject with no turns is NOT A LEAD. It is excluded from every queue,
+    tier count, conversion rate and SLA clock, and appears in one dashboard segment instead.
+    Counting it would corrupt the exact metrics Layer 1 exists to produce.
+    """
+
+    CONVERSATION = "conversation", "Conversation"
+    SELF_SERVE = "self_serve", "Self-serve registration"
+    IMPORTED = "imported", "Imported"
+
+
 class LeadStatus(models.TextChoices):
     """12 lifecycle statuses. The first 8 match the dashboard's pipeline columns."""
 
@@ -106,6 +124,13 @@ class Lead(BaseModel):
     # ── Contact / identity (filled progressively; email may arrive via capture) ─
     visitor_name = models.CharField(max_length=200, blank=True, default="")
     company = models.CharField(max_length=200, blank=True, default="")
+    # v7.2 — provenance. INTERNAL-ONLY (§10.5): a fact about how we acquired somebody.
+    lead_source = models.CharField(
+        max_length=16,
+        choices=LeadSource.choices,
+        default=LeadSource.CONVERSATION,
+        db_index=True,
+    )
     email = models.EmailField(blank=True, default="", db_index=True)
     industry = models.CharField(max_length=120, blank=True, default="")
     role = models.CharField(max_length=120, blank=True, default="")

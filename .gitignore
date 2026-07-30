@@ -254,3 +254,5 @@ itrix-backend-v6-*.zip
 itrix-backend-v7-phase*/
 itrix-backend-v7-phase*.zip
 .v7-phase*-backup-*/
+/itrix-backend-v7-phase4/
+/.v72-phase4-backup-*/

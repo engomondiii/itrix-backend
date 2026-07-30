@@ -13,11 +13,27 @@ class ClientIdentitySerializer(serializers.ModelSerializer):
     leadId = serializers.CharField(source="lead_id", read_only=True)
     fullName = serializers.CharField(source="full_name", allow_blank=True)
     ndaSigned = serializers.BooleanField(source="nda_signed", read_only=True)
+    # v7.2 — a fact about the holder's OWN address, so it is theirs to see. It is not a
+    # disclosure about anybody else. `itrix-web` reads a MISSING key as "unknown" rather than
+    # as unconfirmed, which is why this is the only place it can come from.
+    emailVerified = serializers.SerializerMethodField()
 
     class Meta:
         model = Client
-        fields = ["id", "leadId", "email", "fullName", "organization", "role", "ndaSigned"]
-        read_only_fields = ["id", "leadId", "email", "ndaSigned"]
+        fields = [
+            "id",
+            "leadId",
+            "email",
+            "fullName",
+            "organization",
+            "role",
+            "ndaSigned",
+            "emailVerified",
+        ]
+        read_only_fields = ["id", "leadId", "email", "ndaSigned", "emailVerified"]
+
+    def get_emailVerified(self, obj) -> bool:
+        return getattr(obj, "email_verified_at", None) is not None
 
 
 class InviteClaimRequestSerializer(serializers.Serializer):
@@ -28,6 +44,12 @@ class InviteClaimRequestSerializer(serializers.Serializer):
     full_name = serializers.CharField(required=False, allow_blank=True, default="")
     organization = serializers.CharField(required=False, allow_blank=True, default="")
     role = serializers.CharField(required=False, allow_blank=True, default="")
+    # v7.2 — the instrument versions the visitor was SHOWN travel with the claim, and
+    # `claim_invite()` writes the record inside the transaction that creates the Client
+    # (R62). The surface used to POST them separately to `portal/legal/assent/` first, which
+    # produced a SECOND record because the backend has recorded one in-transaction since
+    # v7.1 Phase 3.
+    assent = serializers.ListField(child=serializers.DictField(), required=False, default=list)
 
 
 class InviteClaimResponseSerializer(serializers.Serializer):

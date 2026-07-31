@@ -22,11 +22,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # App source
 COPY . .
 
-# Ensure the start script is executable inside the image (it also runs migrations
-# on boot — see start.sh). Copying from a Windows checkout can drop the exec bit,
-# so set it explicitly rather than relying on the source file's mode.
-RUN chmod +x /app/start.sh
-
 # Collect static (safe even if empty); failures shouldn't break the build at this
 # stage because env vars may not be present — settings tolerate missing values.
 RUN DJANGO_SETTINGS_MODULE=itrix.settings.production SECRET_KEY=build-time-dummy \
@@ -37,15 +32,7 @@ EXPOSE 8000
 # Railway/Heroku inject $PORT.
 #
 # v4.0.4: serve BOTH HTTP and WebSocket from ONE ASGI process with Daphne. gunicorn (WSGI)
-# cannot handle /ws/* upgrades.
-#
-# The container now starts via start.sh, which RUNS DATABASE MIGRATIONS before
-# execing daphne. Previously the server started directly with no migration step,
-# so a deploy carrying a new migration served an old schema and 500'd on any new
-# column. start.sh closes that gap; it also expands $PORT via the shell to a real
-# integer before daphne runs (daphne rejects a non-integer -p, unlike gunicorn).
-#
-# Invoked via `sh` explicitly (not `["/app/start.sh"]`) so it runs even if the
-# executable bit did not survive the checkout/copy — one less thing that can break
-# a deploy on a Windows-origin working tree.
-CMD ["sh", "/app/start.sh"]
+# cannot handle /ws/* upgrades. We start via a small entrypoint so $PORT is expanded by the
+# shell to a real integer BEFORE daphne runs (daphne rejects a non-integer -p, unlike
+# gunicorn). Shell-form CMD guarantees /bin/sh performs the variable expansion.
+CMD daphne -b 0.0.0.0 -p ${PORT:-8000} itrix.asgi:application

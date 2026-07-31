@@ -490,12 +490,6 @@ def _generate_assistant_turn(thread, body: str):
         if not deliverable:
             text = stream_envelope.UNDER_REVIEW_WORDING
 
-    # If a client page was just revealed for this turn, append the link so the visitor
-    # can reach it regardless of whether the live socket delivered the reveal event.
-    reveal = getattr(thread, "_client_page_reveal", None)
-    if reveal and reveal.get("url") and status == StreamingStatus.SETTLED:
-        text = _append_client_page_link(text, reveal["url"])
-
     message = ingest.ingest_agent_message(
         thread.conversation,
         agent_key="concierge",
@@ -518,20 +512,3 @@ def _generate_assistant_turn(thread, body: str):
         logger.debug("next-prompt suggestion skipped for thread %s", thread.id)
 
     return ThreadTurnSerializer(message).data
-
-
-def _append_client_page_link(text: str, url: str) -> str:
-    """
-    Append the client-page link to a governed reply.
-
-    A bare internal URL carries no claim, so it does not need to pass the claims
-    discipline again. Kept to one short, plain sentence so it reads as a hand-off,
-    not a sales line.
-    """
-    text = (text or "").rstrip()
-    invite = (
-        f"\n\nYour personalised itriX page is ready — you can open it here: {url}"
-    )
-    if url and url not in text:
-        return text + invite
-    return text

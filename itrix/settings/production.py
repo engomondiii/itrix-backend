@@ -31,10 +31,13 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# Email: real delivery is still gated by ENABLE_EMAIL_DELIVERY inside the service;
-# the SMTP backend here is only the Django fallback when something calls send_mail
-# directly. The Resend service path is preferred.
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# Email: the transport and the provider are both resolved in base.py now, from the
+# environment. This file used to pin EMAIL_BACKEND to SMTP and describe Resend as
+# "preferred", which was true of an earlier deployment and misleading afterwards —
+# `email_sender` reads settings.EMAIL_PROVIDER, and base.py derives it.
+#
+# Real delivery is still gated by ENABLE_EMAIL_DELIVERY, so a production deploy with
+# credentials present but the flag off sends nothing and logs every attempt.
 
 
 # ─── Realtime / WebSocket (v4.0 Phase 2) ─────────────────────────────────────

@@ -24,8 +24,23 @@ CORS_ALLOWED_ORIGINS = list(
     }
 )
 
-# Console email backend in dev (Resend path is gated by ENABLE_EMAIL_DELIVERY).
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# ── Email in development ─────────────────────────────────────────────────────
+# The console backend is the right default locally: a developer with no credentials
+# still sees the whole message body, including the verification link, in the terminal.
+#
+# But it USED to be unconditional, which meant a real SMTP configuration could not be
+# exercised locally at all — the one place you would want to test it before deploying.
+# So it now yields when a mailbox is actually configured, and `EMAIL_BACKEND` in the
+# environment still overrides both.
+from .base import EMAIL_HOST_PASSWORD, EMAIL_HOST_USER, env  # noqa: E402
+
+_explicit_backend = env("EMAIL_BACKEND", "")
+if _explicit_backend:
+    EMAIL_BACKEND = _explicit_backend
+elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Browsable API is handy in dev.
 REST_FRAMEWORK = {  # noqa: F405

@@ -465,9 +465,96 @@ PINECONE_INDEX = env("PINECONE_INDEX", "itrix-knowledge-core")
 PINECONE_CLOUD = env("PINECONE_CLOUD", "aws")
 PINECONE_REGION = env("PINECONE_REGION", "us-east-1")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# OUTBOUND EMAIL
+#
+# ── TWO PROVIDERS, ONE CHOKE-POINT ───────────────────────────────────────────
+# `apps.emails.services.email_sender.send_email` is the only place outbound mail is
+# created (that is what makes the R66 confirmation gate a single rule rather than
+# something every builder has to remember). It can now deliver through either:
+#
+#   smtp    Django's own mail backend — Gmail / Google Workspace, or any SMTP host
+#   resend  the Resend HTTP API, as before
+#
+# EMAIL_PROVIDER selects. "auto" (the default) means: use SMTP when a host user is
+# configured, otherwise Resend when an API key is configured, otherwise nothing is
+# deliverable and every send is logged as stubbed.
+#
+# ── THE ENVELOPE SENDER IS DERIVED, NOT ASSUMED ──────────────────────────────
+# Gmail refuses to send with a From address that is neither the authenticated
+# mailbox nor one of its verified aliases. Leaving EMAIL_FROM pointing at a
+# different domain while authenticating as another mailbox is the single most
+# common way this configuration fails, and it fails at send time with an SMTP
+# error rather than at boot. So when the provider is SMTP and EMAIL_FROM has not
+# been set explicitly, the authenticated mailbox becomes the sender.
+# ─────────────────────────────────────────────────────────────────────────────
 RESEND_API_KEY = env("RESEND_API_KEY", "")
-EMAIL_FROM = env("EMAIL_FROM", "team@itrix.ai")
+
+EMAIL_HOST = env("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(env("EMAIL_PORT", "587") or 587)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_HOST_USER = (env("EMAIL_HOST_USER", "gpslab@iwl.kr") or "").strip()
+
+# Google shows app passwords in four spaced groups ("abcd efgh ijkl mnop") and people
+# paste them that way. SMTP AUTH would fail on the spaces, so they are stripped here
+# rather than left as a support call.
+#
+# NO DEFAULT VALUE. A credential with a fallback in source control is a credential in
+# every clone, branch and CI log of this repository — and rotating it then means
+# editing code rather than an environment variable. Set EMAIL_HOST_PASSWORD in the
+# environment; when it is absent nothing is deliverable and every send is logged.
+EMAIL_HOST_PASSWORD = "".join((env("EMAIL_HOST_PASSWORD", "") or "").split())
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "20") or 20)
+
+EMAIL_PROVIDER = (env("EMAIL_PROVIDER", "auto") or "auto").strip().lower()
+if EMAIL_PROVIDER not in {"auto", "smtp", "resend", "none"}:
+    EMAIL_PROVIDER = "auto"
+if EMAIL_PROVIDER == "auto":
+    if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+        EMAIL_PROVIDER = "smtp"
+    elif RESEND_API_KEY:
+        EMAIL_PROVIDER = "resend"
+    else:
+        EMAIL_PROVIDER = "none"
+
 EMAIL_FROM_NAME = env("EMAIL_FROM_NAME", "iTrix Assessment Team")
+
+# ── THE SENDER IS DECIDED BY THE PROVIDER, NOT BY PREFERENCE ────────────────
+# Under SMTP the authenticated mailbox WINS over EMAIL_FROM, and that is not a
+# stylistic choice. Gmail and Google Workspace refuse a From address the credential
+# does not own (553 / SMTPSenderRefused); the message is rejected at send time, in a
+# background task, long after the visitor has been told to check their email.
+#
+# This deployment is exactly that trap: EMAIL_FROM is set to a different domain from
+# EMAIL_HOST_USER. Honouring it would mean every confirmation link failing to send
+# while the configuration looked deliberate. So EMAIL_FROM is ignored here and the
+# reason is logged, rather than being obeyed into a guaranteed failure.
+#
+# EMAIL_FROM still binds for Resend, which verifies DOMAINS rather than mailboxes and
+# so can legitimately send as an address that is not a real inbox.
+_email_from_env = (env("EMAIL_FROM", "") or "").strip()
+EMAIL_FROM_IGNORED = ""
+
+if EMAIL_PROVIDER == "smtp" and EMAIL_HOST_USER:
+    EMAIL_FROM = EMAIL_HOST_USER
+    if _email_from_env and _email_from_env.lower() != EMAIL_HOST_USER.lower():
+        # Surfaced by apps.emails.EmailsConfig.ready() so it appears once at boot.
+        EMAIL_FROM_IGNORED = _email_from_env
+elif _email_from_env:
+    EMAIL_FROM = _email_from_env
+else:
+    EMAIL_FROM = "team@itrix.ai"
+
+# Django's own default, used by anything that calls send_mail() directly. Kept in step
+# with EMAIL_FROM so there is one sender identity rather than two.
+DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>" if EMAIL_FROM_NAME else EMAIL_FROM
+SERVER_EMAIL = EMAIL_FROM
+
+# The Django transport. `development.py` narrows this to the console when nothing is
+# configured, so a developer with no credentials still sees the mail body.
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+
 INTERNAL_ALERT_EMAIL = env("INTERNAL_ALERT_EMAIL", "team@itrix.ai")
 
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")

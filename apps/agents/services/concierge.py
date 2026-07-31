@@ -74,6 +74,56 @@ class ConciergeAgent(BaseAgent):
     def _question(self, ctx: AgentContext) -> str:
         return (ctx.extra or {}).get("message", "") or ctx.prompt
 
+    def _conversation_user_prompt(self, ctx: AgentContext, question: str, instruction: str) -> str:
+        """
+        Build the user prompt WITH conversation memory.
+
+        The turn path passes prior turns, closed-state summaries and the real journey
+        state through ``ctx.extra`` (``recent_turns``, ``closed_state_summaries``,
+        ``journey_state``). We fold them into a budgeted, priority-ordered context via
+        ``context_assembly.assemble`` so the model can see what has already been said —
+        which is the whole reason it stops re-greeting and re-asking answered questions.
+
+        When ``extra`` carries no history (a bare first turn, or a caller that has not
+        been updated), this degrades to the previous single-turn prompt, so no path is
+        left worse off than before.
+        """
+        extra = ctx.extra or {}
+        recent = list(extra.get("recent_turns") or [])
+        summaries = list(extra.get("closed_state_summaries") or [])
+        journey_state = extra.get("journey_state") or ""
+
+        if not recent and not summaries:
+            # No memory available for this turn — original single-turn behaviour.
+            return f"Visitor question:\n{question}\n\n{instruction}"
+
+        try:
+            from apps.conversations.services import context_assembly
+
+            assembled = context_assembly.assemble(
+                system_contract=(
+                    "The following is the running transcript of one continuous "
+                    "conversation with a visitor. Earlier turns are context you have "
+                    "ALREADY seen — do not restart, re-introduce yourself, or re-ask "
+                    "anything the visitor has already answered. Continue naturally from "
+                    "where the conversation actually is."
+                ),
+                journey_state=str(journey_state or ""),
+                disclosure_ceiling=ctx.disclosure_ceiling,
+                current_turn=f"Visitor (current turn): {question}",
+                recent_turns=recent,
+                closed_state_summaries=summaries,
+            )
+            memory_block = assembled.text()
+        except Exception:  # noqa: BLE001 - memory is additive; never break generation
+            logger.debug("context assembly failed; using single-turn prompt")
+            return f"Visitor question:\n{question}\n\n{instruction}"
+
+        return (
+            f"{memory_block}\n\n"
+            f"Now respond to the visitor's current turn.\n\n{instruction}"
+        )
+
     def run_ai(self, ctx: AgentContext) -> AgentOutput:
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
@@ -94,7 +144,7 @@ class ConciergeAgent(BaseAgent):
                 chunks=chunks,
                 context=retrieval_context,
             )
-            user = f"Visitor question:\n{question}\n\n{_CONCIERGE_INSTRUCTION}"
+            user = self._conversation_user_prompt(ctx, question, _CONCIERGE_INSTRUCTION)
             raw = ClaudeClient().complete(system=system, user=user, max_tokens=700)
         except AIEngineDisabled:
             return AgentOutput(payload={}, used_ai=False)
@@ -158,7 +208,7 @@ class ConciergeAgent(BaseAgent):
                 chunks=chunks,
                 context=retrieval_context,
             )
-            user = f"Visitor question:\n{question}\n\n{_CONCIERGE_STREAM_INSTRUCTION}"
+            user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
             yield from ClaudeClient().stream(system=system, user=user, max_tokens=700)
         except AIEngineDisabled:
             return

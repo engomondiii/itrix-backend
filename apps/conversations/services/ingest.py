@@ -122,17 +122,18 @@ def _after_inbound_turn(thread, message, body: str) -> None:
     # something the model gets to weigh up.
     _route_support_intent(thread, body)
 
-    # A turn posted on an empty thread starts the review (1 -> 2). Idempotent: a second
-    # turn is a satisfied no-op, not an error.
-    lead = getattr(thread, "lead", None)
-    if lead is None:
-        return
+    # Advance the qualification loop for this turn. This handles BOTH the first-turn
+    # transition (1 -> 2) and — via the coverage tracker + stop rule — closing the loop
+    # (2 -> 3) once the band is satisfied. It works for anonymous (lead-less) threads as
+    # well as identified ones, which the old ``on_first_turn``-only hook did not: it
+    # returned early for anonymous visitors, so their state never moved and the intro
+    # re-fired on every turn. Deterministic; best-effort; never blocks the persisted turn.
     try:
-        from apps.journey.services.advance import on_first_turn
+        from apps.conversations.services import qualification
 
-        on_first_turn(lead, thread=thread)
-    except Exception:  # noqa: BLE001 - an invalid transition here is expected mid-journey
-        logger.debug("first-turn advance skipped for lead %s", getattr(lead, "id", "?"))
+        qualification.advance_on_turn(thread, body)
+    except Exception:  # noqa: BLE001 - state advancement is best-effort
+        logger.debug("qualification advance skipped for thread %s", getattr(thread, "id", "?"))
 
 
 def _route_support_intent(thread, body: str) -> None:

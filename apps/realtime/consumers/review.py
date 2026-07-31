@@ -187,6 +187,22 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
+        # SUGGEST THE NEXT PROMPT. While the qualification loop is open, generate and
+        # broadcast the follow-up question so the composer shows next-step chips. The
+        # broadcast reaches this same socket group, so the visitor sees it live.
+        await database_sync_to_async(self._suggest_next)()
+
+    def _suggest_next(self):
+        thread = getattr(self.conversation, "thread", None)
+        if thread is None:
+            return
+        try:
+            from apps.conversations.services import qualification
+
+            qualification.suggest_next(thread)
+        except Exception:  # noqa: BLE001
+            logger.debug("next-prompt suggestion skipped for thread %s", getattr(thread, "id", "?"))
+
     # ── sync helpers (DB / agent) ────────────────────────────────────────────
     def _persist_inbound(self, body: str):
         from apps.conversations.services import ingest
@@ -195,9 +211,20 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
 
     def _build_ctx(self, body: str):
         from apps.agents.services.context import PLANE_PUBLIC, AgentContext
+        from apps.conversations.services import conversation_context
 
         lead = self.conversation.lead
         session = getattr(lead, "review_session", None) if lead else None
+        thread = getattr(self.conversation, "thread", None)
+        # CONVERSATION MEMORY: the same assembler the HTTP path uses, so a streamed
+        # reply sees prior turns + closed-state summaries + real journey state and
+        # continues the conversation instead of restarting it. Falls back to a bare
+        # {"message": body} when the thread has no memory yet.
+        extra = (
+            conversation_context.build_turn_extra(thread, body)
+            if thread is not None
+            else {"message": body}
+        )
         return AgentContext(
             lead_id=str(lead.id) if lead else None,
             prompt=getattr(session, "prompt", "") or body,
@@ -209,7 +236,7 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             tier=getattr(lead, "tier", 4) if lead else 4,
             plane=PLANE_PUBLIC,
             context_label=self.context_label,
-            extra={"message": body},
+            extra=extra,
         )
 
     def _finalize_reply(self, streamed_text: str, ctx) -> dict:

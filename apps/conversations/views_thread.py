@@ -419,7 +419,7 @@ def _generate_assistant_turn(thread, body: str):
     """
     from apps.agents.services.context import PLANE_PUBLIC, AgentContext
     from apps.conversations.models import StreamingStatus
-    from apps.conversations.services import ingest
+    from apps.conversations.services import conversation_context, ingest
     from apps.governance.services import stream_envelope, stream_guard
 
     lead = getattr(thread, "lead", None)
@@ -435,7 +435,9 @@ def _generate_assistant_turn(thread, body: str):
         # anonymous regardless of what their thread has reached.
         plane=PLANE_PUBLIC,
         context_label="anonymous_review",
-        extra={"message": body, "thread_id": str(thread.id)},
+        # CONVERSATION MEMORY: prior turns + closed-state summaries + real journey
+        # state, so the reply continues the conversation instead of restarting it.
+        extra=conversation_context.build_turn_extra(thread, body),
     )
 
     # PART 1 — the pre-flight envelope. A turn that would require level-4 or -5
@@ -497,4 +499,16 @@ def _generate_assistant_turn(thread, body: str):
         thread=thread,
         streaming_status=status,
     )
+
+    # SUGGEST THE NEXT PROMPT. While the qualification loop is open, generate the
+    # follow-up question and broadcast ``question.suggested`` so the composer shows
+    # the next-step chips beneath this answer. Best-effort: the reply already stands
+    # on its own if this fails.
+    try:
+        from apps.conversations.services import qualification
+
+        qualification.suggest_next(thread, message=message)
+    except Exception:  # noqa: BLE001
+        logger.debug("next-prompt suggestion skipped for thread %s", thread.id)
+
     return ThreadTurnSerializer(message).data

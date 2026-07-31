@@ -500,17 +500,20 @@ def _has_signed_nda(subject) -> bool:
 
 def for_anonymous_thread(thread) -> dict[str, Any]:
     """
-    The shell contract for a thread that has NO lead yet (State 1, first visit).
+    The shell contract for a thread that has NO lead yet (States 1-3, anonymous band).
 
-    A visitor gets a thread from their very first sentence, before any Lead exists. This
-    returns the minimum-privilege shell: state 1, public ceiling, base sections only.
+    A visitor gets a thread from their very first sentence, before any Lead exists. An
+    anonymous conversation can now progress through the qualification band on the thread
+    itself (ARRIVED -> IN_REVIEW -> DIAGNOSED) without a Lead, so this reflects the
+    thread's ACTUAL current state and whether the question loop is still open, rather
+    than hardcoding state 1 with the loop always open. The disclosure ceiling stays
+    public throughout — anonymous is anonymous regardless of how far the band has moved.
     """
-    pane_sections = content_pane_sections_for(
-        JourneyState.ARRIVED.value, IDENTITY_ANONYMOUS
-    )
-    rail_sections = conversation_rail_sections_for(
-        JourneyState.ARRIVED.value, IDENTITY_ANONYMOUS
-    )
+    state_key = _anonymous_state_key(thread)
+    state_number = journey_number(state_key) or 1
+
+    pane_sections = content_pane_sections_for(state_key, IDENTITY_ANONYMOUS)
+    rail_sections = conversation_rail_sections_for(state_key, IDENTITY_ANONYMOUS)
 
     return {
         "thread_id": str(getattr(thread, "id", "") or "") or None,
@@ -518,14 +521,15 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
         # A visitor who has just typed their first sentence is WORKING even though no
         # Lead exists yet.
         "shell_mode": shell_mode_for(thread),
-        "journey_state": 1,
-        "state_key": JourneyState.ARRIVED.value,
+        "journey_state": state_number,
+        "state_key": state_key,
         "identity_state": IDENTITY_ANONYMOUS,
         "disclosure_ceiling": "public",
-        "value_delivered": False,
-        "current_work": _CURRENT_WORK[1],
-        "composer_label": composer_label_for(JourneyState.ARRIVED.value),
-        "question_loop_open": True,
+        # Value is delivered once the reflection stage (DIAGNOSED, 3) is reached.
+        "value_delivered": state_number >= 3,
+        "current_work": _CURRENT_WORK.get(state_number, _CURRENT_WORK[1]),
+        "composer_label": composer_label_for(state_key),
+        "question_loop_open": _anonymous_question_loop_open(thread, state_number),
         "attachments_enabled": _attachments_enabled(),
         "conversation_rail_sections": rail_sections,
         "content_pane_sections": pane_sections,
@@ -534,7 +538,7 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
         ),
         "conversation_header": {
             "title": (getattr(thread, "title", "") or "New review"),
-            "state_label": STATE_CHIP_LABELS["ARRIVED"],
+            "state_label": STATE_CHIP_LABELS.get(state_key, STATE_CHIP_LABELS["ARRIVED"]),
             "human_owner": None,
             "support_sla": None,
             "quick_help": False,
@@ -543,3 +547,50 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
         # precedence rule could read. None is the honest answer rather than a placeholder.
         "next_best_action": None,
     }
+
+
+def _anonymous_state_key(thread) -> str:
+    """The thread's current state key, tolerating the state service being unavailable."""
+    try:
+        from apps.conversations.services.thread_state import current_state_key
+
+        return current_state_key(thread)
+    except Exception:  # noqa: BLE001
+        return JourneyState.ARRIVED.value
+
+
+def _anonymous_question_loop_open(thread, state_number: int) -> bool:
+    """
+    Is the adaptive question loop still open for this anonymous thread?
+
+    Open only inside the qualification band (states 1-2). Once the band closes
+    (DIAGNOSED, 3+) it is closed. When the adaptive loop is enabled we additionally
+    let the deterministic stop rule close it early — the moment coverage is complete —
+    so the composer stops showing follow-up chips as soon as the loop has really ended.
+    """
+    if state_number not in (1, 2):
+        return False
+    # State 1 (ARRIVED) is before the first turn — the loop is always open here. State 1
+    # has no REQUIRED dimensions, so a coverage check would report it vacuously complete
+    # and close the loop before the visitor has said anything. Only evaluate the stop
+    # rule once the review has actually begun (state 2).
+    if state_number < 2:
+        return True
+    from django.conf import settings
+
+    if not getattr(settings, "ENABLE_ADAPTIVE_QUESTIONS", False):
+        return True
+    try:
+        from apps.agents.services import coverage as coverage_svc
+        from apps.agents.services import stop_rule
+
+        coverage = coverage_svc.build_for_thread(thread)
+        decision = stop_rule.evaluate(
+            thread=thread,
+            coverage=coverage,
+            journey_state=state_number,
+            questions_asked=int(getattr(thread, "questions_asked", 0) or 0),
+        )
+        return bool(decision.should_continue)
+    except Exception:  # noqa: BLE001
+        return True

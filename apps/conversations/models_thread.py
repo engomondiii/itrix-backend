@@ -118,6 +118,24 @@ class Thread(BaseModel):
     # The journey state at creation time — useful for cohorting without replaying
     # the transition log.
     state_at_creation = models.CharField(max_length=20, blank=True, default="ARRIVED")
+    # The CURRENT journey state of this thread.
+    #
+    # ── WHY THIS EXISTS ──────────────────────────────────────────────────────
+    # Journey state has historically lived only on the Lead. An anonymous visitor's
+    # thread has NO lead (one is only minted when they qualify/register), so before
+    # this field there was nowhere to record that an anonymous conversation had moved
+    # from ARRIVED (1) to IN_REVIEW (2) to DIAGNOSED (3). The turn path therefore
+    # could not advance the qualification loop for anonymous visitors, and every turn
+    # re-started the intro. This field is the lead-less anchor the state machine
+    # advances against; when a lead exists, the Lead remains the source of truth and
+    # this mirrors it. See ``conversations.services.thread_state``.
+    current_state = models.CharField(
+        max_length=20, blank=True, default="ARRIVED", db_index=True
+    )
+    # How many adaptive questions have been asked in this thread's qualification band.
+    # Denormalised from QuestionSuggestion so the stop-rule budget check does not have
+    # to re-count on every turn; QuestionSuggestion remains the auditable record.
+    questions_asked = models.PositiveSmallIntegerField(default=0)
 
     last_activity_at = models.DateTimeField(null=True, blank=True, db_index=True)
     claimed_at = models.DateTimeField(null=True, blank=True)

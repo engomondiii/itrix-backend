@@ -1,3 +1,0 @@
-
-# itrix-backend client-page-reveal install backups (safe to delete)
-.client-page-reveal-v1-backup-*/

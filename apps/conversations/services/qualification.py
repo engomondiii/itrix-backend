@@ -72,52 +72,64 @@ def advance_on_turn(thread, body: str) -> None:
     # The qualification band is states 1-2. We only evaluate the stop rule / loop close
     # while inside it; past it we fall through to the reveal check.
     if state_number in (1, 2):
-        try:
-            from apps.agents.services import coverage as coverage_svc
-            from apps.agents.services import stop_rule
+        _evaluate_and_close_loop(thread, state_number, body)
 
-            coverage = coverage_svc.snapshot(thread)  # computes AND persists per-dimension
-            decision = stop_rule.evaluate(
-                thread=thread,
-                coverage=coverage,
-                journey_state=state_number,
-                questions_asked=_questions_asked(thread),
-                last_visitor_text=body or "",
-            )
-        except Exception:  # noqa: BLE001
-            logger.debug("stop-rule evaluation failed for thread %s", getattr(thread, "id", "?"))
-            decision = None
-
-        # ``should_continue`` False means the loop should END for one of the four reasons
-        # (covered / budget / visitor asked to stop / sensitivity). Close it once.
-        if decision is not None and not decision.should_continue:
-            try:
-                closed = thread_state.close_qualification_loop(thread, reason=decision.reason)
-                if closed:
-                    logger.info(
-                        "qualification loop closed for thread %s (%s)",
-                        getattr(thread, "id", "?"), decision.reason,
-                    )
-            except Exception:  # noqa: BLE001
-                logger.debug("loop close failed for thread %s", getattr(thread, "id", "?"))
-
-    # 3) CLIENT-PAGE REVEAL (3 -> 4). Runs on every turn, with its own gates: it only
-    # acts once the loop has closed (DIAGNOSED) AND the visitor has given a company +
-    # a valid email. This is what carries the conversation past DIAGNOSED to the custom
-    # page, which the surface previously never did.
+    # 2) CLIENT-PAGE REVEAL (3 -> 4). Runs on EVERY turn, with its own gates: it acts
+    # once the loop has closed (DIAGNOSED) AND an email has been given anywhere in the
+    # conversation. This is what carries the visitor past DIAGNOSED to the custom page.
     _maybe_reveal(thread, body)
 
 
+def _evaluate_and_close_loop(thread, state_number: int, body: str) -> None:
+    """The stop-rule evaluation + loop close, factored out of advance_on_turn."""
+    from apps.conversations.services import thread_state
+
+    try:
+        from apps.agents.services import coverage as coverage_svc
+        from apps.agents.services import stop_rule
+
+        coverage = coverage_svc.snapshot(thread)  # computes AND persists per-dimension
+        decision = stop_rule.evaluate(
+            thread=thread,
+            coverage=coverage,
+            journey_state=state_number,
+            questions_asked=_questions_asked(thread),
+            last_visitor_text=body or "",
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("stop-rule evaluation failed for thread %s", getattr(thread, "id", "?"))
+        return
+
+    # ``should_continue`` False means the loop should END for one of the four reasons
+    # (covered / budget / visitor asked to stop / sensitivity). Close it once.
+    if not decision.should_continue:
+        try:
+            closed = thread_state.close_qualification_loop(thread, reason=decision.reason)
+            if closed:
+                logger.info(
+                    "qualification loop closed for thread %s (%s)",
+                    getattr(thread, "id", "?"), decision.reason,
+                )
+        except Exception:  # noqa: BLE001
+            logger.debug("loop close failed for thread %s", getattr(thread, "id", "?"))
+
+
 def _maybe_reveal(thread, body: str) -> None:
-    """Attempt the client-page reveal; store the outcome for the reply to surface."""
+    """
+    Attempt the client-page reveal; stash the outcome for the reply to surface.
+
+    Runs on every turn. The bridge itself gates on DIAGNOSED + an email given
+    anywhere in the conversation, so this is a cheap no-op until the visitor is
+    actually ready.
+    """
     try:
         from apps.conversations.services import reveal_bridge
 
         outcome = reveal_bridge.maybe_reveal_client_page(thread, body or "")
         if outcome.get("revealed"):
-            # Stash the URL on the instance so the generation path can add the link to
-            # the reply (the socket reveal handles live navigation; the link is the
-            # transport-independent fallback).
+            # Stash on the instance so the generation path can (a) tell the AI the page
+            # is ready so it presents it in its own voice, and (b) append the link as a
+            # transport-independent fallback.
             setattr(thread, "_client_page_reveal", outcome)
     except Exception:  # noqa: BLE001 - reveal is best-effort; never break the turn
         logger.debug("client-page reveal check failed for thread %s", getattr(thread, "id", "?"))

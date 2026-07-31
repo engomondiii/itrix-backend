@@ -1,3 +1,0 @@
-
-# Keep the container start script LF - a CRLF shell script fails on Linux
-start.sh text eol=lf

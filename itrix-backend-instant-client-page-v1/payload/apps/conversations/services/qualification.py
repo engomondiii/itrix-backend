@@ -63,13 +63,26 @@ def advance_on_turn(thread, body: str) -> None:
 
     if not _adaptive_on():
         # Without the adaptive loop the deterministic band still governs state via
-        # enter_in_review above; there is no coverage-driven close to evaluate.
+        # enter_in_review above; there is no coverage-driven close to evaluate — but
+        # the client-page reveal below still runs (it has its own gates).
+        _maybe_reveal(thread, body)
         return
 
     state_number = thread_state.current_state_number(thread)
-    # The qualification band is states 1-2. Once past it there is nothing to close.
-    if state_number not in (1, 2):
-        return
+    # The qualification band is states 1-2. We only evaluate the stop rule / loop close
+    # while inside it; past it we fall through to the reveal check.
+    if state_number in (1, 2):
+        _evaluate_and_close_loop(thread, state_number, body)
+
+    # 2) CLIENT-PAGE REVEAL (3 -> 4). Runs on EVERY turn, with its own gates: it acts
+    # once the loop has closed (DIAGNOSED) AND an email has been given anywhere in the
+    # conversation. This is what carries the visitor past DIAGNOSED to the custom page.
+    _maybe_reveal(thread, body)
+
+
+def _evaluate_and_close_loop(thread, state_number: int, body: str) -> None:
+    """The stop-rule evaluation + loop close, factored out of advance_on_turn."""
+    from apps.conversations.services import thread_state
 
     try:
         from apps.agents.services import coverage as coverage_svc
@@ -99,6 +112,27 @@ def advance_on_turn(thread, body: str) -> None:
                 )
         except Exception:  # noqa: BLE001
             logger.debug("loop close failed for thread %s", getattr(thread, "id", "?"))
+
+
+def _maybe_reveal(thread, body: str) -> None:
+    """
+    Attempt the client-page reveal; stash the outcome for the reply to surface.
+
+    Runs on every turn. The bridge itself gates on DIAGNOSED + an email given
+    anywhere in the conversation, so this is a cheap no-op until the visitor is
+    actually ready.
+    """
+    try:
+        from apps.conversations.services import reveal_bridge
+
+        outcome = reveal_bridge.maybe_reveal_client_page(thread, body or "")
+        if outcome.get("revealed"):
+            # Stash on the instance so the generation path can (a) tell the AI the page
+            # is ready so it presents it in its own voice, and (b) append the link as a
+            # transport-independent fallback.
+            setattr(thread, "_client_page_reveal", outcome)
+    except Exception:  # noqa: BLE001 - reveal is best-effort; never break the turn
+        logger.debug("client-page reveal check failed for thread %s", getattr(thread, "id", "?"))
 
 
 def suggest_next(thread, *, message=None) -> dict:

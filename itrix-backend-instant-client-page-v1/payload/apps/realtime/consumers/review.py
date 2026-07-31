@@ -196,6 +196,9 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
         thread = getattr(self.conversation, "thread", None)
         if thread is None:
             return
+        # No "next question" after the page has been handed over.
+        if getattr(thread, "_client_page_reveal", None):
+            return
         try:
             from apps.conversations.services import qualification
 
@@ -261,6 +264,15 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             citations = [{"chunkId": c, "label": None} for c in (out.chunk_ids or []) if c]
 
         deliverable = governance_status in ("auto_approved", "approved")
+
+        # If a client page was revealed while persisting this turn, append the link so
+        # the visitor can reach it even if the live reveal event was missed. The reveal
+        # fact rides on ctx.extra (set by build_turn_extra during _build_ctx).
+        if deliverable:
+            reveal = (getattr(ctx, "extra", None) or {}).get("client_page_reveal") or {}
+            if reveal.get("url"):
+                body_text = _append_client_page_link_ws(body_text, reveal["url"])
+
         msg = ingest.ingest_agent_message(
             self.conversation,
             agent_key="concierge",
@@ -613,3 +625,11 @@ def _normalize_client_page(raw: dict, lead) -> dict:
         "conversationId": _s(raw.get("conversationId")) or (_s(pitch.get("conversationId")) or None),
         "usedAi": raw.get("usedAi") is True or raw.get("used_ai") is True,
     }
+
+
+def _append_client_page_link_ws(text: str, url: str) -> str:
+    """Append the client-page link to a streamed reply (see views_thread._append_client_page_link)."""
+    text = (text or "").rstrip()
+    if url and url not in text:
+        return text + f"\n\nYour personalised itriX page is ready — open it here: {url}"
+    return text

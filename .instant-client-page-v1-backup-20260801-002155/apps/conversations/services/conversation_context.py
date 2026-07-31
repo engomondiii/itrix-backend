@@ -136,12 +136,6 @@ def build_turn_extra(thread, body: str, *, exclude_message_id: str | None = None
         extra["recent_turns"] = recent_turns(thread, exclude_message_id=exclude_message_id)
         extra["closed_state_summaries"] = closed_state_summaries(thread)
         extra["journey_state"] = _current_state_key(thread)
-        # If a client page was revealed for this turn (stashed on the thread during
-        # ingest), pass it through so the agent presents the page in its own words
-        # instead of promising a human follow-up.
-        reveal = getattr(thread, "_client_page_reveal", None)
-        if reveal:
-            extra["client_page_reveal"] = reveal
     except Exception:  # noqa: BLE001 - memory is additive; never break generation
         logger.debug("build_turn_extra memory assembly failed for thread %s", getattr(thread, "id", "?"))
     return extra

@@ -490,6 +490,14 @@ def _generate_assistant_turn(thread, body: str):
         if not deliverable:
             text = stream_envelope.UNDER_REVIEW_WORDING
 
+    # If a client page was just revealed for this turn, append the link so the visitor
+    # can reach it regardless of whether the live socket delivered the reveal event.
+    # (The agent was also told to present it in its own words; the link is the
+    # transport-independent guarantee.)
+    reveal = getattr(thread, "_client_page_reveal", None)
+    if reveal and reveal.get("url") and status == StreamingStatus.SETTLED:
+        text = _append_client_page_link(text, reveal["url"])
+
     message = ingest.ingest_agent_message(
         thread.conversation,
         agent_key="concierge",
@@ -502,13 +510,27 @@ def _generate_assistant_turn(thread, body: str):
 
     # SUGGEST THE NEXT PROMPT. While the qualification loop is open, generate the
     # follow-up question and broadcast ``question.suggested`` so the composer shows
-    # the next-step chips beneath this answer. Best-effort: the reply already stands
-    # on its own if this fails.
-    try:
-        from apps.conversations.services import qualification
+    # the next-step chips beneath this answer. Skipped once the page is revealed —
+    # there is no "next question" after the visitor has been handed their page.
+    if not (reveal and reveal.get("revealed")):
+        try:
+            from apps.conversations.services import qualification
 
-        qualification.suggest_next(thread, message=message)
-    except Exception:  # noqa: BLE001
-        logger.debug("next-prompt suggestion skipped for thread %s", thread.id)
+            qualification.suggest_next(thread, message=message)
+        except Exception:  # noqa: BLE001
+            logger.debug("next-prompt suggestion skipped for thread %s", thread.id)
 
     return ThreadTurnSerializer(message).data
+
+
+def _append_client_page_link(text: str, url: str) -> str:
+    """
+    Append the client-page link to a governed reply.
+
+    A bare internal URL carries no claim, so it does not need to pass the claims
+    discipline again. One short, plain line so it reads as a hand-off.
+    """
+    text = (text or "").rstrip()
+    if url and url not in text:
+        return text + f"\n\nYour personalised itriX page is ready — open it here: {url}"
+    return text

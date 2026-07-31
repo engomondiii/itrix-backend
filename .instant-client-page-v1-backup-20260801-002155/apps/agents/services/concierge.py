@@ -92,11 +92,10 @@ class ConciergeAgent(BaseAgent):
         recent = list(extra.get("recent_turns") or [])
         summaries = list(extra.get("closed_state_summaries") or [])
         journey_state = extra.get("journey_state") or ""
-        reveal_directive = self._reveal_directive(extra)
 
         if not recent and not summaries:
             # No memory available for this turn — original single-turn behaviour.
-            return f"Visitor question:\n{question}\n\n{reveal_directive}{instruction}"
+            return f"Visitor question:\n{question}\n\n{instruction}"
 
         try:
             from apps.conversations.services import context_assembly
@@ -118,39 +117,11 @@ class ConciergeAgent(BaseAgent):
             memory_block = assembled.text()
         except Exception:  # noqa: BLE001 - memory is additive; never break generation
             logger.debug("context assembly failed; using single-turn prompt")
-            return f"Visitor question:\n{question}\n\n{reveal_directive}{instruction}"
+            return f"Visitor question:\n{question}\n\n{instruction}"
 
         return (
             f"{memory_block}\n\n"
-            f"Now respond to the visitor's current turn.\n\n{reveal_directive}{instruction}"
-        )
-
-    @staticmethod
-    def _reveal_directive(extra: dict) -> str:
-        """
-        When a personalised page has just been generated for this visitor, tell the
-        model to HAND IT OVER rather than promise a human will follow up.
-
-        This is the fix for the "the Assessment Team will be in touch" ending: the
-        model has no other way to know an instant page exists, so without this it does
-        the generic-concierge thing and promises human follow-up — the opposite of the
-        intended outcome. The link itself is also appended to the reply by the turn
-        path as a transport-independent fallback; this directive makes the model's OWN
-        words match that outcome.
-        """
-        reveal = extra.get("client_page_reveal") or {}
-        if not reveal.get("revealed"):
-            return ""
-        url = reveal.get("url") or ""
-        return (
-            "IMPORTANT — A PERSONALISED itriX PAGE HAS JUST BEEN GENERATED FOR THIS "
-            "VISITOR AND IS READY NOW. Your reply MUST hand it over warmly and directly: "
-            "tell them their personalised page is ready and that they can open it now"
-            + (f" at this link: {url}" if url else "")
-            + ". Do NOT say the team will 'be in touch', do NOT say you will 'prepare a "
-            "briefing', do NOT ask to 'close the intake', and do NOT promise any human "
-            "follow-up — the page is the deliverable and it exists already. Keep it to a "
-            "couple of warm sentences. Then STOP.\n\n"
+            f"Now respond to the visitor's current turn.\n\n{instruction}"
         )
 
     def run_ai(self, ctx: AgentContext) -> AgentOutput:

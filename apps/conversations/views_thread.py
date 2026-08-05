@@ -498,6 +498,17 @@ def _generate_assistant_turn(thread, body: str):
     if reveal and reveal.get("url") and status == StreamingStatus.SETTLED:
         text = _append_client_page_link(text, reveal["url"])
 
+    # And if the page is waiting on an email address, make sure the reply actually
+    # asks for one. The agent was told to ask in its own words; this is the
+    # guarantee that the ask happens even with the AI engine off or degraded, which
+    # is the difference between a conversation that can complete and one that
+    # dead-ends at DIAGNOSED.
+    contact_decision = getattr(thread, "_contact_ask", None)
+    if contact_decision and status == StreamingStatus.SETTLED:
+        from apps.conversations.services import contact_ask
+
+        text = contact_ask.append_ask(text, contact_decision)
+
     message = ingest.ingest_agent_message(
         thread.conversation,
         agent_key="concierge",
@@ -507,6 +518,14 @@ def _generate_assistant_turn(thread, body: str):
         thread=thread,
         streaming_status=status,
     )
+
+    # COUNT THE ASK DOWN. Only now, and only for a turn the visitor will actually
+    # read: an ask held by the guard was never put to anybody and must not spend the
+    # budget.
+    if contact_decision and status == StreamingStatus.SETTLED:
+        from apps.conversations.services import contact_ask
+
+        contact_ask.record_asked(thread, contact_decision, message=message)
 
     # SUGGEST THE NEXT PROMPT. While the qualification loop is open, generate the
     # follow-up question and broadcast ``question.suggested`` so the composer shows

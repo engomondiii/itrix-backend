@@ -260,3 +260,7 @@ itrix-backend-v7-phase*.zip
 # itrix-backend-email-v1
 itrix-backend-email-v1/
 .backend-email-v1-backup-*
+
+# contact-ask-v1
+.contact-ask-v1-backup-*/
+itrix-backend-contact-ask-v1*

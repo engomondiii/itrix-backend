@@ -92,7 +92,11 @@ class ConciergeAgent(BaseAgent):
         recent = list(extra.get("recent_turns") or [])
         summaries = list(extra.get("closed_state_summaries") or [])
         journey_state = extra.get("journey_state") or ""
-        reveal_directive = self._reveal_directive(extra)
+        # The reveal directive hands over a page that EXISTS; the contact directive
+        # asks for the one thing needed to generate it. They are mutually exclusive
+        # by construction — the reveal requires the address the ask is asking for —
+        # and the reveal wins if a caller ever sets both.
+        reveal_directive = self._reveal_directive(extra) or self._contact_directive(extra)
 
         if not recent and not summaries:
             # No memory available for this turn — original single-turn behaviour.
@@ -152,6 +156,24 @@ class ConciergeAgent(BaseAgent):
             "follow-up — the page is the deliverable and it exists already. Keep it to a "
             "couple of warm sentences. Then STOP.\n\n"
         )
+
+    @staticmethod
+    def _contact_directive(extra: dict) -> str:
+        """
+        When the review is complete but no email address has been given, tell the
+        model to ASK FOR ONE rather than close the conversation.
+
+        This is the other half of the "the Assessment Team will be in touch" fix.
+        ``_reveal_directive`` above only fires once the personalised page exists, and
+        the page cannot exist until an address is given — so without this the model
+        was never told to ask, and the conversation dead-ended at DIAGNOSED.
+
+        WHETHER to ask is decided deterministically upstream, in
+        ``conversations.services.contact_ask``. This only carries the instruction.
+        """
+        from apps.conversations.services import contact_ask
+
+        return contact_ask.directive(extra.get("contact_ask") or {})
 
     def run_ai(self, ctx: AgentContext) -> AgentOutput:
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient

@@ -273,6 +273,16 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             if reveal.get("url"):
                 body_text = _append_client_page_link_ws(body_text, reveal["url"])
 
+        # And the mirror image: when the page is waiting on an email address, make
+        # sure the reply asks for one. The agent was told to ask in its own words;
+        # this guarantees the ask survives a degraded or model-free turn, so a
+        # streamed conversation cannot dead-end at DIAGNOSED either.
+        contact_decision = (getattr(ctx, "extra", None) or {}).get("contact_ask") or {}
+        if deliverable and contact_decision.get("ask"):
+            from apps.conversations.services import contact_ask
+
+            body_text = contact_ask.append_ask(body_text, contact_decision)
+
         msg = ingest.ingest_agent_message(
             self.conversation,
             agent_key="concierge",
@@ -281,6 +291,14 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             claim_level=1,
             cited_chunk_ids=[c["chunkId"] for c in citations],
         )
+
+        # Count the ask down only for a turn the visitor will actually read.
+        if deliverable and contact_decision.get("ask"):
+            from apps.conversations.services import contact_ask
+
+            contact_ask.record_asked(
+                getattr(self.conversation, "thread", None), contact_decision, message=msg
+            )
         return {
             "message_id": str(msg.id),
             "body": body_text if deliverable else "",

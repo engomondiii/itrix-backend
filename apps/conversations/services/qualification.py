@@ -79,6 +79,14 @@ def advance_on_turn(thread, body: str) -> None:
     # conversation. This is what carries the visitor past DIAGNOSED to the custom page.
     _maybe_reveal(thread, body)
 
+    # 3) THE CONTACT ASK. The reveal above needs an email address, and until this
+    # existed nothing ever asked for one — so a conversation that closed its loop
+    # sat at DIAGNOSED forever while the model, given no instruction, promised a
+    # human follow-up instead. Deterministic, budgeted, and a no-op once an address
+    # has been given. Runs AFTER the reveal so a turn that just revealed the page
+    # never also asks for the address it just used.
+    _maybe_ask_for_contact(thread, body)
+
 
 def _evaluate_and_close_loop(thread, state_number: int, body: str) -> None:
     """The stop-rule evaluation + loop close, factored out of advance_on_turn."""
@@ -133,6 +141,34 @@ def _maybe_reveal(thread, body: str) -> None:
             setattr(thread, "_client_page_reveal", outcome)
     except Exception:  # noqa: BLE001 - reveal is best-effort; never break the turn
         logger.debug("client-page reveal check failed for thread %s", getattr(thread, "id", "?"))
+
+
+def _maybe_ask_for_contact(thread, body: str) -> None:
+    """
+    Decide whether this turn's reply should ask for an email address, and stash it.
+
+    Stashed on the instance exactly as ``_client_page_reveal`` is, so the generation
+    path picks it up through ``conversation_context.build_turn_extra`` on both the
+    HTTP and the WebSocket transports without either of them learning a new rule.
+
+    ── THE STASH IS ALWAYS OVERWRITTEN, NEVER JUST SET ──────────────────────
+    The WebSocket consumer holds ONE Thread instance for the life of the socket, so
+    every turn in that session sees the same Python object. A decision written on
+    turn N and merely left in place would still be there on turn N+1 — including on
+    the turn that reveals the page, where the reply would hand over the personalised
+    page and then ask for the address it had just used. So the attribute is assigned
+    on every turn, whatever the decision, and a no-ask decision clears it.
+    """
+    decision = None
+    try:
+        from apps.conversations.services import contact_ask
+
+        evaluated = contact_ask.evaluate(thread, body or "")
+        if evaluated.get("ask"):
+            decision = evaluated
+    except Exception:  # noqa: BLE001 - the ask is best-effort; never break the turn
+        logger.debug("contact-ask evaluation failed for thread %s", getattr(thread, "id", "?"))
+    setattr(thread, "_contact_ask", decision)
 
 
 def suggest_next(thread, *, message=None) -> dict:

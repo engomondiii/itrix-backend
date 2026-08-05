@@ -128,6 +128,8 @@ def build_turn_extra(thread, body: str, *, exclude_message_id: str | None = None
         recent_turns            prior turns as "Speaker: text" lines (may be empty)
         closed_state_summaries  deterministic summaries of earlier states (may be empty)
         journey_state           the thread's current state key (e.g. "IN_REVIEW")
+        client_page_reveal      set when this turn revealed the personalised page
+        contact_ask             set when this turn's reply must ask for an email
     """
     extra: dict = {"message": body, "thread_id": str(getattr(thread, "id", "") or "")}
     if thread is None:
@@ -142,6 +144,12 @@ def build_turn_extra(thread, body: str, *, exclude_message_id: str | None = None
         reveal = getattr(thread, "_client_page_reveal", None)
         if reveal:
             extra["client_page_reveal"] = reveal
+        # And if the reveal is waiting on an email address nobody has asked for,
+        # pass that decision through too, so the agent asks for it in its own words
+        # instead of ending on a promise of human follow-up.
+        ask = getattr(thread, "_contact_ask", None)
+        if ask:
+            extra["contact_ask"] = ask
     except Exception:  # noqa: BLE001 - memory is additive; never break generation
         logger.debug("build_turn_extra memory assembly failed for thread %s", getattr(thread, "id", "?"))
     return extra

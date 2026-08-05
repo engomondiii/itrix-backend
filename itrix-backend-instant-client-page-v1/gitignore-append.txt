@@ -1,3 +1,0 @@
-
-# itrix-backend instant-client-page install backups (safe to delete)
-.instant-client-page-v1-backup-*/

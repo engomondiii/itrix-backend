@@ -551,5 +551,5 @@ def _append_client_page_link(text: str, url: str) -> str:
     """
     text = (text or "").rstrip()
     if url and url not in text:
-        return text + f"\n\nYour personalised itriX page is ready — open it here: {url}"
+        return text + f"\n\nYour personalised itriX page is ready — open it here:\n\n<{url}>"
     return text

@@ -649,5 +649,5 @@ def _append_client_page_link_ws(text: str, url: str) -> str:
     """Append the client-page link to a streamed reply (see views_thread._append_client_page_link)."""
     text = (text or "").rstrip()
     if url and url not in text:
-        return text + f"\n\nYour personalised itriX page is ready — open it here: {url}"
+        return text + f"\n\nYour personalised itriX page is ready — open it here:\n\n<{url}>"
     return text

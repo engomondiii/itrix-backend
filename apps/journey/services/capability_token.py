@@ -103,6 +103,34 @@ def mint(
     return f"{_b64e(payload_bytes)}.{_b64e(sig)}"
 
 
+def _tidy(token: str) -> str:
+    """
+    Strip whatever a link ends up carrying on its way through prose.
+
+    ── WHY THIS EXISTS ──────────────────────────────────────────────────────
+    A minted token is ``<payload>.<signature>`` — it CONTAINS a period. When the
+    client-page URL is written into a sentence, the sentence's own full stop lands
+    flush against the signature, and a visitor who selects the link by hand (or an
+    autolinker that guesses where the URL ends) carries that full stop into the
+    request. ``split(".", 1)`` then hands the trailing punctuation to the base64
+    decoder, the signature does not match, and the visitor is told their review
+    link is unavailable — when in fact it is valid for another two weeks.
+
+    That was a real production failure, and the surrounding fix stops the URL from
+    ever being written next to punctuation again. This function is the second line
+    of defence, and it matters for a specific reason: LINKS ALREADY SENT TO REAL
+    PEOPLE ARE BROKEN, and tidying here repairs them without reissuing anything.
+
+    It is deliberately narrow. Only trailing whitespace and sentence punctuation
+    come off, and only from the END. Nothing is stripped from the payload or from
+    inside the signature, so no token that would have failed verification can now
+    pass it: base64url's alphabet is ``A-Za-z0-9-_`` plus ``=`` padding, and none
+    of the characters removed here can appear in a valid signature.
+    """
+    if not token:
+        return token
+    return token.strip().rstrip(".,;:!?)]}'\"\u201d\u2019\u00a0")
+
 def verify(token: str, *, expected_typ: str | None = None) -> TokenPayload:
     """
     Verify signature + expiry (and optionally the type) and return the payload.
@@ -110,6 +138,7 @@ def verify(token: str, *, expected_typ: str | None = None) -> TokenPayload:
     Raises ``CapabilityTokenError`` on any problem. Does NOT check the journey or
     consume single-use nonces — the caller does that after loading the subject.
     """
+    token = _tidy(token)
     if not token or "." not in token:
         raise CapabilityTokenError("Malformed token.")
     payload_b64, sig_b64 = token.split(".", 1)

@@ -155,6 +155,12 @@ class ConciergeAgent(BaseAgent):
             "briefing', do NOT ask to 'close the intake', and do NOT promise any human "
             "follow-up — the page is the deliverable and it exists already. Keep it to a "
             "couple of warm sentences. Then STOP.\n\n"
+            "DO NOT WRITE THE LINK YOURSELF, and do not repeat the URL inside a sentence. "
+            "The link is appended for you, on its own line, after whatever you write. A URL "
+            "written mid-sentence ends up flush against the following full stop, and because "
+            "the token itself contains a period, that punctuation breaks the link for anyone "
+            "who selects it by hand. Refer to it as 'your personalised page' in words and let "
+            "the link stand alone below.\n\n"
         )
 
     @staticmethod

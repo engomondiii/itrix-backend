@@ -9,7 +9,8 @@ ingestible file (``.docx`` / ``.pdf`` / ``.txt`` / ``.md``), inferring:
 * **namespace** from filename patterns (technology / proofs / alpha-compute / alpha-core /
   licensing / company / general).
 
-Idempotent: keyed on ``file_path`` via get_or_create, so re-running won't duplicate. Use
+Idempotent: keyed on the POSIX form of ``file_path``, so re-running won't duplicate —
+including across operating systems. Use
 ``--dry-run`` to preview the mapping without writing, and ``--base`` to point at a different
 knowledge_docs directory.
 """
@@ -140,8 +141,17 @@ class Command(BaseCommand):
                     created += 1
                     continue
 
+                # POSIX FORM, ALWAYS. `str(f)` gives backslashes on Windows and forward
+                # slashes on Linux, so the same file registered from a dev machine and
+                # from the Railway container produced TWO different keys and therefore
+                # TWO rows — each with its own UUID and its own full set of vectors
+                # (`f"{document.id}:{chunk.index}"`). That is what duplicated the whole
+                # corpus on 2026-08-07.
+                #
+                # `as_posix()` is the same string on every platform, so the idempotence
+                # this command's docstring already claimed is now actually true.
                 obj, made = KnowledgeDocument.objects.get_or_create(
-                    file_path=str(f),
+                    file_path=f.as_posix(),
                     defaults={
                         "title": title,
                         "namespace": ns,

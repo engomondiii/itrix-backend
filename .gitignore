@@ -268,3 +268,7 @@ itrix-backend-contact-ask-v1*
 # review-link-v1
 .review-link-v1-backup-*/
 itrix-backend-review-link-v1*
+
+# realtime-v2
+.realtime-v2-backup-*/
+itrix-backend-realtime-v2*

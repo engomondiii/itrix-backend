@@ -71,6 +71,26 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             self.subject_group = presence.subject_group(str(self.conversation.lead_id))
             await presence.group_add(self.channel_layer, self.subject_group, self.channel_name)
 
+        # ── AND THE THREAD GROUP ────────────────────────────────────────────────
+        # Five broadcasts are addressed to `thread.<id>` rather than `conv.<id>`:
+        # `thread.updated` (ingest, claim), `shell.update` (thread_state,
+        # reveal_bridge), `question.suggested` (qualification) and `journey.reveal`
+        # (reveal_bridge). This socket only ever joined the conversation group, so
+        # every one of them was sent to a group with no members and silently
+        # dropped.
+        #
+        # What that cost, concretely: a new conversation never received its
+        # generated title, so the rail showed a bare "4m ago"; the composer never
+        # received its next-step chips; the shell contract never refreshed on a
+        # state change; and the personalised-page reveal never reached
+        # `useClientPageReveal`, which is why the "View your page" button never
+        # appeared even when the page was ready.
+        self.thread_group = None
+        thread_group = await self._thread_group()
+        if thread_group:
+            self.thread_group = thread_group
+            await presence.group_add(self.channel_layer, self.thread_group, self.channel_name)
+
         if self.ack:
             await self.accept(subprotocol=self.ack)
         else:
@@ -87,6 +107,8 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             await presence.group_discard(self.channel_layer, self.group, self.channel_name)
         if getattr(self, "subject_group", None):
             await presence.group_discard(self.channel_layer, self.subject_group, self.channel_name)
+        if getattr(self, "thread_group", None):
+            await presence.group_discard(self.channel_layer, self.thread_group, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
         msg_type = content.get("type")
@@ -337,6 +359,16 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
     def _get_conversation(self):  # pragma: no cover - overridden
         raise NotImplementedError
 
+    async def _thread_group(self):
+        """The thread group for this conversation, or None when it has no thread."""
+        from channels.db import database_sync_to_async
+
+        return await database_sync_to_async(self._thread_group_sync)()
+
+    def _thread_group_sync(self):
+        thread = getattr(self.conversation, "thread", None)
+        return getattr(thread, "group_name", None) if thread is not None else None
+
     # ── group event relays (server → client), used for cross-process fan-out ──
     async def message_final(self, event):
         await self.send_json({"type": "message.final", "payload": event.get("payload", {})})
@@ -370,6 +402,43 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
 
     async def team_typing(self, event):
         await self.send_json({"type": "team.typing", "payload": event.get("payload", {})})
+
+    # ── The relays that were missing ─────────────────────────────────────────
+    # Channels dispatches a group event to the method named after its type with the
+    # dots turned into underscores. With no method, the frame is not merely ignored:
+    # the consumer raises "No handler for message type ...", which is both a lost
+    # event and a line of noise in the server log for every occurrence.
+    #
+    # Each of these has a live sender in the codebase and a live handler on the
+    # frontend. They were the gap in between.
+
+    async def thread_updated(self, event):
+        """Title, state or ownership changed — the rail re-labels and re-orders."""
+        await self.send_json({"type": "thread.updated", "payload": event.get("payload", {})})
+
+    async def shell_update(self, event):
+        """A fresh shell contract after a state move."""
+        await self.send_json({"type": "shell.update", "payload": event.get("payload", {})})
+
+    async def question_suggested(self, event):
+        """The next question and its chips, for the composer."""
+        await self.send_json({"type": "question.suggested", "payload": event.get("payload", {})})
+
+    async def artifact_ready(self, event):
+        """A governed artifact is available in this thread."""
+        await self.send_json({"type": "artifact.ready", "payload": event.get("payload", {})})
+
+    async def message_stage(self, event):
+        """A real pipeline transition — the pending indicator's only input."""
+        await self.send_json({"type": "message.stage", "payload": event.get("payload", {})})
+
+    async def message_halted(self, event):
+        """The guard stopped a message. The client discards what it rendered."""
+        await self.send_json({"type": "message.halted", "payload": event.get("payload", {})})
+
+    async def attachment_status(self, event):
+        """An attachment finished, failed or was rejected."""
+        await self.send_json({"type": "attachment.status", "payload": event.get("payload", {})})
 
 
 class ReviewConsumer(_BaseReviewConsumer):

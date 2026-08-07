@@ -272,3 +272,7 @@ itrix-backend-review-link-v1*
 # realtime-v2
 .realtime-v2-backup-*/
 itrix-backend-realtime-v2*
+
+# knowledge-v4
+.knowledge-v4-backup-*/
+itrix-backend-knowledge-v4*

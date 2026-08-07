@@ -280,3 +280,7 @@ itrix-backend-knowledge-v4*
 # redis-channel-layer
 .redis-channel-layer-backup-*/
 itrix-backend-redis-channel-layer*
+
+# revert-ingestion
+.revert-ingestion-backup-*/
+itrix-backend-revert-ingestion*

@@ -571,11 +571,59 @@ CELERY_TASK_ALWAYS_EAGER = not ENABLE_CELERY
 # When ENABLE_REALTIME is on we use the Redis channel layer (reusing REDIS_URL) so
 # WebSocket fan-out works across processes. Otherwise we use the in-memory layer,
 # which is perfect for tests and single-process dev and requires no broker.
+#
+# ── WHY PUBSUB AND NOT THE CORE LAYER ────────────────────────────────────────
+# This was `channels_redis.core.RedisChannelLayer` with `{"hosts": [REDIS_URL]}`
+# and nothing else, and it did not survive contact with Railway.
+#
+# The core layer receives by BLOCKING ON BRPOP. Railway's internal network drops
+# a connection that has been idle, the blocked read never returns, and the socket
+# raises:
+#
+#     redis.exceptions.TimeoutError: Timeout reading from redis.railway.internal:6379
+#       ... in channels/utils.py await_many_dispatch
+#
+# That traceback is the consumer's own receive loop, so the exception kills the
+# consumer and the browser reconnects — which is the WSCONNECT/WSDISCONNECT
+# cycling every few seconds in the production logs.
+#
+# It is not a cosmetic log problem. This layer is the transport for every realtime
+# feature: streamed tokens, team replies reaching a visitor, live thread titles,
+# the client-page reveal. A socket that dies every few seconds delivers none of
+# them reliably, however correct the code above it is.
+#
+# `RedisPubSubChannelLayer` uses Redis pub/sub instead of long BRPOP polls. There
+# is no long-lived blocking read to time out, and it is the layer channels_redis
+# recommends for exactly this deployment shape.
+#
+# ── AND THE SETTINGS THAT KEEP IT ALIVE ──────────────────────────────────────
+# `health_check_interval` makes redis-py PING an idle connection rather than
+# discovering it is dead by failing a real read. `socket_keepalive` asks the OS to
+# keep the TCP connection warm, which is what stops the network dropping it in the
+# first place. Both are per-host config, hence the dict form rather than a bare URL.
 if ENABLE_REALTIME:
     CHANNEL_LAYERS = {
         "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [REDIS_URL]},
+            "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+            "CONFIG": {
+                "hosts": [
+                    {
+                        "address": REDIS_URL,
+                        # PING an idle connection every 30s instead of finding out
+                        # it is dead when a real read fails.
+                        "health_check_interval": 30,
+                        # Keep the TCP connection warm so the network has no idle
+                        # window in which to drop it.
+                        "socket_keepalive": True,
+                        # Bounded, so a genuinely unreachable Redis fails fast and
+                        # visibly rather than hanging a worker.
+                        "socket_connect_timeout": 5,
+                    }
+                ],
+                # Namespaces the pub/sub channels. Without it, another service
+                # sharing this Redis instance would collide with our group names.
+                "prefix": "itrix",
+            },
         }
     }
 else:

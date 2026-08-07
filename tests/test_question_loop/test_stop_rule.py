@@ -155,3 +155,52 @@ def test_the_stop_reason_is_recorded():
                                   questions_asked=4)
     assert decision.reason
     assert decision.budget_remaining == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The PROCEED signal (added 2026-08-07)
+# ─────────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Yes I would like to move forward",
+        "ok let's proceed",
+        "go ahead and set that up",
+        "sounds good, let's get started",
+        "sign me up",
+        "what are the next steps?",
+        "I am in — ready to start",
+    ],
+)
+def test_visitor_acceptance_closes_the_loop(text):
+    """
+    Explicit acceptance of the next step ends the band. This is the transcript
+    signal the first three visitor closers could not catch: the visitor neither
+    declined, nor asked for the verdict, nor asked for a person — they said yes.
+    """
+    decision = stop_rule.evaluate(journey_state=2, questions_asked=0, last_visitor_text=text)
+    assert decision.should_continue is False
+    assert decision.reason == stop_rule.STOP_ASKED_TO_PROCEED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "pressure is primarily is on both, the scale is many",
+        "our workload is mostly training",
+        "we run on a GPU cluster",
+    ],
+)
+def test_ordinary_answers_do_not_read_as_acceptance(text):
+    decision = stop_rule.evaluate(journey_state=2, questions_asked=0, last_visitor_text=text)
+    assert decision.should_continue is True
+
+
+def test_decline_outranks_acceptance_wording():
+    """"Not interested in moving forward" is a decline, and records as one."""
+    decision = stop_rule.evaluate(
+        journey_state=2, questions_asked=0,
+        last_visitor_text="not interested in moving forward",
+    )
+    assert decision.should_continue is False
+    assert decision.reason == stop_rule.STOP_VISITOR_DECLINED

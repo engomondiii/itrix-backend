@@ -277,13 +277,16 @@ def test_the_ask_does_not_survive_the_turn_that_reveals_the_page():
     from apps.conversations.services import conversation_context
 
     thread = _thread()
+    # ``_say`` ingests, and ingest is the single production call site of
+    # ``advance_on_turn`` — one call per visitor turn is the contract, and the
+    # stash-reset semantics (always assigned, per turn) depend on it. A second
+    # manual call here would model a transport that does not exist and would
+    # (correctly) read as a new turn, clearing the reveal it just made.
     _say(thread, COVERING_TEXT)
-    qualification.advance_on_turn(thread, COVERING_TEXT)
     assert getattr(thread, "_contact_ask", None) is not None  # asked on this turn
 
     # Same instance, next turn — and this one carries the address.
     _say(thread, "dana@example.com")
-    qualification.advance_on_turn(thread, "dana@example.com")
     extra = conversation_context.build_turn_extra(thread, "dana@example.com")
 
     assert getattr(thread, "_contact_ask", None) is None

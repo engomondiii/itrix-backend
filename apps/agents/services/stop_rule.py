@@ -33,6 +33,7 @@ STOP_BUDGET = "question_budget_exhausted"
 STOP_VISITOR_DECLINED = "visitor_declined"
 STOP_ASKED_FOR_OUTCOME = "visitor_asked_for_outcome"
 STOP_ASKED_FOR_HUMAN = "visitor_asked_for_human"
+STOP_ASKED_TO_PROCEED = "visitor_asked_to_proceed"
 STOP_GOVERNANCE_HANDOFF = "governance_handoff"
 
 # Stage 1 is frictionless; Stage 2 is earned and gets one more question.
@@ -76,6 +77,25 @@ _ASKED_FOR_HUMAN = re.compile(
     r"\b(?:speak (?:to|with) (?:a|someone|a real)|talk to (?:a|someone)|"
     r"real person|human being|a human|call me|contact me|sales (?:rep|person)|"
     r"can someone (?:call|email)|put me through)\b",
+    re.IGNORECASE,
+)
+
+# The visitor telling us to GO — explicit acceptance of the next step. This is the
+# fourth visitor-driven closer, and the one the first three could not catch: a
+# visitor who says "yes, I would like to move forward" has not declined, has not
+# asked for a person, and has not asked for the verdict — they have accepted it.
+# Continuing to qualify someone who just said "let's go" is the same rudeness as
+# interrogating someone who asked for a human, and it is what left the band open
+# while the model improvised a hand-off ("the team will be notified", "a contact
+# form") that the platform cannot honour. Broad on purpose, like _DECLINE: a false
+# positive closes the band and produces one budgeted, declinable ask for an email
+# address — recoverable. A false negative strands an accepting visitor in the loop.
+_ASKED_TO_PROCEED = re.compile(
+    r"\b(?:move forward|go ahead|proceed|next steps?|"
+    r"let'?s (?:do (?:it|this)|get started|start|go|begin)|"
+    r"sign me up|count me in|i(?:'m| am) in|"
+    r"set (?:that|this|it) up|ready to (?:start|begin|move|go)|"
+    r"sounds good[,.]? (?:let'?s|go)|happy to (?:start|begin|continue))\b",
     re.IGNORECASE,
 )
 
@@ -129,6 +149,9 @@ def evaluate(*, thread=None, coverage=None, journey_state: int = 2,
         if _DECLINE.search(last_visitor_text):
             return StopDecision(False, STOP_VISITOR_DECLINED,
                                 "visitor declined to continue", questions_asked, budget)
+        if _ASKED_TO_PROCEED.search(last_visitor_text):
+            return StopDecision(False, STOP_ASKED_TO_PROCEED,
+                                "visitor accepted the next step", questions_asked, budget)
 
     # Condition 1: everything required for this state is covered.
     if coverage is not None and coverage.is_complete_for(journey_state):

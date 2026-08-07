@@ -61,13 +61,19 @@ def advance_on_turn(thread, body: str) -> None:
     except Exception:  # noqa: BLE001
         logger.debug("enter_in_review failed for thread %s", getattr(thread, "id", "?"))
 
-    if not _adaptive_on():
-        # Without the adaptive loop the deterministic band still governs state via
-        # enter_in_review above; there is no coverage-driven close to evaluate — but
-        # the client-page reveal below still runs (it has its own gates).
-        _maybe_reveal(thread, body)
-        return
-
+    # ── THE FLAG GATES GENERATION, NOT THE BAND ──────────────────────────────
+    # ENABLE_ADAPTIVE_QUESTIONS used to make this function return here, skipping the
+    # stop-rule evaluation AND the contact ask. That turned a UI feature flag into a
+    # journey switch: with the flag off, nothing could ever close the loop, so the
+    # thread sat at IN_REVIEW forever, the contact ask (gated on DIAGNOSED) was
+    # unreachable, and the client-page reveal was permanently "not_diagnosed" — even
+    # when the visitor volunteered an email address. The conversation dead-ended
+    # while the model, given no instruction, improvised a human hand-off.
+    #
+    # Coverage and the stop rule are deterministic, model-free, and belong to the
+    # band itself (Architecture: Layer 1 owns coverage and the stop rule). The flag
+    # keeps exactly the scope its name claims — ADAPTIVE QUESTION generation — which
+    # ``suggest_next`` below still checks. State advancement is not a feature.
     state_number = thread_state.current_state_number(thread)
     # The qualification band is states 1-2. We only evaluate the stop rule / loop close
     # while inside it; past it we fall through to the reveal check.
@@ -129,18 +135,28 @@ def _maybe_reveal(thread, body: str) -> None:
     Runs on every turn. The bridge itself gates on DIAGNOSED + an email given
     anywhere in the conversation, so this is a cheap no-op until the visitor is
     actually ready.
+
+    ── THE STASH IS ALWAYS OVERWRITTEN, NEVER JUST SET ──────────────────────
+    Same rule as ``_maybe_ask_for_contact`` below, for the same reason: the
+    WebSocket consumer holds ONE Thread instance for the life of the socket. A
+    reveal stashed on the turn that fired it and merely left in place would still
+    be there on every LATER turn in that session — so the reveal directive and the
+    appended link would repeat under every subsequent reply. Assign on every turn;
+    a no-reveal turn clears it.
     """
+    outcome = None
     try:
         from apps.conversations.services import reveal_bridge
 
-        outcome = reveal_bridge.maybe_reveal_client_page(thread, body or "")
-        if outcome.get("revealed"):
+        result = reveal_bridge.maybe_reveal_client_page(thread, body or "")
+        if result.get("revealed"):
             # Stash on the instance so the generation path can (a) tell the AI the page
             # is ready so it presents it in its own voice, and (b) append the link as a
             # transport-independent fallback.
-            setattr(thread, "_client_page_reveal", outcome)
+            outcome = result
     except Exception:  # noqa: BLE001 - reveal is best-effort; never break the turn
         logger.debug("client-page reveal check failed for thread %s", getattr(thread, "id", "?"))
+    setattr(thread, "_client_page_reveal", outcome)
 
 
 def _maybe_ask_for_contact(thread, body: str) -> None:
@@ -233,14 +249,34 @@ def _questions_asked(thread) -> int:
     QuestionSuggestion count via question_history if the counter is unset.
     """
     n = int(getattr(thread, "questions_asked", 0) or 0)
-    if n:
-        return n
-    try:
-        from apps.agents.services import question_history
+    if not n:
+        try:
+            from apps.agents.services import question_history
 
-        return int(question_history.count_for(thread))
-    except Exception:  # noqa: BLE001
-        return 0
+            n = int(question_history.count_for(thread))
+        except Exception:  # noqa: BLE001
+            n = 0
+
+    # ── THE DELIVERED-REPLY FLOOR ────────────────────────────────────────────
+    # Both counters above move only when the QUESTION GENERATOR emits. But the
+    # concierge asks a question with essentially every in-band reply of its own —
+    # the approved behaviour — whether or not the generator emitted chips for it.
+    # When emission stalls (generation off, wording rejected, nothing left in the
+    # bank) the counters freeze below the budget and the band can never close on
+    # exhaustion: the exact "asks forever" failure the stop rule exists to prevent,
+    # reached through its own bookkeeping. Every delivered agent reply in the band
+    # was an opportunity to ask, so it is counted as one. Team, system and support
+    # messages are not questions and are excluded.
+    try:
+        from apps.conversations.models import Message, SenderKind
+
+        delivered = Message.objects.filter(
+            thread=thread, sender_kind=SenderKind.AGENT
+        ).count()
+        n = max(n, int(delivered))
+    except Exception:  # noqa: BLE001 - a counting failure must never break a turn
+        pass
+    return n
 
 
 def _bump_questions_asked(thread) -> None:

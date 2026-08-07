@@ -27,6 +27,32 @@ _CLAIMS_DISCIPLINE = (
 )
 
 
+_RESULT_PAGE_TASK = (
+    "TASK: Produce a personalised, honest diagnosis of the visitor's computation "
+    "bottleneck and how ALPHA could help, suitable for a public result page. Keep it "
+    "concrete but qualitative, and consistent with the claims discipline above."
+)
+
+_CONVERSATION_TASK = (
+    "TASK: You are in a live conversation. ANSWER THE QUESTION THE VISITOR ACTUALLY "
+    "ASKED.\n"
+    "- If they ask what itriX is, what it sells, who is behind it, what AXIOM, CRE or "
+    "FQNM are, how pricing works, or what an engagement involves — answer that "
+    "directly and substantively from the knowledge context. These are fair questions "
+    "and refusing them is not discretion, it is unhelpfulness.\n"
+    "- Do NOT turn every question into a diagnosis of their workload. A question "
+    "about the company is not a request to be qualified.\n"
+    "- Do NOT ask for their workload details as a precondition for answering "
+    "something general.\n"
+    "- Where the knowledge context genuinely does not cover what they asked, say so "
+    "plainly in one sentence and answer as much as you can. Never invent a figure, a "
+    "customer, a benchmark or a capability.\n"
+    "- Then, if it is natural, you may add one short sentence moving the conversation "
+    "forward. One, not a paragraph.\n"
+    "Warm, precise, and within the claims discipline above."
+)
+
+
 def _format_context(chunks: list[dict]) -> str:
     if not chunks:
         return "(no specific knowledge retrieved — stay general and qualitative)"
@@ -47,8 +73,16 @@ def build_system_prompt(
     pressures: list[str],
     chunks: list[dict],
     context: str = "public",
+    task: str | None = None,
 ) -> str:
-    """Return the full system prompt for a public result generation."""
+    """
+    Return the full system prompt.
+
+    ``task`` overrides the closing instruction. It defaults to result-page
+    generation, which is what every existing caller wants; the conversational
+    concierge passes ``_CONVERSATION_TASK`` instead (see
+    ``build_conversation_system_prompt``).
+    """
     return "\n\n".join(
         [
             _BRAND_CORE,
@@ -62,13 +96,65 @@ def build_system_prompt(
                 f"- Disclosure context: {context} (do not reveal anything above this tier)"
             ),
             f"KNOWLEDGE CONTEXT (grounding — cite only what's here):\n{_format_context(chunks)}",
-            (
-                "TASK: Produce a personalised, honest diagnosis of the visitor's computation "
-                "bottleneck and how ALPHA could help, suitable for a public result page. Keep it "
-                "concrete but qualitative, and consistent with the claims discipline above."
-            ),
+            task or _RESULT_PAGE_TASK,
         ]
     )
+
+
+def build_conversation_system_prompt(
+    *,
+    product_route: str,
+    license_pathway: str | None,
+    tier: int,
+    pressures: list[str],
+    chunks: list[dict],
+    context: str = "public",
+    question: str = "",
+) -> str:
+    """
+    The system prompt for a CONVERSATIONAL turn, as distinct from page generation.
+
+    ── WHY THIS EXISTS ──────────────────────────────────────────────────────
+    There was one builder, and its TASK line read: "Produce a personalised, honest
+    diagnosis of the visitor's computation bottleneck ... suitable for a public
+    result page."
+
+    The conversational concierge used that same builder for every turn. So when a
+    visitor asked "what is itriX?", the model had just been instructed that its job
+    was to diagnose their computation bottleneck for a result page — and it did the
+    only thing that instruction allows: it turned an ordinary question about the
+    company into bottleneck framing, or declined it.
+
+    That is the whole of the reported "can't answer what is itriX". Retrieval was
+    working and the knowledge was reachable; the model was simply told to be doing
+    something else.
+
+    Everything protective is unchanged and shared: the brand core, the claims
+    discipline, the disclosure context, and grounding on retrieved chunks only. Only
+    the TASK differs — and it has to, because answering a question and generating a
+    page are not the same job.
+    """
+    base = build_system_prompt(
+        product_route=product_route,
+        license_pathway=license_pathway,
+        tier=tier,
+        pressures=pressures,
+        chunks=chunks,
+        context=context,
+        task=_CONVERSATION_TASK,
+    )
+
+    # Named entities, resolved from a table rather than inferred by the model. See
+    # entity_context for why that constraint is not negotiable.
+    note = ""
+    if question:
+        try:
+            from apps.ai_engine.services import entity_context
+
+            note = entity_context.grounding_note(question)
+        except Exception:  # noqa: BLE001 - enrichment is never load-bearing
+            note = ""
+    return f"{base}\n\n{note}" if note else base
 
 
 # ─────────────────────────────────────────────────────────────────────────────

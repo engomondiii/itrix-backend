@@ -108,7 +108,9 @@ def test_required_dimensions_gate_completeness(thread):
     coverage = coverage_svc.build_for_thread(thread)
     assert coverage.is_complete_for(2) is False
 
+    # Completes all five: the platform and pressure here, plus scale and timeline.
     add_turn(thread, "It runs on a GPU cluster and the cost is unsustainable")
+    add_turn(thread, "We run 64 GPUs and it is urgent this quarter")
     coverage = coverage_svc.build_for_thread(thread)
     assert coverage.is_complete_for(2) is True
 

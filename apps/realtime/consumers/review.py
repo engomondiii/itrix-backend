@@ -716,7 +716,13 @@ def _normalize_client_page(raw: dict, lead) -> dict:
 
 def _append_client_page_link_ws(text: str, url: str) -> str:
     """Append the client-page link to a streamed reply (see views_thread._append_client_page_link)."""
+    from apps.conversations.views_thread import WHAT_HAPPENS_NEXT
+
     text = (text or "").rstrip()
     if url and url not in text:
-        return text + f"\n\nYour personalised itriX page is ready — open it here:\n\n<{url}>"
+        return text + (
+            "\n\nYour personalised itriX page is ready — open it here:"
+            f"\n\n<{url}>"
+            f"\n\n{WHAT_HAPPENS_NEXT}"
+        )
     return text

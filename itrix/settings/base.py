@@ -385,7 +385,12 @@ MAX_ATTACHMENT_BYTES = int(env("MAX_ATTACHMENT_BYTES", "104857600"))
 MAX_ATTACHMENT_BYTES_PER_TURN = int(env("MAX_ATTACHMENT_BYTES_PER_TURN", "524288000"))
 MAX_ATTACHMENTS_PER_SESSION = int(env("MAX_ATTACHMENTS_PER_SESSION", "200"))
 PRE_NDA_ATTACHMENT_RETENTION_DAYS = int(env("PRE_NDA_ATTACHMENT_RETENTION_DAYS", "30"))
-QUESTION_BUDGET_PER_STATE = int(env("QUESTION_BUDGET_PER_STATE", "3"))
+# Raised 3 -> 4 alongside coverage.REQUIRED_BY_STATE going from three dimensions to
+# five. At three, five required dimensions would almost always have closed the loop on
+# budget exhaustion rather than on coverage — the same thin diagnosis, reached a
+# different way. Still a hard cap, and still what protects a visitor who does not want
+# to answer. Overridable per environment.
+QUESTION_BUDGET_PER_STATE = int(env("QUESTION_BUDGET_PER_STATE", "4"))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Streaming governance

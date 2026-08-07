@@ -22,9 +22,15 @@ from apps.conversations.services import threads as thread_svc
 
 # Covers workload + pressure_area + platform_environment in one turn, which is the
 # required set for the band — so the loop closes and the thread reaches DIAGNOSED.
+# Covers the FIVE required dimensions in one turn — workload, pressure_area,
+# platform_environment, scale and timeline — so the loop closes and the thread reaches
+# DIAGNOSED. It grew when the requirement went from three dimensions to five (#12);
+# a single sentence covering three no longer closes the loop, which is the point of
+# that change.
 COVERING_TEXT = (
     "Our training and inference workload runs on a GPU cluster with PyTorch and the "
-    "cost is rising faster than the value it creates."
+    "cost is rising faster than the value it creates. We run 64 GPUs and it is urgent "
+    "this quarter."
 )
 
 

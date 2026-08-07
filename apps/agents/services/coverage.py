@@ -120,10 +120,31 @@ _COMPILED: dict[str, dict[str, list]] = {
 # Which dimensions must be covered before the qualification band can close. The rest are
 # useful but not required — insisting on all ten would make the loop feel like an
 # interrogation, which is the failure mode §3 exists to avoid.
+# ── HOW MUCH WE HAVE TO KNOW BEFORE THE LOOP CLOSES ─────────────────────────
+# Raised from three dimensions to five (change request, 2026-08).
+#
+# WHY IT MATTERED. The loop closing is what carries a visitor to DIAGNOSED, and
+# DIAGNOSED is what makes the personalised page reachable. At three dimensions a
+# single well-written opening sentence could satisfy all three at once — "our
+# training and inference cost is rising faster than the value it creates, on a GPU
+# cluster" covers workload, pressure_area and platform_environment in one breath —
+# so a visitor could reach their personalised page in two messages. The page was
+# then generated from almost nothing, which is exactly what was reported.
+#
+# WHY FIVE AND NOT TEN. The other side of this is real too: a visitor who is
+# interrogated before being given anything leaves. Ten dimensions is a form, not a
+# conversation. `scale` and `timeline` are the two additions that most change
+# whether a diagnosis is worth reading — how big the workload is, and whether the
+# pressure is urgent or structural — and both are things somebody with a genuine
+# problem answers readily and without needing an NDA.
+#
+# The question budget in stop_rule.py is the other half of the guarantee: the loop
+# still closes on budget exhaustion or a decline signal even when a visitor will not
+# answer, so raising this can lengthen a conversation but cannot trap anyone in one.
 REQUIRED_BY_STATE: dict[int, tuple[str, ...]] = {
     1: (),
-    2: ("workload", "pressure_area", "platform_environment"),
-    3: ("workload", "pressure_area", "platform_environment"),
+    2: ("workload", "pressure_area", "platform_environment", "scale", "timeline"),
+    3: ("workload", "pressure_area", "platform_environment", "scale", "timeline"),
 }
 
 

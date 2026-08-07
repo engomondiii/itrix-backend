@@ -36,9 +36,13 @@ pytestmark = pytest.mark.django_db
 #   workload             -> "training", "inference", "workload"
 #   platform_environment -> "PyTorch", "CUDA"
 #   pressure_area        -> "slow", "cost"
+# Covers all FIVE required dimensions — workload, pressure_area,
+# platform_environment, scale and timeline — so the loop closes in one turn.
+# Widened when #12 raised the requirement from three dimensions to five.
 COVERING_TEXT = (
-    "Our training and inference workload runs on PyTorch with CUDA and it is too "
-    "slow, and the cost has become a real problem for us."
+    "Our training and inference workload runs on a GPU cluster with PyTorch and the "
+    "cost is rising faster than the value it creates. We run 64 GPUs and it is urgent "
+    "this quarter."
 )
 
 

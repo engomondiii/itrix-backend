@@ -83,6 +83,11 @@ def test_public_tier_holds_only_approved_knowledge_core_material():
         "alpha_compute_problemology_public.md",
         "alpha_core_problemology_public.md",
         "brand_story_company_public.md",
+        # Written to be published: the company/technology overview the concierge
+        # answers "what is itriX" from. Reviewed against the NDA boundary — it names
+        # AXIOM, CRE and FQNM and what they are FOR, and carries no construction
+        # detail, no benchmark figure and no evaluation methodology.
+        "itrix_company_overview_public.md",
     }
     actual = {p.name for p in _files_in("public")}
     unexpected = actual - approved

@@ -31,7 +31,10 @@ _CONCIERGE_INSTRUCTION = (
     "You are the itriX assessment concierge. Answer the visitor's question clearly and "
     "calmly, strictly within the claims discipline: no benchmark numbers, no guaranteed "
     "improvements, no competitor comparisons, and never request confidential technical "
-    "detail before an NDA. Prefer 'may', 'potential', 'evaluated'. Respond ONLY with a "
+    "detail before an NDA. Prefer 'may', 'potential', 'evaluated'. A QUESTION ABOUT "
+    "itriX ITSELF — what it is, what it sells, who is behind it, how pricing works — "
+    "IS A FAIR QUESTION: answer it from the knowledge context instead of redirecting "
+    "to the visitor's workload. Respond ONLY with a "
     'JSON object: {"reply": string, "suggestNda": boolean}.'
 )
 
@@ -40,7 +43,10 @@ _CONCIERGE_STREAM_INSTRUCTION = (
     "You are the itriX assessment concierge. Answer the visitor's question clearly and "
     "calmly, strictly within the claims discipline: no benchmark numbers, no guaranteed "
     "improvements, no competitor comparisons, and never request confidential technical "
-    "detail before an NDA. Prefer 'may', 'potential', 'evaluated'. Reply in plain, warm "
+    "detail before an NDA. Prefer 'may', 'potential', 'evaluated'. A QUESTION ABOUT "
+    "itriX ITSELF — what it is, what it sells, who is behind it, how pricing works — "
+    "IS A FAIR QUESTION: answer it from the knowledge context instead of redirecting "
+    "to the visitor's workload. Reply in plain, warm "
     "prose (no JSON, no markdown headings). Keep it concise — a few sentences."
 )
 
@@ -184,22 +190,37 @@ class ConciergeAgent(BaseAgent):
     def run_ai(self, ctx: AgentContext) -> AgentOutput:
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
-        from apps.ai_engine.services.system_prompt_builder import build_system_prompt
+        from apps.ai_engine.services.system_prompt_builder import build_conversation_system_prompt
 
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
 
+        # A question naming a person or company embeds nothing about the workloads
+        # they are associated with, so it retrieves on generic similarity and finds
+        # generic chunks. The expansion appends the relevant workload families; the
+        # visitor's own words stay first and are never replaced.
+        from apps.ai_engine.services import entity_context
+
         chunks = KnowledgeRetriever().retrieve(
-            question, namespace=self._namespace(ctx), top_k=6, context=retrieval_context
+            entity_context.expand_query(question),
+            namespace=self._namespace(ctx),
+            top_k=6,
+            context=retrieval_context,
         )
         try:
-            system = build_system_prompt(
+            # CONVERSATIONAL, not result-page. The shared builder's default TASK tells
+            # the model to produce a diagnosis for a result page, which is why an
+            # ordinary question ("what is itriX?") came back reframed as bottleneck
+            # talk or declined outright. Same brand core, same claims discipline,
+            # same grounding — different job.
+            system = build_conversation_system_prompt(
                 product_route=ctx.product_route,
                 license_pathway=ctx.license_pathway,
                 tier=ctx.tier,
                 pressures=ctx.pressures,
                 chunks=chunks,
                 context=retrieval_context,
+                question=question,
             )
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_INSTRUCTION)
             raw = ClaudeClient().complete(system=system, user=user, max_tokens=700)
@@ -249,7 +270,7 @@ class ConciergeAgent(BaseAgent):
 
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
-        from apps.ai_engine.services.system_prompt_builder import build_system_prompt
+        from apps.ai_engine.services.system_prompt_builder import build_conversation_system_prompt
 
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
@@ -257,13 +278,19 @@ class ConciergeAgent(BaseAgent):
             chunks = KnowledgeRetriever().retrieve(
                 question, namespace=self._namespace(ctx), top_k=6, context=retrieval_context
             )
-            system = build_system_prompt(
+            # CONVERSATIONAL, not result-page. The shared builder's default TASK tells
+            # the model to produce a diagnosis for a result page, which is why an
+            # ordinary question ("what is itriX?") came back reframed as bottleneck
+            # talk or declined outright. Same brand core, same claims discipline,
+            # same grounding — different job.
+            system = build_conversation_system_prompt(
                 product_route=ctx.product_route,
                 license_pathway=ctx.license_pathway,
                 tier=ctx.tier,
                 pressures=ctx.pressures,
                 chunks=chunks,
                 context=retrieval_context,
+                question=question,
             )
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
             yield from ClaudeClient().stream(system=system, user=user, max_tokens=700)

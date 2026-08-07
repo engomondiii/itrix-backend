@@ -40,7 +40,21 @@ STAGE_1_STATES = {1, 2}
 
 
 def question_budget(journey_state: int) -> int:
-    base = int(getattr(settings, "QUESTION_BUDGET_PER_STATE", 3))
+    """
+    How many questions we may ask in this state before the loop closes regardless.
+
+    RAISED FROM 3 TO 4 alongside the coverage requirement going from three
+    dimensions to five (see coverage.REQUIRED_BY_STATE). With a budget of three, five
+    required dimensions would almost always have closed the loop on BUDGET rather
+    than on coverage — which is the same thin diagnosis as before, just arrived at by
+    a different route. Four leaves room for coverage to be the reason.
+
+    This is still a hard cap, and it is still what protects a visitor who will not
+    answer: the loop closes on exhaustion or on a decline signal whether or not we
+    learned anything. Raising the requirement can lengthen a conversation. It cannot
+    trap anybody in one.
+    """
+    base = int(getattr(settings, "QUESTION_BUDGET_PER_STATE", 4))
     return base if journey_state in STAGE_1_STATES else base + 1
 
 

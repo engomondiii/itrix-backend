@@ -29,7 +29,9 @@ def test_the_generator_falls_back_to_the_bank_when_generation_is_off(thread):
 
 def test_the_first_question_targets_a_required_dimension(thread):
     question = qg.generate(thread=thread, coverage=_coverage(), journey_state=2)
-    assert question.target_dimension in ("workload", "pressure_area", "platform_environment")
+    assert question.target_dimension in (
+        "workload", "pressure_area", "platform_environment", "scale", "timeline",
+    )
 
 
 def test_successive_questions_target_different_dimensions(thread):
@@ -50,7 +52,10 @@ def test_emitting_records_the_question(thread):
 
 def test_a_fallback_question_still_counts_toward_the_budget(thread):
     """A fallback question was still ASKED — not counting it would break the budget."""
-    for _ in range(3):
+    # Asks the whole budget, whatever it is, rather than hard-coding it. The budget
+    # moved from 3 to 4 with the five-dimension requirement (#12), and a test that
+    # pins the number fails on the next change without saying anything useful.
+    for _ in range(stop_rule.question_budget(2)):
         qg.emit(thread, qg.generate(thread=thread, coverage=_coverage(), journey_state=2))
     decision = stop_rule.evaluate(coverage=_coverage(), journey_state=2,
                                   questions_asked=question_history.count_for(thread))

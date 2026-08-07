@@ -542,6 +542,24 @@ def _generate_assistant_turn(thread, body: str):
     return ThreadTurnSerializer(message).data
 
 
+# ── WHAT HAPPENS AFTER THE PAGE ─────────────────────────────────────────────
+# The reveal used to end at the link, so a visitor reached their page and had no idea
+# what it was for or what came next — reported as "what happens next after receiving
+# personalised page". Three short steps, and honest about the fact that the page is a
+# starting point rather than a verdict.
+#
+# Deterministic copy rather than model-generated: this is a description of the itriX
+# engagement path, and a paraphrase that drifted would be a commitment nobody made.
+WHAT_HAPPENS_NEXT = (
+    "What happens from here: the page reflects the pressure areas you described and "
+    "sets out the assessment path that fits them. It is a starting point, not a "
+    "verdict — nothing on it is a measured result yet. When you are ready, you can "
+    "keep asking questions here, share more about the workload, or ask to speak to "
+    "the specialist who reviewed it. Anything workload-specific stays "
+    "non-confidential until an NDA is in place."
+)
+
+
 def _append_client_page_link(text: str, url: str) -> str:
     """
     Append the client-page link to a governed reply.
@@ -551,5 +569,9 @@ def _append_client_page_link(text: str, url: str) -> str:
     """
     text = (text or "").rstrip()
     if url and url not in text:
-        return text + f"\n\nYour personalised itriX page is ready — open it here:\n\n<{url}>"
+        return text + (
+            "\n\nYour personalised itriX page is ready — open it here:"
+            f"\n\n<{url}>"
+            f"\n\n{WHAT_HAPPENS_NEXT}"
+        )
     return text

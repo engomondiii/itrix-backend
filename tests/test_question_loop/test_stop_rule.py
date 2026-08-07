@@ -33,7 +33,8 @@ def test_the_loop_continues_when_nothing_is_covered():
 
 def test_covered_dimensions_stop_the_loop():
     coverage = _empty_coverage()
-    for dimension in ("workload", "pressure_area", "platform_environment"):
+    # All FIVE required dimensions (#12 raised the requirement from three).
+    for dimension in ("workload", "pressure_area", "platform_environment", "scale", "timeline"):
         coverage.dimensions[dimension] = coverage_svc.COVERED
     decision = stop_rule.evaluate(coverage=coverage, journey_state=2, questions_asked=1)
     assert decision.should_continue is False
@@ -42,14 +43,17 @@ def test_covered_dimensions_stop_the_loop():
 
 def test_the_budget_stops_the_loop():
     decision = stop_rule.evaluate(coverage=_empty_coverage(), journey_state=2,
-                                  questions_asked=3)
+                                  questions_asked=4)
     assert decision.should_continue is False
     assert decision.reason == stop_rule.STOP_BUDGET
 
 
 def test_stage_two_gets_one_more_question():
-    assert stop_rule.question_budget(2) == 3
-    assert stop_rule.question_budget(6) == 4
+    # Raised 3 -> 4 alongside the five-dimension requirement, so coverage stays
+    # reachable rather than the loop always closing on budget exhaustion.
+    assert stop_rule.question_budget(2) == 4
+    # A later state still gets one MORE than the stage-1 band: 4 + 1.
+    assert stop_rule.question_budget(6) == 5
 
 
 @pytest.mark.parametrize("text", [
@@ -148,6 +152,6 @@ def test_the_rule_makes_no_model_call():
 
 def test_the_stop_reason_is_recorded():
     decision = stop_rule.evaluate(coverage=_empty_coverage(), journey_state=2,
-                                  questions_asked=3)
+                                  questions_asked=4)
     assert decision.reason
     assert decision.budget_remaining == 0

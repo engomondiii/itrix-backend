@@ -287,6 +287,13 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
 
         deliverable = governance_status in ("auto_approved", "approved")
 
+        # Internal names never reach a visitor (mirror of views_thread; the streamed
+        # text may have carried the term for a moment, but the settled message that
+        # replaces it in the transcript — and the record — does not).
+        from apps.conversations.services import terminology
+
+        body_text = terminology.normalise_outbound(body_text)
+
         # If a client page was revealed while persisting this turn, append the link so
         # the visitor can reach it even if the live reveal event was missed. The reveal
         # fact rides on ctx.extra (set by build_turn_extra during _build_ctx).

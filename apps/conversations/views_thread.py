@@ -39,6 +39,7 @@ from apps.conversations.serializers_thread import (
     ThreadTurnSerializer,
     TurnSubmitSerializer,
 )
+from apps.clients.backends import ClientJWTAuthentication
 from apps.conversations.services import threads as thread_svc
 
 logger = logging.getLogger("itrix")
@@ -102,13 +103,58 @@ def _rate_limited(request, session_id: str, kind: str):
     return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE CLIENT PLANE (2026-08-10)
+#
+# `list_for_client` / `get_for_client` have existed in the service layer since the
+# spine shipped, and claiming a thread at signup deliberately REMOVES it from the
+# session plane (`client__isnull=True` in every session filter). But no view ever
+# authenticated a client, so the moment a thread was claimed it became unreachable:
+# the workspace could neither list nor reopen the very conversations signing up
+# was supposed to carry over. These views now authenticate the Bearer client-JWT
+# when one is presented (the authenticator stays silent otherwise, so the
+# anonymous session path is byte-for-byte unchanged) and route ownership to the
+# client helpers.
+# ─────────────────────────────────────────────────────────────────────────────
+def _client_from(request):
+    """The authenticated Client, or None on the anonymous plane."""
+    from apps.clients.models import Client
+
+    user = getattr(request, "user", None)
+    return user if isinstance(user, Client) and user.is_active else None
+
+
+def _resolve_thread(request, thread_id):
+    """One ownership rule for every thread view: client plane first, then session."""
+    client = _client_from(request)
+    if client is not None:
+        owned = thread_svc.get_for_client(thread_id, client)
+        if owned is not None:
+            return owned
+        # Fall through: a signed-in customer opening one of their still-anonymous
+        # (pre-signup, same-browser) threads must not be refused for having
+        # authenticated.
+    return thread_svc.get_for_session(thread_id, visitor_session_from(request))
+
+
 class ThreadListCreateView(APIView):
     """POST threads/ · GET threads/ — PUBLIC, scoped to the visitor session."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request):
+        client = _client_from(request)
+        if client is not None:
+            # The UNION: client-owned threads plus any anonymous threads still on
+            # this browser's session — signing in must never make a conversation
+            # disappear from the list.
+            qs = thread_svc.list_for_client_and_session(client, visitor_session_from(request))[:100]
+            return Response(
+                {"threads": ThreadSummarySerializer(qs, many=True).data},
+                status=status.HTTP_200_OK,
+            )
         session_id = visitor_session_from(request)
         if not session_id:
             # No session means no threads. Not an error — a first-time visitor.
@@ -124,15 +170,21 @@ class ThreadListCreateView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
+        client = _client_from(request)
         session_id = visitor_session_from(request)
         issued_session = False
-        if not session_id:
+        if client is None and not session_id:
             session_id = new_visitor_session()
             issued_session = True
 
         body = data.get("body", "") or ""
+        # A signed-in customer's new chat is CLIENT-OWNED from birth — created on
+        # the session plane it would vanish from their workspace the way claimed
+        # threads used to.
         thread = thread_svc.create_thread(
-            visitor_session=session_id,
+            visitor_session="" if client is not None else session_id,
+            client=client,
+            lead=getattr(client, "lead", None) if client is not None else None,
             title=thread_svc.derive_title(body) if body else "",
         )
 
@@ -172,10 +224,11 @@ class ThreadDetailView(APIView):
     """GET/PATCH/DELETE threads/{id}/ — PUBLIC, scoped to the visitor session."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def _load(self, request, thread_id):
-        return thread_svc.get_for_session(thread_id, visitor_session_from(request))
+        return _resolve_thread(request, thread_id)
 
     def get(self, request, thread_id):
         thread = self._load(request, thread_id)
@@ -216,10 +269,11 @@ class ThreadMessagesView(APIView):
     """GET threads/{id}/messages/ — paginated transcript."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request, thread_id):
-        thread = thread_svc.get_for_session(thread_id, visitor_session_from(request))
+        thread = _resolve_thread(request, thread_id)
         if thread is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -256,15 +310,20 @@ class ThreadTurnsView(APIView):
     """
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def post(self, request, thread_id):
         session_id = visitor_session_from(request)
-        thread = thread_svc.get_for_session(thread_id, session_id)
+        thread = _resolve_thread(request, thread_id)
         if thread is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        limited = _rate_limited(request, session_id, "turn")
+        # A signed-in customer may have no visitor session at all; the rate key
+        # must still be THEIRS, not one shared empty bucket for every client.
+        client = _client_from(request)
+        rate_key = session_id or (f"client:{client.id}" if client is not None else "")
+        limited = _rate_limited(request, rate_key, "turn")
         if limited is not None:
             return limited
 
@@ -305,10 +364,11 @@ class ThreadShellView(APIView):
     """GET threads/{id}/shell/ — just the shell contract, for a cheap re-render."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request, thread_id):
-        thread = thread_svc.get_for_session(thread_id, visitor_session_from(request))
+        thread = _resolve_thread(request, thread_id)
         if thread is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         from apps.journey.services import shell
@@ -351,10 +411,11 @@ class ThreadPaneView(APIView):
     """
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # Populates request.user from a Bearer client-JWT when present; silent otherwise.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request, thread_id):
-        thread = thread_svc.get_for_session(thread_id, visitor_session_from(request))
+        thread = _resolve_thread(request, thread_id)
         if thread is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 

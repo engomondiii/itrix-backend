@@ -21,7 +21,7 @@ import logging
 import re
 
 from django.conf import settings
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from apps.conversations.models import (
@@ -139,6 +139,27 @@ def list_for_client(client):
     if client is None:
         return Thread.objects.none()
     return Thread.objects.filter(client=client).order_by("-last_activity_at", "-created_at")
+
+
+def list_for_client_and_session(client, visitor_session: str):
+    """
+    Everything this person can open: their client-owned threads PLUS the
+    anonymous threads still living on their browser session.
+
+    The union matters because no claim step exists yet — a customer's pre-signup
+    conversations remain session-owned, and a client-only list would make them
+    vanish from the workspace the moment they signed in.
+    """
+    if client is None:
+        return list_for_session(visitor_session)
+    query = models.Q(client=client)
+    if visitor_session:
+        query = query | models.Q(
+            visitor_session=str(visitor_session),
+            owner_kind=ThreadOwnerKind.SESSION,
+            client__isnull=True,
+        )
+    return Thread.objects.filter(query).order_by("-last_activity_at", "-created_at")
 
 
 def get_for_session(thread_id, visitor_session: str) -> Thread | None:

@@ -504,6 +504,120 @@ class PortalSettingsView(APIView):
         return Response(_settings_payload(client))
 
 
+class PortalNdaRequestView(APIView):
+    """
+    POST portal/nda/request/ — CLIENT. Ask for an NDA from the Documents screen.
+
+    ── WHY THIS EXISTS (change request, 2026-08-10) ─────────────────────────────
+    The Documents screen's "Arrange an NDA" control was a LINK into Messages, so
+    pressing it navigated the customer away from the room they were trying to
+    open and left them to compose the request themselves. It now submits here,
+    in place.
+
+    THREE THINGS HAPPEN, and the confirmation the customer reads promises exactly
+    these and nothing more:
+      1. the request is stamped on the Client (`nda_requested_at`) — a request,
+         never `nda_signed`, which is the countersigned fact and would open the
+         data room on the strength of a button press;
+      2. a message is posted into their portal conversation, so "keep an eye on
+         your workspace inbox" is true rather than a hopeful phrase;
+      3. the team is alerted by email and the customer gets a confirmation to the
+         address on their account.
+
+    Idempotent by intent: asking twice keeps the FIRST timestamp and does not
+    spam the team, because a customer who presses a button twice has not made two
+    requests.
+    """
+
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
+    # The message the customer sees in their inbox, and the sentence the screen
+    # shows. One string, so the two can never drift apart.
+    INBOX_BODY = (
+        "Thank you — we have your request for an NDA. The itriX team will prepare it "
+        "and send it to the address on your account for signature. You will see it "
+        "here in your inbox as well, so you can keep an eye on either. Once it is "
+        "signed and countersigned, your confidential data room opens automatically."
+    )
+
+    def post(self, request):
+        from django.utils import timezone
+
+        from apps.conversations.services import ingest
+        from apps.conversations.services.history import (
+            ensure_portal_thread,
+            get_or_create_portal_conversation,
+        )
+
+        client = request.user
+
+        if client.nda_signed:
+            return Response(
+                {"detail": "Your NDA is already in place.", "ndaRequested": True},
+                status=status.HTTP_200_OK,
+            )
+
+        already_requested = client.nda_requested_at is not None
+        if not already_requested:
+            client.nda_requested_at = timezone.now()
+            client.save(update_fields=["nda_requested_at", "updated_at"])
+
+        # The inbox note. Best-effort: the request is already recorded, and losing
+        # the customer's stamped request because a message failed to persist would
+        # be the worse outcome of the two.
+        if not already_requested:
+            try:
+                conv = get_or_create_portal_conversation(client)
+                thread = ensure_portal_thread(conv, client)
+                ingest.ingest_agent_message(
+                    conv, agent_key="concierge", body=self.INBOX_BODY, thread=thread
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("nda.request inbox note failed for client %s", client.id)
+
+            try:
+                self._notify(client)
+            except Exception:  # noqa: BLE001
+                logger.exception("nda.request notification failed for client %s", client.id)
+
+        logger.info("clients.nda_requested client=%s repeat=%s", client.id, already_requested)
+        return Response(
+            {"ndaRequested": True, "message": self.INBOX_BODY},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @staticmethod
+    def _notify(client):
+        from apps.emails.services.email_sender import send_email
+
+        internal_to = getattr(settings, "INTERNAL_ALERT_EMAIL", "") or ""
+        if internal_to:
+            send_email(
+                kind="internal_alert",
+                to_email=internal_to,
+                subject=f"NDA requested — {client.organization or client.email}",
+                body=(
+                    f"{client.full_name or client.email} requested an NDA from the "
+                    f"Documents screen.\n\n"
+                    f"Client: {client.id}\n"
+                    f"Email: {client.email}\n"
+                    f"Organisation: {client.organization or '(not given)'}\n"
+                ),
+                lead=getattr(client, "lead", None),
+            )
+        send_email(
+            kind="confirmation",
+            to_email=client.email,
+            subject="Your itriX NDA is being prepared",
+            body=(
+                f"{PortalNdaRequestView.INBOX_BODY}\n\n"
+                "You do not need to do anything until it arrives."
+            ),
+            lead=getattr(client, "lead", None),
+        )
+
+
 class PortalTeamInviteView(APIView):
     """
     POST portal/settings/team/invite/ — CLIENT. Record a teammate invitation.

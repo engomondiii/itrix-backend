@@ -61,6 +61,11 @@ class Client(BaseModel):
     # NDA state gates the client's disclosure ceiling and the data room (reveal ④).
     nda_signed = models.BooleanField(default=False)
     nda_signed_at = models.DateTimeField(null=True, blank=True)
+    # When the customer asked for an NDA from the Documents screen (2026-08-10).
+    # Distinct from nda_signed_at, which records the countersigned fact: a request
+    # is a request, and conflating the two would show a data room as open because
+    # somebody pressed a button.
+    nda_requested_at = models.DateTimeField(null=True, blank=True)
 
     # Portal settings (§68): the client's notification switches. A plain JSON map so
     # adding a switch is a copy change, not a migration; absent keys fall back to the

@@ -68,6 +68,30 @@ def get_or_create_portal_conversation(client) -> Conversation:
     )
 
 
+def ensure_portal_thread(conversation: Conversation, client):
+    """
+    The Thread spine for a portal conversation, created on first need.
+
+    Attachments are scoped to a THREAD (attachments.permissions.owns_thread), and
+    portal conversations predate the spine, so without this the workspace composer
+    would have nothing to stage a file against. Client-owned: owns_thread's client
+    branch (thread.client_id == user.id) is what authorizes the upload.
+    """
+    from apps.conversations.models_thread import Thread, ThreadContext, ThreadOwnerKind
+
+    existing = getattr(conversation, "thread", None)
+    if existing is not None:
+        return existing
+    return Thread.objects.create(
+        conversation=conversation,
+        client=client,
+        lead=getattr(client, "lead", None),
+        owner_kind=ThreadOwnerKind.CLIENT,
+        context=ThreadContext.PORTAL,
+        title=conversation.title or "Portal conversation",
+    )
+
+
 def deliverable_messages(conversation: Conversation):
     """Client-facing message list: only approved/auto-approved turns, in order."""
     from apps.conversations.models import GovernanceStatus

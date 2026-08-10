@@ -62,6 +62,11 @@ class Client(BaseModel):
     nda_signed = models.BooleanField(default=False)
     nda_signed_at = models.DateTimeField(null=True, blank=True)
 
+    # Portal settings (§68): the client's notification switches. A plain JSON map so
+    # adding a switch is a copy change, not a migration; absent keys fall back to the
+    # defaults in views (everything on), so an empty dict means "never touched".
+    notification_prefs = models.JSONField(default=dict, blank=True)
+
     is_active = models.BooleanField(default=True)
     last_login_at = models.DateTimeField(null=True, blank=True)
 
@@ -198,3 +203,36 @@ from apps.clients.models_consumed import ConsumedInvite  # noqa: E402,F401
 # its table would then never be generated.
 from apps.clients.models_reset import PasswordResetToken  # noqa: E402,F401
 from apps.clients.models_verification import EmailVerificationToken  # noqa: E402,F401
+
+
+class ClientTeamInvite(BaseModel):
+    """
+    A teammate the client asked to bring into their workspace (§68 team access).
+
+    DELIBERATELY MINIMAL. The row is the durable record that the invitation was
+    made — it is what the Settings screen lists as 'invited'. It does not yet
+    grant the invitee an account: activation (the invitee setting a password and
+    the two accounts sharing the workspace) is a later, deliberate step, and
+    pretending otherwise here would show 'active' teammates who cannot sign in.
+    """
+
+    class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
+        REVOKED = "revoked", "Revoked"
+
+    client = models.ForeignKey(
+        "clients.Client", on_delete=models.CASCADE, related_name="team_invites"
+    )
+    email = models.EmailField(db_index=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.INVITED, db_index=True
+    )
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["client", "email"], name="uniq_invite_per_client_email"),
+        ]
+
+    def __str__(self) -> str:
+        return f"ClientTeamInvite({self.email}, {self.status})"

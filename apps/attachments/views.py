@@ -28,6 +28,7 @@ from rest_framework.views import APIView
 
 from apps.attachments import policy, storage
 from apps.attachments.models import Attachment
+from apps.clients.backends import ClientJWTAuthentication
 from apps.attachments.permissions import owns_thread
 from apps.attachments.serializers import AttachmentSerializer
 from apps.attachments.services import audit, intake, retention
@@ -44,8 +45,14 @@ def _flag_enabled() -> bool:
 class AttachmentUploadView(APIView):
     """POST attachments/ — stage one file against a thread the caller owns."""
 
+    # ── CLIENT PLANE (2026-08-10) ─────────────────────────────────────────────
+    # owns_thread() has always had a client branch (thread.client_id == user.id),
+    # but with no authenticator on these views request.user could never BE a
+    # Client, so the workspace could not attach files to its own thread. The
+    # authenticator populates request.user when a Bearer client-JWT is present
+    # and stays silent otherwise, so the anonymous session path is unchanged.
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    authentication_classes = [ClientJWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -107,7 +114,8 @@ class AttachmentDetailView(APIView):
     """GET / DELETE attachments/{id}/."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # See AttachmentUploadView: the client branch of owns_thread needs a user.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request, attachment_id):
         attachment = _load(request, attachment_id)
@@ -137,7 +145,8 @@ class AttachmentDownloadView(APIView):
     """GET attachments/{id}/download/ — signed, authorized, never inline."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    # See AttachmentUploadView: the client branch of owns_thread needs a user.
+    authentication_classes = [ClientJWTAuthentication]
 
     def get(self, request, attachment_id):
         attachment = _load(request, attachment_id)

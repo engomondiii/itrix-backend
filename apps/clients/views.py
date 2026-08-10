@@ -86,9 +86,9 @@ from apps.clients.serializers import (  # noqa: E402
     ClientTokenRefreshRequestSerializer,
     PortalDataRoomSerializer,
     PortalEvaluationSerializer,
+    PortalSettingsPatchSerializer,
     PortalOverviewSerializer,
     PortalPoCSerializer,
-    PortalSettingsSerializer,
 )
 from apps.clients.services.client_creator import authenticate_client  # noqa: E402
 from apps.clients.tokens import build_tokens_for_client, decode_client_token  # noqa: E402
@@ -289,10 +289,68 @@ class PortalConversationMessagesView(APIView):
         from apps.conversations.serializers import ConversationThreadSerializer
         from apps.conversations.services.history import mark_read
 
+        from apps.conversations.services.history import ensure_portal_thread
+
         client = request.user
         conv = get_object_or_404(Conversation, id=conversation_id, client=client)
+        # Eager: a file can be attached BEFORE the first message is sent, and
+        # attachments stage against the thread — so the composer needs its id now.
+        ensure_portal_thread(conv, client)
+        conv.refresh_from_db()
         mark_read(conv, client=client)
         return Response(ConversationThreadSerializer(conv).data)
+
+    def post(self, request, conversation_id):
+        """
+        Send a client message on this conversation.
+
+        ── THE ROUTE THE SCREEN WAS ALREADY CALLING (2026-08-10) ───────────────
+        The Messages screen has always POSTed here (portalApi.sendMessage); the
+        view only implemented GET, so every send died as a 405 behind the proxy's
+        generic 502. The reply contract is deliberately honest: the response is
+        the client's own PERSISTED message — not a fabricated agent answer. The
+        team's (or agent's) reply, when it exists, arrives through the same
+        polling that already refreshes the thread.
+
+        Attachments ride the same turn: `attachmentIds` are the ids the client
+        staged through the attachments endpoint against this conversation's
+        thread. The link is made EXPLICITLY here (ingest.associate_attachments)
+        — ingest itself only records the ids in meta, and a link that exists
+        only in meta renders nothing.
+        """
+        from apps.conversations.models import Conversation
+        from apps.conversations.serializers import MessageSerializer
+        from apps.conversations.services import ingest
+        from apps.conversations.services.history import ensure_portal_thread
+
+        client = request.user
+        conv = get_object_or_404(Conversation, id=conversation_id, client=client)
+
+        body = (request.data.get("body") or "").strip()
+        attachment_ids = request.data.get("attachmentIds") or []
+        if not isinstance(attachment_ids, list):
+            attachment_ids = []
+        attachment_ids = [str(a) for a in attachment_ids][:8]
+        if not body and not attachment_ids:
+            return Response({"detail": "A message is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        thread = ensure_portal_thread(conv, client)
+        try:
+            message = ingest.ingest_inbound(
+                conv,
+                sender_kind="client",
+                body=body,
+                client=client,
+                thread=thread,
+                meta={"attachment_ids": attachment_ids},
+            )
+        except Exception as exc:  # noqa: BLE001 — MessageTooLong carries its own text
+            return Response({"detail": str(exc)}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+        if attachment_ids:
+            ingest.associate_attachments(message, attachment_ids)
+
+        return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
 
 
 class PortalDocumentsView(APIView):
@@ -305,13 +363,32 @@ class PortalDocumentsView(APIView):
         client = request.user
         nda = client.nda_signed
         # Public materials are always available; NDA-only materials unlock post-signature.
-        documents = [
-            {"title": "iTrix overview", "disclosure": "public", "href": "", "locked": False},
-            {"title": "ALPHA approach summary", "disclosure": "controlled_public", "href": "", "locked": False},
-            {"title": "Technical deep-dive", "disclosure": "nda_only", "href": "", "locked": not nda},
-            {"title": "Evaluation methodology", "disclosure": "nda_only", "href": "", "locked": not nda},
+        # Grouped into the folder shape the Documents screen renders (see the
+        # serializer's SHAPE FIX note): open folders always show, data-room folders
+        # carry the locked flag until the NDA is signed.
+        open_folders = [
+            {
+                "folder": "Overview",
+                "documents": [
+                    {"title": "itriX overview", "disclosure": "public", "href": "", "locked": False},
+                    {"title": "ALPHA approach summary", "disclosure": "controlled_public", "href": "", "locked": False},
+                ],
+            }
         ]
-        return Response(PortalDataRoomSerializer({"ndaSigned": nda, "documents": documents}).data)
+        data_room_folders = [
+            {
+                "folder": "Technical materials",
+                "documents": [
+                    {"title": "Technical deep-dive", "disclosure": "nda_only", "href": "", "locked": not nda},
+                    {"title": "Evaluation methodology", "disclosure": "nda_only", "href": "", "locked": not nda},
+                ],
+            }
+        ]
+        return Response(
+            PortalDataRoomSerializer(
+                {"ndaSigned": nda, "openFolders": open_folders, "dataRoomFolders": data_room_folders}
+            ).data
+        )
 
 
 class PortalEvaluationView(APIView):
@@ -364,29 +441,101 @@ class PortalPoCView(APIView):
         )
 
 
+# Every switch defaults ON: a customer who never opened Settings still gets told
+# about the things the portal exists to tell them about. An empty stored dict
+# therefore means "never touched", not "everything off".
+NOTIFICATION_DEFAULTS = {
+    "newTeamMessage": True,
+    "reviewUpdated": True,
+    "evalOrPocStatus": True,
+    "documentShared": True,
+}
+
+
+def _settings_payload(client):
+    """The nested PortalSettings shape the Settings screen renders."""
+    team = [{"email": client.email, "status": "active"}]
+    team += [
+        {"email": invite.email, "status": "invited"}
+        for invite in client.team_invites.filter(status="invited").order_by("created_at")
+    ]
+    notifications = {**NOTIFICATION_DEFAULTS, **(client.notification_prefs or {})}
+    return {
+        "profile": {
+            "fullName": client.full_name or None,
+            "email": client.email,
+            "organization": client.organization or None,
+            "role": client.role or None,
+        },
+        "team": team,
+        "notifications": notifications,
+    }
+
+
 class PortalSettingsView(APIView):
-    """GET/PATCH portal/settings/ — CLIENT. Client profile."""
+    """GET/PATCH portal/settings/ — CLIENT. Profile · team access · notifications."""
 
     authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request):
-        return Response(PortalSettingsSerializer(request.user).data)
+        return Response(_settings_payload(request.user))
 
     def patch(self, request):
         client = request.user
-        ser = PortalSettingsSerializer(data=request.data, partial=True)
+        ser = PortalSettingsPatchSerializer(data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
-        for field_attr, value in (
-            ("full_name", data.get("full_name")),
-            ("organization", data.get("organization")),
-            ("role", data.get("role")),
-        ):
-            if value is not None:
-                setattr(client, field_attr, value)
-        client.save(update_fields=["full_name", "organization", "role", "updated_at"])
-        return Response(PortalSettingsSerializer(client).data)
+
+        profile = data.get("profile") or {}
+        update_fields = []
+        for camel, attr in (("fullName", "full_name"), ("organization", "organization"), ("role", "role")):
+            if camel in profile and profile[camel] is not None:
+                setattr(client, attr, profile[camel])
+                update_fields.append(attr)
+
+        if "notifications" in data:
+            merged = {**NOTIFICATION_DEFAULTS, **(client.notification_prefs or {}), **data["notifications"]}
+            client.notification_prefs = merged
+            update_fields.append("notification_prefs")
+
+        if update_fields:
+            client.save(update_fields=[*update_fields, "updated_at"])
+        return Response(_settings_payload(client))
+
+
+class PortalTeamInviteView(APIView):
+    """
+    POST portal/settings/team/invite/ — CLIENT. Record a teammate invitation.
+
+    The Settings screen has always rendered this form; the route simply did not
+    exist, so pressing Invite failed. The row is the durable record and shows as
+    'invited' in the team list (see ClientTeamInvite for what activation still
+    requires). Inviting the same address twice is a no-op, not an error.
+    """
+
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
+    def post(self, request):
+        from apps.clients.models import ClientTeamInvite
+
+        from django.core.exceptions import ValidationError
+        from django.core.validators import validate_email
+
+        client = request.user
+        email = (request.data.get("email") or "").strip().lower()
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({"detail": "A valid email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if email == client.email.lower():
+            return Response(
+                {"detail": "That address is already on this workspace."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ClientTeamInvite.objects.get_or_create(client=client, email=email)
+        return Response(_settings_payload(client), status=status.HTTP_201_CREATED)
 
 
 def _visitor_session_from(request) -> str:

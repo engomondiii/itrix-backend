@@ -22,6 +22,7 @@ class MessageSerializer(serializers.ModelSerializer):
     governanceStatus = serializers.CharField(source="governance_status", read_only=True)
     underReview = serializers.SerializerMethodField()
     body = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
     at = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
@@ -34,6 +35,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "citedChunkIds",
             "governanceStatus",
             "underReview",
+            "attachments",
             "at",
         ]
         read_only_fields = fields
@@ -44,6 +46,36 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_body(self, obj) -> str:
         # Never leak held/blocked content to a client-facing serializer.
         return obj.body if obj.is_deliverable else ""
+
+    def get_attachments(self, obj):
+        """
+        The files sent with this turn, in the shape the thread renders
+        (portal chips + the anonymous transcript alike). Lazy import and
+        broad except: `attachments` is a flag-gated app, and a message must
+        render even when it is off or a link points at a purged file.
+        """
+        links = getattr(obj, "attachment_links", None)
+        if links is None:
+            return []
+        ids = [link.attachment_id for link in links.all()]
+        if not ids:
+            return []
+        try:
+            from apps.attachments.models import Attachment
+
+            rows = Attachment.objects.filter(id__in=ids)
+            return [
+                {
+                    "attachmentId": str(a.id),
+                    "filename": a.filename,
+                    "sizeBytes": a.bytes,
+                    "downloadable": a.is_downloadable,
+                }
+                for a in rows
+                if not a.is_deleted
+            ]
+        except Exception:  # noqa: BLE001
+            return []
 
 
 class ConversationSummarySerializer(serializers.ModelSerializer):
@@ -77,11 +109,19 @@ class ConversationThreadSerializer(serializers.ModelSerializer):
     """A full thread with its deliverable messages (PortalThread)."""
 
     messages = serializers.SerializerMethodField()
+    # The spine's id, so the workspace composer can stage attachments against the
+    # thread that owns them (attachments are thread-scoped). Null for the shipped
+    # conversations that predate the spine; the portal send creates it on demand.
+    threadId = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ["id", "context", "title", "messages"]
+        fields = ["id", "context", "title", "threadId", "messages"]
         read_only_fields = fields
+
+    def get_threadId(self, obj):  # noqa: N802 — camelCase is the client-plane contract
+        thread = getattr(obj, "thread", None)
+        return str(thread.id) if thread is not None else None
 
     def get_messages(self, obj):
         from apps.conversations.services.history import deliverable_messages

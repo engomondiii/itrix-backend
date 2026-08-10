@@ -103,11 +103,28 @@ class PortalDocumentSerializer(serializers.Serializer):
     locked = serializers.BooleanField()
 
 
+class PortalDocumentFolderSerializer(serializers.Serializer):
+    """One folder of documents, as the Documents screen renders it."""
+
+    folder = serializers.CharField()
+    documents = PortalDocumentSerializer(many=True)
+
+
 class PortalDataRoomSerializer(serializers.Serializer):
-    """PortalDataRoom — NDA-aware document listing."""
+    """
+    PortalDataRoom — NDA-aware document listing.
+
+    ── SHAPE FIX (2026-08-10) ───────────────────────────────────────────────
+    The screen renders FOLDERS (`openFolders` + `dataRoomFolders`, per
+    portal.types.PortalDataRoom); this serializer used to emit a flat
+    `documents` list, so `data.openFolders.map(...)` crashed the Documents page
+    with "Cannot read properties of undefined (reading 'map')" the first time a
+    real client opened it. The payload now matches what is rendered.
+    """
 
     ndaSigned = serializers.BooleanField()
-    documents = PortalDocumentSerializer(many=True)
+    openFolders = PortalDocumentFolderSerializer(many=True)
+    dataRoomFolders = PortalDocumentFolderSerializer(many=True)
 
 
 class PortalEvaluationSerializer(serializers.Serializer):
@@ -124,10 +141,35 @@ class PortalPoCSerializer(serializers.Serializer):
     successCriteria = serializers.ListField(child=serializers.DictField(), default=list)
 
 
-class PortalSettingsSerializer(serializers.Serializer):
-    """GET/PATCH portal/settings/ — client profile + notification prefs."""
+class PortalNotificationPrefsSerializer(serializers.Serializer):
+    """The four notification switches (§68). Keys mirror PortalNotificationPrefs."""
 
-    fullName = serializers.CharField(source="full_name", allow_blank=True, required=False)
-    organization = serializers.CharField(allow_blank=True, required=False)
-    role = serializers.CharField(allow_blank=True, required=False)
+    newTeamMessage = serializers.BooleanField(required=False)
+    reviewUpdated = serializers.BooleanField(required=False)
+    evalOrPocStatus = serializers.BooleanField(required=False)
+    documentShared = serializers.BooleanField(required=False)
+
+
+class PortalSettingsProfileSerializer(serializers.Serializer):
+    """The editable profile block inside PortalSettings."""
+
+    fullName = serializers.CharField(allow_blank=True, allow_null=True, required=False)
     email = serializers.EmailField(read_only=True)
+    organization = serializers.CharField(allow_blank=True, allow_null=True, required=False)
+    role = serializers.CharField(allow_blank=True, allow_null=True, required=False)
+
+
+class PortalSettingsPatchSerializer(serializers.Serializer):
+    """
+    PATCH portal/settings/ — the nested write shape the Settings screen sends
+    ({profile: {...}} and/or {notifications: {...}}).
+
+    ── SHAPE FIX (2026-08-10) ───────────────────────────────────────────────
+    The screen renders {profile, team, notifications} (portal.types
+    .PortalSettings); the old serializer was a flat profile, so `data.team.map`
+    and the notification switches crashed the Settings page. GET now returns
+    the nested shape (built in the view) and PATCH accepts it.
+    """
+
+    profile = PortalSettingsProfileSerializer(required=False)
+    notifications = PortalNotificationPrefsSerializer(required=False)

@@ -38,6 +38,7 @@ from apps.clients.views import (
     PortalOverviewView,
     PortalPoCView,
     PortalSettingsView,
+    PortalTeamInviteView,
 )
 
 app_name = "clients"
@@ -76,5 +77,10 @@ urlpatterns = [
     path("portal/evaluation/", PortalEvaluationView.as_view(), name="portal-evaluation"),
     path("portal/poc/", PortalPoCView.as_view(), name="portal-poc"),
     path("portal/settings/", PortalSettingsView.as_view(), name="portal-settings"),
+    path(
+        "portal/settings/team/invite/",
+        PortalTeamInviteView.as_view(),
+        name="portal-team-invite",
+    ),
     path("portal/next-action/", PortalNextBestActionView.as_view(), name="portal-next-action"),
 ]

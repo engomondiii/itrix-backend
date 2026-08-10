@@ -65,6 +65,14 @@ def ingest_inbound(
     )
     history.touch(conversation)
     _after_inbound_turn(thread, msg, text)
+    # ── MESSAGING FAN-OUT (Celery integration, 2026-08-10) ───────────────────
+    # A client message used to land silently: it persisted, the client saw it in
+    # their own thread, and the team found out only if somebody happened to open
+    # the cockpit. Client turns only ever originate from the portal (HTTP view or
+    # the portal WebSocket consumer — both funnel through here), so this single
+    # guarded hook notifies the team for both transports.
+    if sender_kind == SenderKind.CLIENT and msg.sender_client is not None:
+        _notify_team_of_client_message(msg)
     return msg
 
 
@@ -134,6 +142,54 @@ def _after_inbound_turn(thread, message, body: str) -> None:
         qualification.advance_on_turn(thread, body)
     except Exception:  # noqa: BLE001 - state advancement is best-effort
         logger.debug("qualification advance skipped for thread %s", getattr(thread, "id", "?"))
+
+
+def _notify_team_of_client_message(message) -> None:
+    """
+    In-app team notification for a new CLIENT (portal) message.
+
+    Best-effort, like every other post-turn hook: the client's message is already on the
+    record and must never be lost to a notification hiccup. When ``ENABLE_CELERY`` is on
+    the notification is enqueued ON COMMIT — the task re-reads nothing from this row, but
+    a worker racing an uncommitted transaction is exactly the class of bug on_commit
+    exists to close, and it also means a rolled-back message never produces a phantom
+    alert. With Celery off, the row is written inline, same as the lead fan-out.
+
+    The body deliberately carries NO message text: the notification tray is a pointer,
+    and the message itself is read in the cockpit under its own authorization.
+    """
+    try:
+        from django.conf import settings
+        from django.db import transaction
+
+        client = message.sender_client
+        who = (
+            getattr(client, "organization", "")
+            or getattr(client, "full_name", "")
+            or getattr(client, "email", "")
+            or "A client"
+        )
+        lead = getattr(client, "lead", None)
+        kind = "system"  # Notification.Kind.SYSTEM — no schema change (notify_journey_event precedent)
+        title = f"New client message: {who}"
+        body = "A client wrote to the team in their workspace Messaging."
+        href = f"/leads/{lead.id}" if lead is not None else ""
+
+        if getattr(settings, "ENABLE_CELERY", False):
+            from tasks.notification_tasks import create_notification_task
+
+            lead_id = str(lead.id) if lead is not None else ""
+            transaction.on_commit(
+                lambda: create_notification_task.delay(kind, title, body, href, lead_id=lead_id)
+            )
+        else:
+            from apps.notifications.services.notification_creator import create_notification
+
+            create_notification(kind=kind, title=title, body=body, href=href, lead=lead)
+    except Exception:  # noqa: BLE001 - the persisted turn outranks its fan-out
+        logger.exception(
+            "client-message notification failed for message %s", getattr(message, "id", "?")
+        )
 
 
 def _route_support_intent(thread, body: str) -> None:

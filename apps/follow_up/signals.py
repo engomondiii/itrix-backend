@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -50,18 +52,39 @@ def on_lead_saved(sender, instance, created, **kwargs):
         logger.exception("Fan-out: notification creation failed for lead %s", lead.id)
 
     # 3) Internal alert email (stubbed unless delivery enabled)
+    # ── CELERY OFFLOAD (2026-08-10) ──────────────────────────────────────────
+    # Steps 3 and 4 are SMTP round-trips, and this signal fires inside the request
+    # that created the lead (qualification submit, open signup) — with real delivery
+    # on, that is up to two synchronous mailbox calls on the visitor's critical
+    # path. The `emails.*` tasks were written for exactly this hand-off ("wrappers
+    # so email sends can be offloaded... the lead fan-out works with or without a
+    # worker") and were never wired. With ENABLE_CELERY on, the sends are enqueued
+    # ON COMMIT — the tasks re-fetch the lead by id, so the worker must not race a
+    # transaction that could still roll the row back. With it off, behaviour is
+    # byte-for-byte the old inline send.
+    use_celery = getattr(settings, "ENABLE_CELERY", False)
     try:
-        from apps.emails.services.internal_alert_builder import build_internal_alert
+        if use_celery:
+            from tasks.email_tasks import send_internal_alert_task
 
-        build_internal_alert(lead)
+            transaction.on_commit(lambda: send_internal_alert_task.delay(str(lead.id)))
+        else:
+            from apps.emails.services.internal_alert_builder import build_internal_alert
+
+            build_internal_alert(lead)
     except Exception:  # noqa: BLE001
         logger.exception("Fan-out: internal alert failed for lead %s", lead.id)
 
     # 4) Visitor confirmation (only if we already have an email)
     try:
         if lead.email:
-            from apps.emails.services.confirmation_email_builder import build_confirmation_email
+            if use_celery:
+                from tasks.email_tasks import send_confirmation_task
 
-            build_confirmation_email(lead)
+                transaction.on_commit(lambda: send_confirmation_task.delay(str(lead.id)))
+            else:
+                from apps.emails.services.confirmation_email_builder import build_confirmation_email
+
+                build_confirmation_email(lead)
     except Exception:  # noqa: BLE001
         logger.exception("Fan-out: confirmation email failed for lead %s", lead.id)

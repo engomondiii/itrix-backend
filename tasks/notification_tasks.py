@@ -23,8 +23,16 @@ def check_sla_breaches_task() -> dict:
 
 
 @shared_task(name="notifications.create")
-def create_notification_task(kind: str, title: str, body: str = "", href: str = "") -> dict:
+def create_notification_task(kind: str, title: str, body: str = "", href: str = "", lead_id: str = "") -> dict:
     from apps.notifications.services.notification_creator import create_notification
 
-    n = create_notification(kind=kind, title=title, body=body, href=href)
+    # Optional lead linkage (2026-08-10): callers that know the lead pass its id so the
+    # tray row carries the FK, exactly as the inline path can. Id-only on purpose —
+    # task args go through the broker, so they carry references, never row contents.
+    lead = None
+    if lead_id:
+        from apps.leads.models import Lead
+
+        lead = Lead.objects.filter(pk=lead_id).first()
+    n = create_notification(kind=kind, title=title, body=body, href=href, lead=lead)
     return {"ok": True, "notification_id": str(n.id)}

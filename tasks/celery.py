@@ -26,13 +26,25 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Discover tasks.py / *_tasks modules across installed apps and this package.
 app.autodiscover_tasks()
+# Every *_tasks module in this package, explicitly. This list previously named only six
+# of the twelve modules, so tasks defined in the other six (agent/artifact/attachment/
+# conversation/customer_success/journey) were never imported by a `celery worker` boot —
+# any message enqueued for them would have arrived as "Received unregistered task".
+# Harmless while ENABLE_CELERY was False (eager mode imports at the call site); a real
+# worker deployment needs the full inventory registered before it consumes.
 for _related in (
-    "ingestion_tasks",
+    "agent_tasks",
     "ai_tasks",
-    "scoring_tasks",
-    "email_tasks",
     "analytics_tasks",
+    "artifact_tasks",
+    "attachment_tasks",
+    "conversation_tasks",
+    "customer_success_tasks",
+    "email_tasks",
+    "ingestion_tasks",
+    "journey_tasks",
     "notification_tasks",
+    "scoring_tasks",
 ):
     app.autodiscover_tasks(["tasks"], related_name=_related)
 

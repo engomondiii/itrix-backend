@@ -567,6 +567,21 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = not ENABLE_CELERY
 
+# ── Celery production hardening (worker deployment) ──────────────────────────
+# Retry the broker connection at worker BOOT. Celery 5 defaults to failing fast on
+# startup (and warns that the old always-retry default is deprecated); on Railway a
+# deploy can briefly race Redis availability, and "worker crashes once per deploy"
+# is exactly the failure that setting removes. Runtime reconnects were always retried.
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Task results are read for diagnostics, not by the request path — don't let them
+# accumulate in Redis forever alongside the Channels layer.
+CELERY_RESULT_EXPIRES = 60 * 60 * 24  # 1 day
+# A task that hangs (stuck socket inside a model/RAG call despite client timeouts)
+# must not occupy a prefork slot forever: soft-kill at 5 min, hard-kill at 6.
+# Generous vs. AI_CALL_TIMEOUT_SECONDS so a legitimate slow build is never cut short.
+CELERY_TASK_SOFT_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 360
+
 # ── Channels / realtime transport (v4.0 Phase 2) ─────────────────────────────
 # When ENABLE_REALTIME is on we use the Redis channel layer (reusing REDIS_URL) so
 # WebSocket fan-out works across processes. Otherwise we use the in-memory layer,

@@ -204,3 +204,29 @@ def test_decline_outranks_acceptance_wording():
     )
     assert decision.should_continue is False
     assert decision.reason == stop_rule.STOP_VISITOR_DECLINED
+
+
+@pytest.mark.parametrize("text", ["Yes please", "yes", "Sure!", "okay, go ahead", "Yes, thank you"])
+def test_bare_assent_closes_once_a_reply_has_been_delivered(text):
+    decision = stop_rule.evaluate(journey_state=2, questions_asked=1, last_visitor_text=text)
+    assert decision.should_continue is False
+    assert decision.reason == stop_rule.STOP_ASKED_TO_PROCEED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Yes it would help",           # informational acceptance — substantive words
+        "Yes it will be useful",
+        "yes, but what about pricing?",
+        "Sure — our workload is mostly training",
+    ],
+)
+def test_assent_wrapped_around_substance_does_not_close(text):
+    decision = stop_rule.evaluate(journey_state=2, questions_asked=1, last_visitor_text=text)
+    assert decision.should_continue is True
+
+
+def test_bare_assent_needs_a_delivered_reply_first():
+    decision = stop_rule.evaluate(journey_state=2, questions_asked=0, last_visitor_text="yes")
+    assert decision.should_continue is True

@@ -74,14 +74,25 @@ ASK = "ask"
 #   * it never says the address unlocks anything — reach is set by the
 #     conversation, not by contact details;
 #   * it never describes the page as granted, earned or approved;
-#   * it asks for ONE thing, because one thing is all the reveal needs;
 #   * the second ask names the opt-out, so declining is a real option.
+#
+# ── WHY THE ASK NAMES BOTH DETAILS (change request, 2026-08-10) ─────────────
+# The first bank asked for the address alone. In production the model, asked to
+# collect what the page needs, improvised "what name or organisation should it be
+# addressed to?" — and a visitor who answered exactly that question got nothing,
+# because the reveal is email-anchored and the organisation cannot satisfy it.
+# The ask now names both details in ONE sentence, with the email stated as the
+# essential one, so the visitor can answer once and never gets asked for the
+# wrong thing first. The reveal contract is unchanged: the email alone is
+# sufficient, the name or organisation only enriches the page and the record.
 _ASK_BANK: tuple[str, ...] = (
-    "One last thing — what is your work email address? That is all we need to put "
-    "your personalised itriX page together.",
+    "One last thing — what is your work email address, and what name or "
+    "organisation should the page be addressed to? The email is the essential "
+    "part; it is what we need to put your personalised itriX page together.",
     "If you would like that personalised page, your work email address is the one "
-    "thing still missing. And if you would rather not share it, that is completely "
-    "fine — we can keep going as we are.",
+    "thing still missing — and if you tell us the name or organisation it should "
+    "be addressed to, we will use that too. If you would rather not share an "
+    "address, that is completely fine — we can keep going as we are.",
 )
 
 # Whether a reply already contains an ask of its own. Deliberately broad: a reply
@@ -244,12 +255,17 @@ def directive(decision: dict) -> str:
         "IMPORTANT — THIS VISITOR'S REVIEW IS COMPLETE, AND A PERSONALISED itriX "
         "PAGE CAN BE GENERATED FOR THEM IN THIS CONVERSATION AS SOON AS THEY GIVE "
         "AN EMAIL ADDRESS. Answer their current turn normally, then END your reply "
-        "by asking for their work email address in one short, natural sentence, and "
-        "say plainly that it is what we need to put their personalised page "
-        "together. Do NOT say the team will 'be in touch', do NOT promise that a "
-        "human will follow up, and do NOT offer to 'prepare' or 'send over' a "
-        "briefing — the page is generated here, the moment they give the address. "
-        "Do NOT suggest that giving it shows them anything more than they can "
-        "already see; it does not. Ask for the address and nothing else — no phone "
-        "number, no job title, no company name. Then STOP.\n\n"
+        "by asking, in ONE short natural sentence, for their WORK EMAIL ADDRESS "
+        "and the name or organisation the page should be addressed to — and say "
+        "plainly that the email is the essential part, because it is what we need "
+        "to put their personalised page together. THE EMAIL IS REQUIRED; the name "
+        "or organisation is welcome but optional, and can never replace the email. "
+        "If they have already given a name or organisation but no address, thank "
+        "them for it and ask for the work email address specifically. Do NOT say "
+        "the team will 'be in touch', do NOT promise that a human will follow up, "
+        "and do NOT offer to 'prepare' or 'send over' a briefing — the page is "
+        "generated here, the moment they give the address. Do NOT suggest that "
+        "giving it shows them anything more than they can already see; it does "
+        "not. Ask for nothing beyond those two details — no phone number, no job "
+        "title. Then STOP.\n\n"
     )

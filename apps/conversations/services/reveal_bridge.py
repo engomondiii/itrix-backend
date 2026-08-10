@@ -54,6 +54,16 @@ logger = logging.getLogger("itrix")
 _COMPANY_PATTERNS = (
     re.compile(r"(?:our\s+)?(?:company|org(?:ani[sz]ation)?|employer|firm|startup)\s*(?:name)?\s*(?:is|:|=|named|called)?\s*([A-Z0-9][\w&.\- ]{1,60})", re.IGNORECASE),
     re.compile(r"(?:i(?:'m| am)\s+(?:from|with|at)|we(?:'re| are)\s+(?:from|at)|work(?:ing)?\s+(?:for|at))\s+([A-Z0-9][\w&.\- ]{1,60})", re.IGNORECASE),
+    # The direct answer to the contact ask, which names both details in one line:
+    # "GPSLAB, engomondiii@gmail.com". Anchored to the start of the message and
+    # required to be immediately followed by the address, so it cannot fire
+    # mid-sentence; courtesy openers ("Sure, ...", "Thanks, ...") are excluded
+    # because they are assent, not an organisation.
+    re.compile(
+        r"^\s*(?!(?i:sure|yes|yeah|yep|ok(?:ay)?|thanks|thank you|hi|hello|hey|"
+        r"here|please|alright|great|perfect)\b)"
+        r"([A-Z0-9][\w&.\- ]{1,60}?)\s*[,;:\u2013\u2014-]\s*[\w.+-]+@"
+    ),
 )
 _EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 # A name the visitor commonly gives with their email; captured for the Lead record.

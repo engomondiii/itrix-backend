@@ -99,6 +99,34 @@ _ASKED_TO_PROCEED = re.compile(
     re.IGNORECASE,
 )
 
+# A message that IS an assent and nothing else ("Yes please", "sure", "okay").
+# The phrase set above catches acceptance wrapped in a sentence; this catches the
+# far more common shape — the visitor answering an advance offer with two words.
+# Guarded three ways so "yes" to a clarifying question cannot end the band by
+# accident: the WHOLE message must be assent vocabulary (any substantive word
+# disqualifies it — "yes it would help" is a request for information, not an
+# acceptance), it must be short, and at least one reply must already have been
+# delivered so there exists an offer for the assent to accept.
+_ASSENT_STARTERS = {
+    "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "alright",
+    "absolutely", "definitely", "certainly",
+}
+_ASSENT_VOCAB = _ASSENT_STARTERS | {
+    "please", "thanks", "thank", "you", "do", "go", "ahead", "for", "it",
+    "sounds", "good", "great", "perfect", "of", "course", "why", "not",
+    "lets", "let's",
+}
+
+
+def _is_bare_assent(text: str) -> bool:
+    words = re.findall(r"[a-z']+", (text or "").lower())
+    if not words or len(words) > 8:
+        return False
+    if words[0] not in _ASSENT_STARTERS:
+        return False
+    return all(w in _ASSENT_VOCAB for w in words)
+
+
 # Sensitivity signals requiring Governance hand-off rather than another question.
 _SENSITIVITY = re.compile(
     r"\b(?:classified|itar\b|export control|itar-controlled|state secret|"
@@ -152,6 +180,11 @@ def evaluate(*, thread=None, coverage=None, journey_state: int = 2,
         if _ASKED_TO_PROCEED.search(last_visitor_text):
             return StopDecision(False, STOP_ASKED_TO_PROCEED,
                                 "visitor accepted the next step", questions_asked, budget)
+        # Bare assent only counts once a reply has been delivered — an acceptance
+        # needs an offer to accept, and on the very first turn there has been none.
+        if questions_asked >= 1 and _is_bare_assent(last_visitor_text):
+            return StopDecision(False, STOP_ASKED_TO_PROCEED,
+                                "visitor assented to the next step", questions_asked, budget)
 
     # Condition 1: everything required for this state is covered.
     if coverage is not None and coverage.is_complete_for(journey_state):

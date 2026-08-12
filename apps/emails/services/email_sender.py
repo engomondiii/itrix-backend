@@ -95,6 +95,8 @@ def _deliver_smtp(*, to_email: str, subject: str, body: str, cc) -> str:
     """
     from django.core.mail import EmailMultiAlternatives  # noqa: PLC0415 - lazy
 
+    from apps.emails.services.html_body import html_from_text  # noqa: PLC0415 - lazy
+
     message = EmailMultiAlternatives(
         subject=subject,
         body=body,
@@ -102,6 +104,13 @@ def _deliver_smtp(*, to_email: str, subject: str, body: str, cc) -> str:
         to=[to_email],
         cc=list(cc or []) or None,
     )
+    # ── CLICKABLE LINKS (fix, 2026-08-12) ────────────────────────────────────
+    # Text-only mail left the confirmation link as dead text in clients that do not
+    # auto-detect URLs — and a confirmation link nobody can click is a workspace
+    # nobody can finish opening. The plain text stays the canonical body and the
+    # first part of the message; the HTML is generated from it, so there is no second
+    # copy of the wording to drift.
+    message.attach_alternative(html_from_text(body), "text/html")
     sent_count = message.send(fail_silently=False)
     if not sent_count:
         # The backend accepted the call and delivered nothing. Treated as a failure
@@ -116,12 +125,18 @@ def _deliver_resend(*, to_email: str, subject: str, body: str) -> str:
     import resend  # noqa: PLC0415 - lazy
 
     resend.api_key = settings.RESEND_API_KEY
+    from apps.emails.services.html_body import html_from_text  # noqa: PLC0415 - lazy
+
     result = resend.Emails.send(
         {
             "from": _sender_header(),
             "to": [to_email],
             "subject": subject,
+            # Both parts, for the same reason as the SMTP path. A provider given only
+            # `text` cannot produce a clickable link in a client that does not
+            # auto-detect one.
             "text": body,
+            "html": html_from_text(body),
         }
     )
     return (result or {}).get("id", "") if isinstance(result, dict) else ""

@@ -286,3 +286,5 @@ itrix-backend-redis-channel-layer*
 itrix-backend-revert-ingestion*
 .backend-fixes-aug12-backup-*
 itrix-backend-fixes-aug12/
+.backend-round2-backup-*
+itrix-backend-round2/

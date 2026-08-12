@@ -145,8 +145,16 @@ def for_context(thread, query: str = "", *, max_attachments: int = 10) -> list[d
     """
     from apps.attachments.models import Attachment, AttachmentStatus
 
+    # ── STAFF FILES ARE NOT VISITOR INPUT (2026-08-12) ───────────────────────
+    # Since staff can now send a document into a customer's thread, "every attachment
+    # on the thread" is no longer the same set as "what the visitor gave us". Our own
+    # outbound NDA draft fenced as untrusted visitor data would be wrong twice over:
+    # it would spend the excerpt budget on a document we wrote, and it would present
+    # our own words back to the model as material to analyse.
     attachments = Attachment.objects.filter(
         thread=thread, status=AttachmentStatus.READY, deleted_at__isnull=True
+    ).exclude(
+        uploaded_by_kind=Attachment.UploadedByKind.TEAM
     ).select_related("extraction")[:max_attachments]
 
     out: list[dict] = []

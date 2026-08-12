@@ -20,6 +20,11 @@ pinecone
 resend
 python-docx
 pypdf
+# Attachment extraction: the xlsx and pptx handlers have existed since v6.0 and
+# degraded to metadata-only because neither library was ever installed, so a
+# spreadsheet or a deck attached to a conversation was accepted and unread.
+openpyxl
+python-pptx
 boto3
 requests
 python-slugify

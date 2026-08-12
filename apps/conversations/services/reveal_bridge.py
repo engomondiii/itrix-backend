@@ -121,6 +121,24 @@ def accumulated_contact(thread, *, extra_text: str = "") -> dict:
     clear earlier one.
     """
     merged = {"email": "", "company": "", "name": ""}
+
+    # ── AN ACCOUNT ALREADY TOLD US (fix, 2026-08-12) ─────────────────────────
+    # A signed-in customer starting a conversation was being asked for their work
+    # email and organisation — details their own account holds. Worse, until they
+    # typed them into the chat the reveal stayed blocked on `no_email_yet`, so the
+    # ask repeated and the page never arrived. The account is seeded FIRST, so it
+    # wins over anything parsed out of the text: for an authenticated customer the
+    # address on the account is the authoritative one, and a stray address quoted
+    # mid-conversation ("our vendor is x@y.com") must not displace it.
+    #
+    # Anonymous threads are unaffected — there is no client, so nothing is seeded
+    # and the behaviour is exactly as before.
+    client = getattr(thread, "client", None) if thread is not None else None
+    if client is not None:
+        merged["email"] = (getattr(client, "email", "") or "").strip()
+        merged["company"] = (getattr(client, "organization", "") or "").strip()
+        merged["name"] = (getattr(client, "full_name", "") or "").strip()
+
     texts: list[str] = []
     if thread is not None:
         try:

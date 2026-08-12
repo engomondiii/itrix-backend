@@ -80,6 +80,26 @@ class ConciergeAgent(BaseAgent):
     def _question(self, ctx: AgentContext) -> str:
         return (ctx.extra or {}).get("message", "") or ctx.prompt
 
+    @staticmethod
+    def _thread(ctx: AgentContext):
+        """
+        The Thread this turn belongs to, or None.
+
+        Resolved from ``extra["thread_id"]``, which `build_turn_extra` sets on both the
+        HTTP and the WebSocket path. Returning None is a normal outcome — the client
+        page and console chats have no thread — and every consumer of this treats a
+        missing thread as "no attachments", never as an error.
+        """
+        thread_id = (ctx.extra or {}).get("thread_id") or ""
+        if not thread_id:
+            return None
+        try:
+            from apps.conversations.models import Thread
+
+            return Thread.objects.filter(id=thread_id).first()
+        except Exception:  # noqa: BLE001 - attachment context is additive
+            return None
+
     def _conversation_user_prompt(self, ctx: AgentContext, question: str, instruction: str) -> str:
         """
         Build the user prompt WITH conversation memory.
@@ -190,7 +210,10 @@ class ConciergeAgent(BaseAgent):
     def run_ai(self, ctx: AgentContext) -> AgentOutput:
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
-        from apps.ai_engine.services.system_prompt_builder import build_conversation_system_prompt
+        from apps.ai_engine.services.system_prompt_builder import (
+            build_conversation_system_prompt,
+            with_attachment_context,
+        )
 
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
@@ -222,6 +245,21 @@ class ConciergeAgent(BaseAgent):
                 context=retrieval_context,
                 question=question,
             )
+            # ── THE VISITOR'S OWN DOCUMENTS (fix, 2026-08-12) ──────────────────
+            # `with_attachment_context` has existed since v6.0 and had NO CALLERS.
+            # Upload worked, the scan worked, extraction worked, excerpt selection
+            # worked — and nothing ever put the result in front of the model, so an
+            # attached architecture document could not inform a single sentence of
+            # the reply. The visitor watched a file upload successfully and then
+            # read an answer that had plainly not read it.
+            #
+            # It is applied to the SYSTEM prompt, after the knowledge chunks, and it
+            # fences the content as untrusted data (§4.5, §19.7 rule 5). The fence
+            # is the weaker half of the pair: what actually holds is that ceiling,
+            # retrieval context, journey state and gating are all decided
+            # deterministically outside the model, so an injected instruction has
+            # nothing to subvert.
+            system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_INSTRUCTION)
             raw = ClaudeClient().complete(system=system, user=user, max_tokens=700)
         except AIEngineDisabled:
@@ -270,7 +308,10 @@ class ConciergeAgent(BaseAgent):
 
         from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
-        from apps.ai_engine.services.system_prompt_builder import build_conversation_system_prompt
+        from apps.ai_engine.services.system_prompt_builder import (
+            build_conversation_system_prompt,
+            with_attachment_context,
+        )
 
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
@@ -292,6 +333,10 @@ class ConciergeAgent(BaseAgent):
                 context=retrieval_context,
                 question=question,
             )
+            # Same attachment context as the non-streaming path. Both transports must
+            # see the same documents, or an answer's content would depend on whether
+            # realtime happened to be on.
+            system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
             yield from ClaudeClient().stream(system=system, user=user, max_tokens=700)
         except AIEngineDisabled:

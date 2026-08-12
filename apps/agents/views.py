@@ -80,7 +80,13 @@ from apps.authentication.permissions import IsGovernanceAdmin  # noqa: E402
 
 # ── Team console ──────────────────────────────────────────────────────────────
 class ConsoleConversationListView(APIView):
-    """GET console/conversations/ — TEAM. Active conversations for the console."""
+    """
+    GET console/conversations/ — TEAM. Active conversations for the console.
+
+    ``select_related("thread")`` is not cosmetic: every row now carries ``threadId``
+    (see the serializer), and without it this list would issue one query per row to
+    fetch it.
+    """
 
     permission_classes = [IsAuthenticated, IsDashboardUser]
 
@@ -88,7 +94,11 @@ class ConsoleConversationListView(APIView):
         from apps.conversations.models import Conversation
         from apps.conversations.serializers import TeamConversationSummarySerializer
 
-        qs = Conversation.objects.filter(is_active=True).order_by("-last_message_at")[:200]
+        qs = (
+            Conversation.objects.filter(is_active=True)
+            .select_related("thread")
+            .order_by("-last_message_at")[:200]
+        )
         return Response(TeamConversationSummarySerializer(qs, many=True).data)
 
 
@@ -106,20 +116,79 @@ class ConsoleMessageView(APIView):
         from apps.conversations.models import Conversation
         from apps.conversations.services import fan_out, ingest
 
-        conv = get_object_or_404(Conversation, id=conversation_id)
+        conv = get_object_or_404(
+            Conversation.objects.select_related("thread"), id=conversation_id
+        )
         body = (request.data.get("body") or request.data.get("message") or "").strip()
-        if not body:
+        attachment_ids = _attachment_ids(request.data)
+        # A file with a covering sentence is the normal shape, but "here is the NDA" with
+        # the document attached and no prose is a legitimate send, so an empty body is
+        # accepted WHEN there is at least one file. Empty and fileless is still a mistake.
+        if not body and not attachment_ids:
             return Response({"detail": "body is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         claim_level = int(request.data.get("claimLevel", 1) or 1)
         msg = ingest.ingest_team_message(conv, user=request.user, body=body)
         msg.claim_level = claim_level
         msg.save(update_fields=["claim_level", "updated_at"])
+
+        # ── STAFF → VISITOR FILES (2026-08-12) ────────────────────────────────
+        # Linked BEFORE the broadcast, so the frame that reaches the customer already
+        # carries the chips. Linking afterwards would deliver a message whose files
+        # appear only on the next fetch — which reads as "they said they attached
+        # something and there is nothing there".
+        #
+        # Linked only to attachments ON THIS CONVERSATION'S THREAD: an id in a request
+        # body is not authorization, and a console operator must not be able to staple
+        # another customer's document to this turn by pasting its id.
+        linked = ingest.associate_attachments(
+            msg, _own_thread_attachments(msg.thread, attachment_ids)
+        )
         final_status = fan_out.govern_and_broadcast(msg)
         return Response(
-            {"messageId": str(msg.id), "governanceStatus": final_status},
+            {
+                "messageId": str(msg.id),
+                "governanceStatus": final_status,
+                # The spine id, so the console can jump from the reply it just sent to
+                # the thread board row that shows it.
+                "threadId": str(msg.thread_id) if msg.thread_id else None,
+                "attachmentsLinked": linked,
+                # Named when they differ, so a mistyped or foreign id is visible rather
+                # than silently dropped.
+                "attachmentsRejected": max(0, len(attachment_ids) - linked),
+            },
             status=status.HTTP_201_CREATED,
         )
+
+
+def _attachment_ids(data) -> list[str]:
+    """``attachmentIds`` from the body, tolerating a single string or a list."""
+    raw = (data or {}).get("attachmentIds") or (data or {}).get("attachment_ids") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    return [str(x) for x in raw if str(x).strip()]
+
+
+def _own_thread_attachments(thread, attachment_ids: list[str]) -> list[str]:
+    """
+    The subset of ``attachment_ids`` that actually belongs to ``thread``.
+
+    Returns [] when the conversation has no thread — there is nothing to scope against,
+    and scoping to "anything" is how a cross-customer link happens.
+    """
+    if thread is None or not attachment_ids:
+        return []
+    try:
+        from apps.attachments.models import Attachment
+
+        allowed = set(
+            Attachment.objects.filter(
+                id__in=attachment_ids, thread=thread, deleted_at__isnull=True
+            ).values_list("id", flat=True)
+        )
+    except Exception:  # noqa: BLE001 - attachments are flag-gated and optional
+        return []
+    return [str(a) for a in attachment_ids if str(a) in {str(x) for x in allowed}]
 
 
 # ── Approval queue ──────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ reachable on the anonymous or client plane at any state, which is why all of it 
 from __future__ import annotations
 
 import logging
+import uuid
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -83,10 +84,23 @@ class CockpitThreadBoardView(_CockpitView):
     """
 
     def get(self, request):
-        rows = threads_svc.rows(
+        # `count` keeps its existing meaning (rows in THIS response) so a deployed board
+        # is unaffected; `total`, `offset` and `hasMore` are additive.
+        payload = threads_svc.page(
             limit=_int_param(request, "limit", threads_svc.DEFAULT_LIMIT),
+            offset=_int_param(request, "offset", 0),
         )
-        return Response({"results": rows, "count": len(rows)}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "results": payload["results"],
+                "count": len(payload["results"]),
+                "total": payload["total"],
+                "limit": payload["limit"],
+                "offset": payload["offset"],
+                "hasMore": payload["hasMore"],
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class CockpitThreadDetailView(_CockpitView):
@@ -118,13 +132,21 @@ class CockpitCustomerBoardView(_CockpitView):
     """
 
     def get(self, request):
-        rows = customers_svc.results(
-            limit=_int_param(request, "limit", customers_svc.DEFAULT_LIMIT)
+        payload = customers_svc.page(
+            limit=_int_param(request, "limit", customers_svc.DEFAULT_LIMIT),
+            offset=_int_param(request, "offset", 0),
         )
         return Response(
             {
-                "results": rows,
-                "count": len(rows),
+                "results": payload["results"],
+                "count": len(payload["results"]),
+                "total": payload["total"],
+                "limit": payload["limit"],
+                "offset": payload["offset"],
+                "hasMore": payload["hasMore"],
+                # Health is derived in Python, so the database cannot sort by it. Said in
+                # the payload so nobody reads row 1 of page 1 as the worst customer of all.
+                "ordering": payload["ordering"],
                 # Named in the payload so a chart cannot invent a fifth class or collapse
                 # `critical` into `at_risk` on its own.
                 "healthClasses": list(customers_svc.HEALTH_CLASSES),
@@ -220,7 +242,15 @@ class CockpitSupportQueueView(_CockpitView):
             blocking_only=request.query_params.get("blockingOnly") == "true",
         )
         return Response(
-            {"results": rows, "count": len(rows), "summary": support_svc.summary()},
+            {
+                "results": rows,
+                "count": len(rows),
+                "summary": support_svc.summary(),
+                # The two actions this queue supports, named in the payload so the
+                # dashboard renders the buttons the API actually honours rather than a
+                # hard-coded guess that drifts.
+                "actions": ["assign", "resolve"],
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -235,6 +265,96 @@ class CockpitSupportRequestView(_CockpitView):
 
     def get(self, request, request_id):
         payload = support_svc.detail(str(request_id))
+        if payload is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class _SupportActionView(_CockpitView):
+    """
+    Shared base for the two support actions.
+
+    ``IsNotViewer`` on top of the team gate, for the same reason the attachment decisions
+    carry it: a read-only role that could close a customer's blocking request would be
+    read-only in name only, and closing one lifts the expansion suppression §18.7 applies.
+    """
+
+    permission_classes = [IsAuthenticated, IsDashboardUser, IsNotViewer]
+
+    @staticmethod
+    def _resolve_user(ref: str):
+        """Resolve an operator by email, name or id. Returns None when unmatched."""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        found = (
+            User.objects.filter(email__iexact=ref).first()
+            or User.objects.filter(name__iexact=ref).first()
+        )
+        if found is not None:
+            return found
+        try:
+            uuid.UUID(str(ref))
+        except (ValueError, TypeError):
+            return None
+        return User.objects.filter(id=ref).first()
+
+
+class CockpitSupportAssignView(_SupportActionView):
+    """
+    POST cockpit/support/queue/{id}/assign/ — take it, hand it over, or drop it.
+
+    ``owner`` absent or null CLEARS the owner. An unowned request is an honest state that
+    the queue displays; leaving somebody nominally responsible for work they have handed
+    on is the state that hides.
+
+    ``owner: "me"`` is accepted because taking the row in front of you is the common case
+    and it should not require knowing your own user id.
+    """
+
+    def post(self, request, request_id):
+        raw = (request.data or {}).get("owner")
+        owner = None
+        if raw not in (None, "", False):
+            ref = str(raw)
+            owner = request.user if ref.lower() == "me" else self._resolve_user(ref)
+            if owner is None:
+                return Response(
+                    {"detail": f"Unknown owner: {ref!r}", "reason": "unknown_owner"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        payload = support_svc.assign(str(request_id), owner=owner, by=request.user)
+        if payload is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class CockpitSupportResolveView(_SupportActionView):
+    """
+    POST cockpit/support/queue/{id}/resolve/ — close it, with a note.
+
+    The note requirement is enforced in the SERVICE, not here, so a direct API call cannot
+    close a customer's problem without saying how — the same placement, for the same
+    reason, as the attachment release reason.
+
+    Resolving does NOT set ``customerConfirmedResolved``. That value is the customer's
+    answer to "did this actually fix it?", and an operator answering it for them would
+    erase the single most useful signal on the row.
+    """
+
+    def post(self, request, request_id):
+        try:
+            payload = support_svc.resolve(
+                str(request_id),
+                note=str((request.data or {}).get("note") or ""),
+                by=request.user,
+            )
+        except support_svc.SupportActionRefused as exc:
+            return Response(
+                {"detail": exc.message, "reason": exc.reason},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if payload is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(payload, status=status.HTTP_200_OK)

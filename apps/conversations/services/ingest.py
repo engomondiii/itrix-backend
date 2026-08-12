@@ -301,10 +301,34 @@ def ingest_team_message(
     body: str,
     governance_status: str = GovernanceStatus.AUTO_APPROVED,
     meta: dict | None = None,
+    thread=None,
 ) -> Message:
-    """Persist a team→client turn (governed like any outbound message)."""
+    """
+    Persist a team→client turn (governed like any outbound message).
+
+    ── IT MUST LAND ON THE THREAD (fix, 2026-08-12) ─────────────────────────────
+    This function used to create the Message with NO ``thread`` and NO ``seq``,
+    while its sibling ``ingest_agent_message`` resolved both. Every transcript
+    read — the visitor's, the portal's, the cockpit's — queries BY THREAD, so a
+    staff reply written here was persisted correctly and then rendered nowhere.
+    The reply existed; nobody could see it.
+
+    ``seq`` matters for the same reason and one more: the realtime sequence is what
+    lets a client detect a GAP and re-fetch. A message left at seq 0 sits before
+    the visitor's first turn in any ordered read, so even a client that found it
+    would show it in the wrong place.
+
+    ``thread`` stays a parameter (defaulting to the conversation's own) because the
+    console can be replying inside a specific thread of a conversation, and the
+    caller knows which. ``_thread_for`` returns None for the shipped review and
+    client-page conversations that predate the spine — those still persist, exactly
+    as before, rather than failing on a missing thread.
+    """
+    thread = thread or _thread_for(conversation)
     msg = Message.objects.create(
         conversation=conversation,
+        thread=thread,
+        seq=_next_seq(thread),
         sender_kind=SenderKind.TEAM,
         sender_user=user,
         body=body or "",
@@ -312,4 +336,11 @@ def ingest_team_message(
         meta=meta or {},
     )
     history.touch(conversation)
+    if thread is not None:
+        try:
+            from apps.conversations.services import threads as thread_svc
+
+            thread_svc.touch(thread)
+        except Exception:  # noqa: BLE001 - a touch failure must not lose the reply
+            pass
     return msg

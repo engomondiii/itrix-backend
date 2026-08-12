@@ -197,6 +197,9 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
 # ── Action payload serializers ───────────────────────────────────────────────
 class AssignSerializer(serializers.Serializer):
     owner = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    # Opt-in takeover. Absent means assign-if-unowned, so the safe behaviour is the
+    # one you get by not thinking about it (see LeadViewSet.assign).
+    force = serializers.BooleanField(required=False, default=False)
 
 
 class StatusSerializer(serializers.Serializer):

@@ -20,8 +20,10 @@ from apps.cockpit.views import (
     CockpitCustomerBoardView,
     CockpitCustomerDetailView,
     CockpitGuardHitsView,
+    CockpitSupportAssignView,
     CockpitSupportQueueView,
     CockpitSupportRequestView,
+    CockpitSupportResolveView,
     CockpitThreadBoardView,
     CockpitThreadCoverageView,
     CockpitThreadDetailView,
@@ -39,7 +41,11 @@ urlpatterns = [
     # ── Customers ────────────────────────────────────────────────────────────
     path("customers/<uuid:client_id>/", CockpitCustomerDetailView.as_view(), name="customer-detail"),
     path("customers/", CockpitCustomerBoardView.as_view(), name="customer-board"),
-    # ── Support (v7.1 Phase 2) ───────────────────────────────────────────────
+    # ── Support (v7.1 Phase 2; actions 2026-08-12) ───────────────────────────
+    # Action routes before the bare {id}/, which would otherwise swallow them — the same
+    # ordering rule as the attachment routes below.
+    path("support/queue/<uuid:request_id>/assign/", CockpitSupportAssignView.as_view(), name="support-assign"),
+    path("support/queue/<uuid:request_id>/resolve/", CockpitSupportResolveView.as_view(), name="support-resolve"),
     path("support/queue/<uuid:request_id>/", CockpitSupportRequestView.as_view(), name="support-request"),
     path("support/queue/", CockpitSupportQueueView.as_view(), name="support-queue"),
     # ── Attachment review (v7.1 Phase 2) ─────────────────────────────────────

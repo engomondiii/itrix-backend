@@ -137,13 +137,32 @@ class ConversationThreadSerializer(serializers.ModelSerializer):
 
 
 class TeamConversationSummarySerializer(ConversationSummarySerializer):
-    """Console conversation row — adds the owning lead (team plane only)."""
+    """
+    Console conversation row — adds the owning lead and the thread (team plane only).
+
+    ── THE MAPPING LINK (2026-08-12) ────────────────────────────────────────────
+    Conversation and Thread are separate models, and the console had no way to get from
+    one to the other: this row carried a conversation id, while every row-level cockpit
+    resource — the thread board, thread detail, coverage, guard hits — is keyed by
+    THREAD. An operator reading a conversation could not open the board row for it
+    without a lookup that no endpoint offered, so the two halves of the same
+    conversation were reachable only by coincidence.
+
+    Null for the shipped review and client-page conversations that predate the spine.
+    Null is the honest answer there — those genuinely have no thread — and it is
+    distinguishable from "not sent", which an omitted field would not be.
+    """
 
     leadId = serializers.CharField(source="lead_id", read_only=True)
+    threadId = serializers.SerializerMethodField()
 
     class Meta(ConversationSummarySerializer.Meta):
-        fields = [*ConversationSummarySerializer.Meta.fields, "leadId"]
+        fields = [*ConversationSummarySerializer.Meta.fields, "leadId", "threadId"]
         read_only_fields = fields
+
+    def get_threadId(self, obj):  # noqa: N802 — camelCase is the wire contract
+        thread = getattr(obj, "thread", None)
+        return str(thread.id) if thread is not None else None
 
 
 class TeamConversationThreadSerializer(ConversationThreadSerializer):

@@ -10,6 +10,7 @@ service means the viewset stays thin and every mutation is consistently logged.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from django.utils import timezone
 
@@ -22,11 +23,71 @@ def _actor_name(user) -> str:
     return getattr(user, "display_name", "") or getattr(user, "email", "") or "system"
 
 
-def assign_owner(lead: Lead, *, owner, by=None) -> Lead:
-    """Assign (or clear) the lead owner and log it."""
+@dataclass(frozen=True)
+class AssignResult:
+    """
+    The outcome of one assignment attempt.
+
+    ``applied`` False means the lead was already owned by someone else and
+    ``only_if_unowned`` was in force — nothing was written and nothing was logged.
+    ``current_owner`` is who holds it, so the caller can say so rather than
+    reporting a generic failure.
+    """
+
+    applied: bool
+    lead: Lead
+    current_owner: object | None = None
+
+
+def assign_owner(lead: Lead, *, owner, by=None, only_if_unowned: bool = False) -> AssignResult:
+    """
+    Assign (or clear) the lead owner and log it.
+
+    ── THE CONDITIONAL WRITE IS THE POINT (fix, 2026-08-12) ─────────────────────
+    ``lead.owner = owner; lead.save()`` is a read-modify-write across a round trip:
+    two operators who both loaded the board see ``owner is None``, both save, and the
+    second one wins silently. The guarded path below claims the lead with a SINGLE
+    conditional UPDATE — ``filter(pk=..., owner__isnull=True).update(...)`` — and the
+    database decides. The row count tells us whether we won.
+
+    Doing it in the database rather than under ``select_for_update`` keeps this correct
+    on both engines without holding a row lock across the activity write, and needs no
+    transaction management from callers.
+
+    The activity row is written ONLY on a write that landed. A timeline that logged
+    losing attempts would show owner changes that never happened, and the timeline is
+    the record people trust when they ask who took a lead.
+    """
     previous = lead.owner
-    lead.owner = owner
-    lead.save(update_fields=["owner", "updated_at"])
+
+    if only_if_unowned and owner is not None:
+        if previous is not None:
+            # Idempotent: assigning to the current owner is the same intention twice,
+            # not a conflict.
+            if previous.id == owner.id:
+                return AssignResult(applied=True, lead=lead, current_owner=previous)
+            return AssignResult(applied=False, lead=lead, current_owner=previous)
+
+        claimed = Lead.objects.filter(pk=lead.pk, owner__isnull=True).update(
+            owner=owner, updated_at=timezone.now()
+        )
+        if not claimed:
+            # Somebody else claimed it between our read and our write. Report THEIR
+            # owner, freshly read — the instance we hold still says None.
+            current = Lead.objects.filter(pk=lead.pk).select_related("owner").first()
+            return AssignResult(
+                applied=False,
+                lead=lead,
+                current_owner=getattr(current, "owner", None),
+            )
+        lead.owner = owner
+    elif only_if_unowned and owner is None and previous is not None:
+        # Clearing an owned lead is an override too, and takes the same explicit route.
+        return AssignResult(applied=False, lead=lead, current_owner=previous)
+    else:
+        lead.owner = owner
+        lead.save(update_fields=["owner", "updated_at"])
+
     LeadActivity.objects.create(
         lead=lead,
         type=LeadActivity.ActivityType.OWNER_CHANGE,
@@ -39,7 +100,7 @@ def assign_owner(lead: Lead, *, owner, by=None) -> Lead:
         by_name=_actor_name(by),
         meta={"from": str(previous.id) if previous else None, "to": str(owner.id) if owner else None},
     )
-    return lead
+    return AssignResult(applied=True, lead=lead, current_owner=owner)
 
 
 def change_status(lead: Lead, *, status: str, by=None) -> Lead:

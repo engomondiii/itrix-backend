@@ -182,3 +182,127 @@ def detail(request_id: str) -> dict | None:
         "body": req.body or "",
         "resolutionNote": req.resolution_note or "",
     }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ACTIONS (2026-08-12) — the queue becomes a work list you can work
+# ═════════════════════════════════════════════════════════════════════════════
+# The queue was read-only: an operator could see whose problem was blocking them and
+# had no way to take it or close it from here, so the row that explained the
+# suppression could not be the row that ended it. Two actions, no more:
+#
+#   assign()   take it, hand it over, or drop it
+#   resolve()  close it, WITH a note
+#
+# ── WHAT THESE DELIBERATELY DO NOT DO ───────────────────────────────────────
+# They do not touch `blocking`, `urgency` or `customer_confirmed_resolved`.
+#   * `blocking` is the customer's situation, not an operator's opinion, and it is the
+#     field NBA suppression reads — an operator who could clear it could unblock their
+#     own expansion action by relabelling somebody else's problem.
+#   * `customer_confirmed_resolved` is the CUSTOMER'S answer. Resolving sets
+#     `resolved_at`; whether it actually helped is theirs to say, and it stays None
+#     ("not asked yet") until they do.
+
+
+class SupportActionRefused(Exception):
+    """Raised when an action cannot apply. Carries a machine reason and a sentence."""
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
+        self.message = message
+
+
+def assign(request_id: str, *, owner, by=None) -> dict | None:
+    """
+    Set (or clear) the owner of one support request.
+
+    ``owner`` None clears it — a request nobody is holding is an honest state and the
+    queue shows it, which is better than an operator staying nominally responsible for
+    something they have handed on.
+
+    Unlike lead assignment this is NOT assign-if-unowned. A support request is not a
+    commercial claim; passing one to whoever is on shift is a normal, expected handover,
+    and requiring a force flag would train people to always send it.
+    """
+    from apps.customer_success.models import SupportRequest
+
+    req = SupportRequest.objects.select_related("client", "owner").filter(id=request_id).first()
+    if req is None:
+        return None
+
+    req.owner = owner
+    req.owner_name = _display(owner)
+    fields = ["owner", "owner_name", "updated_at"]
+
+    # Taking an open request is the first response to it, if nobody has responded yet.
+    # Recorded here because the SLA clock is measured against it and an operator should
+    # not have to remember to stamp it.
+    if owner is not None and req.first_response_at is None and req.is_open:
+        req.first_response_at = timezone.now()
+        fields.append("first_response_at")
+
+    req.save(update_fields=fields)
+    logger.info(
+        "cockpit.support.assigned request=%s owner=%s by=%s",
+        req.id, getattr(owner, "id", None), getattr(by, "id", None),
+    )
+    return detail(str(req.id))
+
+
+def resolve(request_id: str, *, note: str, by=None) -> dict | None:
+    """
+    Close one support request, with the note that says what was done.
+
+    ── THE NOTE IS REQUIRED, AND IT IS REQUIRED HERE ────────────────────────────
+    Not in the UI. A resolution with no note is a row that says a customer's problem
+    ended and cannot say how, and the next person to meet the same problem starts from
+    nothing. Enforcing it in the service means the rule holds for a direct API call as
+    well as for the button — the same reason the attachment release reason is enforced
+    at this layer.
+
+    Idempotent: resolving an already-resolved request keeps the FIRST `resolved_at` and
+    does not overwrite the original note. The first close is when it stopped blocking
+    the customer, and that timestamp is what the health calculation reads.
+    """
+    from apps.customer_success.models import SupportRequest
+
+    body = (note or "").strip()
+    if not body:
+        raise SupportActionRefused(
+            "note_required",
+            "Add a short note saying how this was resolved before closing it.",
+        )
+
+    req = SupportRequest.objects.select_related("client", "owner").filter(id=request_id).first()
+    if req is None:
+        return None
+
+    if req.status == SupportRequest.Status.RESOLVED:
+        return detail(str(req.id))
+
+    req.status = SupportRequest.Status.RESOLVED
+    req.resolved_at = timezone.now()
+    req.resolution_note = body
+    fields = ["status", "resolved_at", "resolution_note", "updated_at"]
+    if req.first_response_at is None:
+        req.first_response_at = req.resolved_at
+        fields.append("first_response_at")
+    req.save(update_fields=fields)
+
+    logger.info(
+        "cockpit.support.resolved request=%s blocking=%s by=%s",
+        req.id, req.blocking, getattr(by, "id", None),
+    )
+    return detail(str(req.id))
+
+
+def _display(user) -> str:
+    if user is None:
+        return ""
+    return (
+        getattr(user, "display_name", "")
+        or getattr(user, "name", "")
+        or getattr(user, "email", "")
+        or ""
+    )

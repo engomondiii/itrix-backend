@@ -78,6 +78,7 @@ def api_index(_request):
                 "cockpit-resources",
                 "legal",
                 "analytics-pitch",
+                "settings",
             ],
             "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture", "client-page", "accounts"],
         }
@@ -143,4 +144,10 @@ urlpatterns = [
     path("templates/", include("apps.templates_library.urls")),     # JWT
     path("reporting/", include("apps.reporting.urls")),             # JWT
     path("notifications/", include("apps.notifications.urls")),      # JWT
+    # ── Operator settings (fix, 2026-08-12) ──────────────────────────────────
+    # `apps.settings` has been in INSTALLED_APPS and has had a urls.py with two routes
+    # since it was written, but this router never mounted it — so `settings/sla/` and
+    # `settings/notifications/` 404'd, and the dashboard's notification-preference screen
+    # had no endpoint to talk to. The app was complete; only the include() was missing.
+    path("settings/", include("apps.settings.urls")),                # JWT
 ]

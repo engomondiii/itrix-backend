@@ -114,15 +114,53 @@ class LeadViewSet(
         return self.request.user
 
     def _detail_response(self, lead, *, code=status.HTTP_200_OK):
-        return Response(LeadDetailSerializer(lead).data, status=code)
+        """
+        Serialise the lead AS IT NOW IS.
+
+        ── WHY THE REFETCH (fix, 2026-08-12) ────────────────────────────────
+        ``get_queryset`` carries ``prefetch_related("notes", "activities",
+        "meetings")``. ``get_object()`` fills those caches BEFORE the action runs,
+        so serialising the same instance afterwards renders the prefetched lists
+        from cache — without the note that was just added or the activity that was
+        just logged. The write succeeded and the response denied it, which reads to
+        an operator as "the button did nothing" and invites a second click.
+
+        Refetching here rather than in each action means no future action can
+        reintroduce the bug by forgetting. Falls back to the in-memory instance if
+        the row has gone (a delete racing a note), so the response is still a lead
+        rather than a 500.
+        """
+        fresh = self.get_queryset().filter(pk=lead.pk).first() or lead
+        return Response(LeadDetailSerializer(fresh).data, status=code)
 
     # ── Custom actions ───────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
     def assign(self, request, pk=None):
+        """
+        Assign, reassign or clear the owner.
+
+        ── ASSIGN-IF-UNOWNED IS THE DEFAULT (fix, 2026-08-12) ───────────────
+        Two operators opening the same lead from the same board and each pressing
+        Assign used to produce a last-write-wins overwrite with NOTHING on screen to
+        say it had happened: the loser saw a success response carrying the winner's
+        name, and the timeline showed two owner changes that nobody was looking at.
+        The lead is now claimed CONDITIONALLY — the write only lands while the lead
+        is still unowned — and a lead that is already owned by someone else comes
+        back as 409 with the current owner, so the second operator learns the fact
+        instead of silently reversing a colleague.
+
+        Deliberate reassignment is still a normal operation: pass ``force: true``.
+        Naming it forces the operator to mean it, and puts "this was a takeover" in
+        the request itself rather than leaving it to be inferred from the timeline.
+
+        Re-assigning to the SAME owner is idempotent and never 409s — pressing a
+        button twice is one intention.
+        """
         lead = self.get_object()
         serializer = AssignSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         owner_ref = serializer.validated_data.get("owner")
+        force = bool(serializer.validated_data.get("force", False))
         owner = None
         if owner_ref:
             owner = self._resolve_owner(owner_ref)
@@ -130,7 +168,27 @@ class LeadViewSet(
                 from apps.core.exceptions import ITrixError
 
                 raise ITrixError(f"Unknown owner: {owner_ref!r}")
-        assign_owner(lead, owner=owner, by=self._actor())
+
+        result = assign_owner(
+            lead, owner=owner, by=self._actor(), only_if_unowned=not force
+        )
+        if not result.applied:
+            # Not an error the operator caused, so it does not read like one: the
+            # payload names who holds it and how to proceed.
+            return Response(
+                {
+                    "detail": "This lead is already assigned.",
+                    "reason": "already_owned",
+                    "currentOwner": {
+                        "id": str(result.current_owner.id),
+                        "name": result.current_owner.display_name,
+                    }
+                    if result.current_owner is not None
+                    else None,
+                    "hint": "Send force: true to reassign it deliberately.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         return self._detail_response(lead)
 
     @staticmethod

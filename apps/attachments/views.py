@@ -25,11 +25,12 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.attachments import policy, storage
 from apps.attachments.models import Attachment
 from apps.clients.backends import ClientJWTAuthentication
-from apps.attachments.permissions import owns_thread
+from apps.attachments.permissions import is_team_caller, owns_thread, staff_may_attach
 from apps.attachments.serializers import AttachmentSerializer
 from apps.attachments.services import audit, intake, retention
 
@@ -52,7 +53,12 @@ class AttachmentUploadView(APIView):
     # authenticator populates request.user when a Bearer client-JWT is present
     # and stays silent otherwise, so the anonymous session path is unchanged.
     permission_classes = [AllowAny]
-    authentication_classes = [ClientJWTAuthentication]
+    # ── TEAM PLANE (2026-08-12) ───────────────────────────────────────────────
+    # `JWTAuthentication` is added so a team member can send a file INTO a customer's
+    # thread from the console. Order matters only in that each authenticator stays
+    # silent when its own credential is absent, so the anonymous session path — no
+    # Authorization header at all — is untouched by both.
+    authentication_classes = [ClientJWTAuthentication, JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -66,7 +72,8 @@ class AttachmentUploadView(APIView):
             return Response({"detail": "No file supplied."}, status=status.HTTP_400_BAD_REQUEST)
 
         thread = _load_thread(thread_id)
-        if thread is None or not owns_thread(request, thread):
+        by_team = staff_may_attach(request, thread)
+        if thread is None or not (owns_thread(request, thread) or by_team):
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         data = upload.read()
@@ -76,8 +83,19 @@ class AttachmentUploadView(APIView):
                 filename=upload.name,
                 data=data,
                 declared_mime=getattr(upload, "content_type", "") or "",
-                uploaded_by_kind="client" if thread.client_id else "session",
-                uploaded_by_id=str(thread.client_id or thread.visitor_session or ""),
+                # The kind is derived from WHO UPLOADED IT, not from who owns the thread.
+                # A staff file on a client thread used to be indistinguishable from the
+                # client's own upload, which matters twice over: the excerpt selector
+                # fences visitor uploads as untrusted input, and the attachment review
+                # queue exists to look at what visitors sent us.
+                uploaded_by_kind=(
+                    "team" if by_team and not owns_thread(request, thread)
+                    else ("client" if thread.client_id else "session")
+                ),
+                uploaded_by_id=str(
+                    getattr(request.user, "id", "") if by_team and not owns_thread(request, thread)
+                    else (thread.client_id or thread.visitor_session or "")
+                ),
             )
         except intake.AttachmentRejected as exc:
             # A rejected FILE never rejects the TURN. The message tells them what they
@@ -114,11 +132,13 @@ class AttachmentDetailView(APIView):
     """GET / DELETE attachments/{id}/."""
 
     permission_classes = [AllowAny]
-    # See AttachmentUploadView: the client branch of owns_thread needs a user.
-    authentication_classes = [ClientJWTAuthentication]
+    # See AttachmentUploadView: the client branch of owns_thread needs a user, and the
+    # team authenticator lets the console poll the status of a file IT staged (GET only —
+    # `delete` refuses team callers below).
+    authentication_classes = [ClientJWTAuthentication, JWTAuthentication]
 
     def get(self, request, attachment_id):
-        attachment = _load(request, attachment_id)
+        attachment = _load(request, attachment_id, allow_team_own_upload=True)
         if attachment is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(AttachmentSerializer(attachment).data)
@@ -220,8 +240,16 @@ def _load_thread(thread_id: str):
         return None
 
 
-def _load(request, attachment_id):
-    """Load an attachment ONLY if the caller owns its thread."""
+def _load(request, attachment_id, *, allow_team_own_upload: bool = False):
+    """
+    Load an attachment ONLY if the caller owns its thread.
+
+    ``allow_team_own_upload`` widens this to a team member reading back a file THEY
+    staged (``uploaded_by_kind == "team"``) — enough to poll its scan status, and no
+    further. It is off by default and passed only from the GET handler, so DELETE stays
+    a visitor-only action: staff purging a customer's file belongs behind the audited
+    quarantine route in the cockpit, not here.
+    """
     try:
         attachment = (
             Attachment.objects.filter(id=attachment_id)
@@ -232,6 +260,12 @@ def _load(request, attachment_id):
         return None
     if attachment is None or attachment.is_deleted:
         return None
-    if not owns_thread(request, attachment.thread):
-        return None
-    return attachment
+    if owns_thread(request, attachment.thread):
+        return attachment
+    if (
+        allow_team_own_upload
+        and attachment.uploaded_by_kind == Attachment.UploadedByKind.TEAM
+        and is_team_caller(request)
+    ):
+        return attachment
+    return None

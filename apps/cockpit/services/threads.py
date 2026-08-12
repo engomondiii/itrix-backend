@@ -28,7 +28,14 @@ import logging
 logger = logging.getLogger("itrix")
 
 # A board is for scanning. Beyond a couple of hundred rows an operator filters rather
-# than scrolls, so the ceiling is a real limit rather than a placeholder.
+# than scrolls, so the PAGE ceiling is a real limit rather than a placeholder.
+#
+# ── THE CAP WAS NOT A PAGE (fix, 2026-08-12) ────────────────────────────────
+# `MAX_LIMIT` used to be the end of the data: `[:limit]` with no offset meant the
+# 501st-oldest thread could not be reached by any request. A cap on page SIZE is a
+# scanning decision; a cap with no offset is data loss with extra steps. `rows()` now
+# takes an offset and reports the total, so every row is reachable and the board can
+# say how much is behind it.
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 500
 
@@ -59,7 +66,7 @@ def _company_for(thread) -> str:
     return ""
 
 
-def rows(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
+def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
     """
     One row per conversation. Newest activity first — the board is a work queue.
 
@@ -72,12 +79,22 @@ def rows(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
 
     So there is no ``includeInactive`` parameter either. A board cannot offer to show
     something the model does not keep.
+
+    Returns ``{results, total, limit, offset, hasMore}``. The ordering carries ``id`` as
+    a final tiebreak: two threads touched in the same instant would otherwise be ordered
+    arbitrarily, and an unstable sort under paging shows one row twice and skips another.
     """
     from django.db.models import Count, Max, Q
 
     from apps.conversations.models import SenderKind, Thread
 
     limit = max(1, min(int(limit or DEFAULT_LIMIT), MAX_LIMIT))
+    offset = max(0, int(offset or 0))
+
+    # Counted on its own query rather than off the annotated one: the annotations exist
+    # to fill the row, and COUNT(*) over three joins to answer "how many threads" is a
+    # cost paid on every board load for a number that does not need them.
+    total = Thread.objects.count()
 
     qs = Thread.objects.select_related("lead", "client").annotate(
         turn_count=Count("messages", distinct=True),
@@ -87,7 +104,7 @@ def rows(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
             distinct=True,
         ),
         newest_message_at=Max("messages__created_at"),
-    ).order_by("-last_activity_at", "-created_at")[:limit]
+    ).order_by("-last_activity_at", "-created_at", "id")[offset:offset + limit]
 
     out: list[dict] = []
     for thread in qs:
@@ -119,7 +136,24 @@ def rows(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
                 "ownerKind": getattr(thread, "owner_kind", "") or "",
             }
         )
-    return out
+    return {
+        "results": out,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "hasMore": offset + len(out) < total,
+    }
+
+
+def rows(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> list[dict]:
+    """
+    The board rows alone.
+
+    Kept as the shape every existing caller and test already expects. `page()` is the
+    one that also reports the total; this is a thin read of it, so there is no second
+    query implementation to drift.
+    """
+    return page(limit=limit, offset=offset)["results"]
 
 
 def detail(thread_id: str, *, may_see_matched_text: bool = False) -> dict | None:

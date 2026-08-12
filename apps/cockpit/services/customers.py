@@ -46,8 +46,20 @@ _ORDER = {"critical": 0, "at_risk": 1, "unknown": 2, "stable": 3}
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 500
 
+# ── PAGING A DERIVED SORT (fix, 2026-08-12) ─────────────────────────────────
+# Health is computed in Python by `health_calculator.calculate`, not stored, so the
+# database cannot order by it. That was already true before paging existed: the old
+# `[:limit]` took an arbitrary 200 clients and sorted THOSE worst-first, so "worst
+# first" has always meant "worst first within what was fetched".
+#
+# Paging makes that visible rather than introducing it, and the page order is now a
+# STABLE database order (`-created_at, id`) so page 2 cannot repeat or skip a row.
+# The payload says `ordering: "worst_first_within_page"` so a dashboard cannot read
+# the first row of page 1 as "the customer most at risk" across the whole book.
+ORDERING = "worst_first_within_page"
 
-def results(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
+
+def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
     """
     Per-customer rows, worst first. TEAM PLANE ONLY.
 
@@ -59,9 +71,14 @@ def results(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
     from apps.customer_success.services.health_calculator import calculate
 
     limit = max(1, min(int(limit or DEFAULT_LIMIT), MAX_LIMIT))
+    offset = max(0, int(offset or 0))
+
+    active = Client.objects.filter(is_active=True)
+    total = active.count()
 
     rows: list[dict] = []
-    for client in Client.objects.filter(is_active=True).select_related("lead")[:limit]:
+    window = active.select_related("lead").order_by("-created_at", "id")[offset:offset + limit]
+    for client in window:
         assessment = calculate(client)
         health_class = assessment.health or "unknown"
         if health_class not in HEALTH_CLASSES:
@@ -94,7 +111,24 @@ def results(*, limit: int = DEFAULT_LIMIT) -> list[dict]:
         )
 
     rows.sort(key=lambda r: _ORDER.get(r["healthClass"], 9))
-    return rows
+    return {
+        "results": rows,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "hasMore": offset + len(rows) < total,
+        "ordering": ORDERING,
+    }
+
+
+def results(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> list[dict]:
+    """
+    The customer rows alone — the shape existing callers and tests expect.
+
+    A thin read of `page()`, so there is only one implementation of the query and the
+    health computation.
+    """
+    return page(limit=limit, offset=offset)["results"]
 
 
 def detail(client_id: str) -> dict | None:

@@ -53,9 +53,19 @@ def _group_send(group_name: str, event: dict) -> None:
 
 
 def broadcast_message(message: Message) -> None:
-    """Fan a persisted message out to its conversation group (governed)."""
+    """
+    Fan a persisted message out to its conversation group (governed).
+
+    ── EVERY FRAME CARRIES BOTH IDS (2026-08-12) ────────────────────────────────
+    The payload named only the conversation, so a client watching a conversation socket
+    could not tell which THREAD a message belonged to — and thread is the key every
+    transcript, artifact and attachment read uses. ``threadId`` is added to both frames
+    below (and it is null for the pre-spine conversations, which is the truth rather
+    than an omission).
+    """
     conv = message.conversation
     conv_id = str(conv.id)
+    thread_id = str(message.thread_id) if message.thread_id else None
     if message.is_deliverable:
         _group_send(
             conv.group_name,
@@ -64,9 +74,11 @@ def broadcast_message(message: Message) -> None:
                 "type": "message.final",
                 "payload": {
                     "conversationId": conv_id,
+                    "threadId": thread_id,
                     "message": {
                         "id": str(message.id),
                         "conversationId": conv_id,
+                        "threadId": thread_id,
                         "senderKind": message.sender_kind,
                         "agentKey": message.agent_key or None,
                         "body": message.body,
@@ -87,6 +99,7 @@ def broadcast_message(message: Message) -> None:
                 "type": "message.under_review",
                 "payload": {
                     "conversationId": conv_id,
+                    "threadId": thread_id,
                     "messageId": str(message.id),
                     "governanceStatus": message.governance_status,
                 },

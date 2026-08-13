@@ -64,10 +64,26 @@ class Attachment(BaseModel):
         CLIENT = "client", "Client"
         TEAM = "team", "Team"
 
+    # ── NULL MEANS "STAGED, NOT YET BOUND" (2026-08-13) ──────────────────────
+    # A visitor on the arrival screen attaches a file BEFORE they have typed
+    # anything, so before a Thread exists. `threadsApi.create({ attachmentIds })`
+    # and `ThreadCreateSerializer.attachment_ids` were both built for exactly
+    # that hand-off; the FK being NOT NULL is what stopped it working, because
+    # the upload had nowhere to put a file that had no thread yet.
+    #
+    # Boundary 3 (scoped to its thread) is NOT weakened by this. During the
+    # unbound window the scope is the UPLOADER — `uploaded_by_kind` plus
+    # `uploaded_by_id`, which are set from the signed session or the
+    # authenticated client and never from the request body. `permissions.
+    # owns_attachment` resolves both cases, and `intake.bind` refuses to move an
+    # attachment that already has a thread, so binding can never carry a file
+    # from one conversation into another.
     thread = models.ForeignKey(
         "conversations.Thread",
         on_delete=models.CASCADE,
         related_name="attachments",
+        null=True,
+        blank=True,
     )
     uploaded_by_kind = models.CharField(
         max_length=16, choices=UploadedByKind.choices, default=UploadedByKind.SESSION

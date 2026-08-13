@@ -37,7 +37,7 @@ class AttachmentRejected(Exception):
 
 
 @transaction.atomic
-def stage(*, thread, filename: str, data: bytes, declared_mime: str = "",
+def stage(*, thread=None, filename: str, data: bytes, declared_mime: str = "",
           uploaded_by_kind: str = "session", uploaded_by_id: str = "") -> Attachment:
     """
     Accept one file.
@@ -45,6 +45,13 @@ def stage(*, thread, filename: str, data: bytes, declared_mime: str = "",
     Raises ``AttachmentRejected`` on a policy breach — carrying the specific, recoverable
     message the visitor sees. A rejected FILE never rejects the TURN: the caller sends
     the message without it.
+
+    ``thread`` MAY BE None (2026-08-13). A visitor attaches on the arrival screen before
+    they have typed anything, so before a Thread exists. The file is staged against the
+    UPLOADER — ``uploaded_by_id`` — and ``bind()`` attaches it to the thread the moment
+    the first turn creates one. ``_is_pre_nda(None)`` returns True, so an unbound file
+    gets the SHORTER retention and the stricter handling: the conservative direction for
+    a document whose conversation we do not know yet.
     """
     size = len(data or b"")
 
@@ -83,7 +90,7 @@ def stage(*, thread, filename: str, data: bytes, declared_mime: str = "",
 
     logger.info(
         "attachment.stage %s thread=%s bytes=%s pre_nda=%s",
-        attachment.id, thread.id, written, pre_nda,
+        attachment.id, getattr(thread, "id", None) or "unbound", written, pre_nda,
     )
     _audit(attachment, "upload")
     return attachment
@@ -109,6 +116,86 @@ def check_turn_total(files: list[tuple[str, bytes]]) -> None:
     decision = policy.check_turn_total(total)
     if not decision:
         raise AttachmentRejected(decision.message, decision.reason)
+
+
+class AttachmentAlreadyBound(Exception):
+    """Raised when a caller tries to move an attachment onto a second thread."""
+
+
+def bind(attachment, thread) -> Attachment:
+    """
+    Attach a staged, UNBOUND attachment to the thread it was sent with.
+
+    ── WHY THIS REFUSES A RE-BIND RATHER THAN ALLOWING ONE ──────────────────────
+    Boundary 3 says an attachment is scoped to its thread. If this function accepted a
+    thread for an attachment that already had one, then a caller who knew (or guessed) an
+    attachment id could name it in their own ``POST threads/`` and carry somebody else's
+    document into their own conversation, where the excerpt selector would feed it to the
+    model. Ownership is checked by the caller; the CARDINALITY is checked here, so the
+    boundary does not depend on every call site remembering it.
+
+    Re-binding to the SAME thread is a no-op rather than an error: a retried turn submit
+    must be safe to replay.
+
+    Rebinding also re-derives ``pre_nda`` and the retention window from the thread. An
+    unbound file was staged with the conservative pre-NDA default; once the thread is
+    known, the real identity state decides — and it can only ever be read from the
+    thread, never from the request.
+    """
+    if attachment.thread_id is not None:
+        if str(attachment.thread_id) == str(getattr(thread, "id", "")):
+            return attachment
+        raise AttachmentAlreadyBound(
+            f"attachment {attachment.id} is already bound to thread {attachment.thread_id}"
+        )
+
+    pre_nda = _is_pre_nda(thread)
+    attachment.thread = thread
+    attachment.pre_nda = pre_nda
+    attachment.retention_expires_at = timezone.now() + timezone.timedelta(
+        days=policy.retention_days_for(pre_nda=pre_nda)
+    )
+    attachment.save(update_fields=["thread", "pre_nda", "retention_expires_at", "updated_at"])
+    logger.info("attachment.bind %s -> thread=%s pre_nda=%s", attachment.id, thread.id, pre_nda)
+    return attachment
+
+
+def bind_many(attachment_ids, thread, *, uploaded_by_id: str = "") -> list[str]:
+    """
+    Bind every attachment in ``attachment_ids`` that this uploader actually owns.
+
+    Returns the ids that are now on ``thread`` — bound here, or already there.
+
+    UNKNOWN, FOREIGN AND ALREADY-BOUND IDS ARE SKIPPED, NOT RAISED. The visitor's words
+    are already on the record by the time this runs; a bad id in the list must never cost
+    them the sentence they typed. What it costs is that file, and the count of what was
+    linked is returned so the caller can report it.
+    """
+    if not attachment_ids:
+        return []
+
+    wanted = [str(a) for a in attachment_ids if a]
+    if not wanted:
+        return []
+
+    rows = Attachment.objects.filter(id__in=wanted, deleted_at__isnull=True)
+    if uploaded_by_id:
+        # The upload recorded WHO staged it. Without this filter, naming a stranger's
+        # unbound attachment id would bind their document into this thread.
+        rows = rows.filter(uploaded_by_id=str(uploaded_by_id))
+
+    bound: list[str] = []
+    for attachment in rows:
+        try:
+            bind(attachment, thread)
+        except AttachmentAlreadyBound:
+            logger.info(
+                "attachment.bind refused %s (already on thread %s)",
+                attachment.id, attachment.thread_id,
+            )
+            continue
+        bound.append(str(attachment.id))
+    return bound
 
 
 def associate(attachment, message) -> None:

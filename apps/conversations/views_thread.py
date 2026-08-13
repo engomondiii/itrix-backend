@@ -87,6 +87,32 @@ def _set_session_cookie(response, session_id: str):
     return response
 
 
+def _bind_attachments(request, thread, attachment_ids) -> list[str]:
+    """
+    Move the caller's UNBOUND attachments onto ``thread``, and report which are there.
+
+    The list is filtered by the UPLOADER inside ``intake.bind_many``, so an id belonging
+    to another session is skipped rather than bound. An id that is already on this thread
+    is returned as-is, which makes a retried submit idempotent; an id on a DIFFERENT
+    thread is refused, because binding must never carry a document between conversations.
+
+    Never raises. Attachments are an enhancement to a turn; the turn is the thing that
+    must not fail.
+    """
+    if not attachment_ids:
+        return []
+    try:
+        from apps.attachments.permissions import uploader_id_for
+        from apps.attachments.services import intake
+
+        return intake.bind_many(
+            attachment_ids, thread, uploaded_by_id=uploader_id_for(request)
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("attachment binding failed for thread %s", getattr(thread, "id", "?"))
+        return []
+
+
 def _rate_limited(request, session_id: str, kind: str):
     """Apply the anonymous-plane rate limits. Returns a Response when blocked."""
     from apps.realtime.services import limits
@@ -188,14 +214,29 @@ class ThreadListCreateView(APIView):
             title=thread_svc.derive_title(body) if body else "",
         )
 
+        # ── THE HAND-OFF THIS SERIALIZER WAS ALWAYS FOR (2026-08-13) ──────────
+        # `attachment_ids` has been declared on ThreadCreateSerializer since v6.0 and was
+        # never read, so a file attached on the arrival screen was silently dropped: it
+        # stayed unbound, no MessageAttachment row was written, and `excerpts.for_context`
+        # — which selects by THREAD — never saw it. The visitor watched their document
+        # upload and then got an answer that ignored it.
+        #
+        # Binding happens BEFORE the first turn is persisted, because the turn is what the
+        # files are linked to and the answer generated below reads them off the thread.
+        bound_ids = _bind_attachments(request, thread, data.get("attachment_ids") or [])
+
         # The FIRST PROMPT IS THE FIRST REVIEW TURN (R12). If the visitor typed
         # something when creating the thread, it is persisted as turn 1 here — there is
         # no screen anywhere that asks them to restate the sentence they already typed.
         if body.strip():
             try:
-                self._persist_first_turn(thread, body)
+                first = self._persist_first_turn(thread, body)
             except MessageTooLong as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+            if bound_ids:
+                from apps.conversations.services import ingest
+
+                ingest.associate_attachments(first, bound_ids)
             # The first sentence deserves an answer in the same response. Waiting
             # for a socket that may never connect is how a visitor concludes the
             # surface is broken.
@@ -332,16 +373,27 @@ class ThreadTurnsView(APIView):
 
         from apps.conversations.services import ingest
 
+        # Bind first, link after the message exists. Files attached in the composer of an
+        # ALREADY-OPEN thread are staged unbound too (the composer does not re-send a
+        # thread id it was not given), so the same hand-off applies here.
+        requested_ids = ser.validated_data.get("attachment_ids", [])
+        bound_ids = _bind_attachments(request, thread, requested_ids)
+
         try:
             message = ingest.ingest_inbound(
                 thread.conversation,
                 sender_kind="visitor",
                 body=ser.validated_data["body"],
                 thread=thread,
-                meta={"attachment_ids": ser.validated_data.get("attachment_ids", [])},
+                meta={"attachment_ids": bound_ids},
             )
         except MessageTooLong as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+        # The link the transcript renders. `associate_attachments` re-checks that every id
+        # is on THIS thread, so a foreign id in the list costs that file and nothing else.
+        if bound_ids:
+            ingest.associate_attachments(message, bound_ids)
 
         # Generate the reply here too. The socket streams it when connected; this
         # guarantees an answer when it is not. See _generate_assistant_turn.

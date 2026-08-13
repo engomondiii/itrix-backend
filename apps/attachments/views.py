@@ -30,7 +30,13 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from apps.attachments import policy, storage
 from apps.attachments.models import Attachment
 from apps.clients.backends import ClientJWTAuthentication
-from apps.attachments.permissions import is_team_caller, owns_thread, staff_may_attach
+from apps.attachments.permissions import (
+    is_team_caller,
+    owns_attachment,
+    owns_thread,
+    staff_may_attach,
+    uploader_id_for,
+)
 from apps.attachments.serializers import AttachmentSerializer
 from apps.attachments.services import audit, intake, retention
 
@@ -41,6 +47,34 @@ def _flag_enabled() -> bool:
     from django.conf import settings
 
     return bool(getattr(settings, "ENABLE_ATTACHMENTS", False))
+
+
+def new_visitor_session() -> str:
+    """
+    Mint a visitor session.
+
+    Imported from the thread views rather than re-implemented: the cookie name, the
+    length and the retention window have to be the SAME value in both places or a file
+    staged here would belong to a session the thread endpoints do not recognise.
+    """
+    from apps.conversations.views_thread import new_visitor_session as mint
+
+    return mint()
+
+
+def _set_visitor_session_cookie(response, session_id: str):
+    """Attach the visitor-session cookie, with the thread views' own flags."""
+    from apps.conversations.views_thread import _set_session_cookie
+
+    return _set_session_cookie(response, session_id)
+
+
+def _authenticated_client(request):
+    """The signed-in Client, or None. Used only to label who staged an upload."""
+    from apps.clients.models import Client
+
+    user = getattr(request, "user", None)
+    return user if isinstance(user, Client) and user.is_active else None
 
 
 class AttachmentUploadView(APIView):
@@ -67,14 +101,52 @@ class AttachmentUploadView(APIView):
                             status=status.HTTP_404_NOT_FOUND)
 
         upload = request.FILES.get("file")
-        thread_id = request.data.get("thread_id") or ""
+        thread_id = str(request.data.get("thread_id") or "").strip()
         if upload is None:
             return Response({"detail": "No file supplied."}, status=status.HTTP_400_BAD_REQUEST)
 
-        thread = _load_thread(thread_id)
-        by_team = staff_may_attach(request, thread)
-        if thread is None or not (owns_thread(request, thread) or by_team):
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        # ── THE ARRIVAL SCREEN HAS NO THREAD (2026-08-13) ─────────────────────
+        # A visitor attaches before typing anything, so `thread_id` is absent and there is
+        # no Thread to own. This used to fall through to the `thread is None` branch below
+        # and return 404 `{"detail": "Not found."}` — which the composer rendered under the
+        # filename as "Not found.", making a working upload look like a missing file.
+        #
+        # An absent thread_id is therefore NOT the same as an unowned one. It stages the
+        # file against the CALLER (session or client) and `intake.bind` moves it onto the
+        # thread when the first turn creates one. A thread_id that IS supplied is still
+        # checked exactly as before: a wrong or foreign id remains a 404.
+        unbound = not thread_id
+        issued_session = ""
+
+        if unbound:
+            if is_team_caller(request):
+                # Staff attach INTO a named conversation. There is no such thing as a team
+                # upload with no destination, and allowing one would create a file no
+                # thread-scoped query could ever reach.
+                return Response(
+                    {"detail": "A thread is required to attach a file as a team member."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            thread = None
+            by_team = False
+            owner_id = uploader_id_for(request)
+            if not owner_id:
+                # First action on the site was attaching a file. Mint the session now so
+                # the upload has an owner, and return it as a cookie so the turn that
+                # follows arrives as the same visitor — otherwise the thread would be
+                # created under a different session and could never claim this file.
+                owner_id = new_visitor_session()
+                issued_session = owner_id
+            owner_kind = (
+                "client" if _authenticated_client(request) is not None else "session"
+            )
+        else:
+            thread = _load_thread(thread_id)
+            by_team = staff_may_attach(request, thread)
+            if thread is None or not (owns_thread(request, thread) or by_team):
+                return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            owner_kind = ""
+            owner_id = ""
 
         data = upload.read()
         try:
@@ -89,12 +161,19 @@ class AttachmentUploadView(APIView):
                 # fences visitor uploads as untrusted input, and the attachment review
                 # queue exists to look at what visitors sent us.
                 uploaded_by_kind=(
-                    "team" if by_team and not owns_thread(request, thread)
-                    else ("client" if thread.client_id else "session")
+                    owner_kind if unbound
+                    else (
+                        "team" if by_team and not owns_thread(request, thread)
+                        else ("client" if thread.client_id else "session")
+                    )
                 ),
                 uploaded_by_id=str(
-                    getattr(request.user, "id", "") if by_team and not owns_thread(request, thread)
-                    else (thread.client_id or thread.visitor_session or "")
+                    owner_id if unbound
+                    else (
+                        getattr(request.user, "id", "")
+                        if by_team and not owns_thread(request, thread)
+                        else (thread.client_id or thread.visitor_session or "")
+                    )
                 ),
             )
         except intake.AttachmentRejected as exc:
@@ -107,7 +186,10 @@ class AttachmentUploadView(APIView):
 
         _process(attachment)
         attachment.refresh_from_db()
-        return Response(AttachmentSerializer(attachment).data, status=status.HTTP_201_CREATED)
+        response = Response(AttachmentSerializer(attachment).data, status=status.HTTP_201_CREATED)
+        if issued_session:
+            _set_visitor_session_cookie(response, issued_session)
+        return response
 
 
 def _process(attachment) -> None:
@@ -176,10 +258,18 @@ class AttachmentDownloadView(APIView):
         if not storage.exists(attachment.blob_key):
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # An unbound attachment has no thread to read the plane off, so the subject falls
+        # back to the uploader it was staged against — which is the same identity, just
+        # recorded before the conversation existed.
+        thread = attachment.thread
         audit.record_download(
             attachment,
-            plane="client" if attachment.thread.client_id else "anonymous",
-            subject=str(attachment.thread.client_id or attachment.thread.visitor_session),
+            plane="client" if (thread and thread.client_id) else "anonymous",
+            subject=str(
+                (thread.client_id or thread.visitor_session)
+                if thread
+                else attachment.uploaded_by_id
+            ),
             purpose="visitor download",
         )
 
@@ -260,7 +350,7 @@ def _load(request, attachment_id, *, allow_team_own_upload: bool = False):
         return None
     if attachment is None or attachment.is_deleted:
         return None
-    if owns_thread(request, attachment.thread):
+    if owns_attachment(request, attachment):
         return attachment
     if (
         allow_team_own_upload

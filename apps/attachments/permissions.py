@@ -47,6 +47,50 @@ def owns_thread(request, thread) -> bool:
     return thread.visitor_session == session and thread.client_id is None
 
 
+def uploader_id_for(request) -> str:
+    """
+    The id an upload by THIS caller is recorded under.
+
+    The authenticated client if there is one, otherwise the signed visitor session. Never
+    a value from the request body — that is the whole point of resolving it here rather
+    than trusting what the upload claims.
+    """
+    from apps.clients.models import Client
+
+    user = getattr(request, "user", None)
+    if isinstance(user, Client) and user.is_active:
+        return str(user.id)
+    return _session_from(request)
+
+
+def owns_attachment(request, attachment) -> bool:
+    """
+    Whether this caller owns ``attachment``, bound or not.
+
+    ── TWO SCOPES, ONE BOUNDARY (§4.6 boundary 3) ───────────────────────────────
+    Once an attachment has a thread, the thread is the scope and ``owns_thread`` is the
+    only question — unchanged. Before it has one, there is no thread to own, so the scope
+    is the UPLOADER: the file is reachable only by the session or client that staged it.
+
+    Both halves resolve against the signed session or the authenticated client. Neither
+    trusts the id in the URL, so guessing an attachment id still returns 404 for the same
+    reason it always did.
+    """
+    if attachment is None:
+        return False
+    if attachment.thread_id is not None:
+        return owns_thread(request, attachment.thread)
+
+    uploader = uploader_id_for(request)
+    if not uploader:
+        return False
+    # An unbound attachment is a VISITOR-PLANE artifact. Team callers reach files through
+    # the audited cockpit queue, not through the endpoint a visitor uses.
+    if attachment.uploaded_by_kind == attachment.UploadedByKind.TEAM:
+        return False
+    return str(attachment.uploaded_by_id) == uploader
+
+
 def is_team_caller(request) -> bool:
     """
     Whether this caller is an authenticated, active iTrix TEAM USER.
@@ -124,4 +168,7 @@ class CanDownloadAttachment(BasePermission):
             return False
         if not obj.is_downloadable:
             return False
-        return owns_thread(request, obj.thread)
+        # `owns_attachment` rather than `owns_thread`: an attachment staged on the arrival
+        # screen has no thread yet, and its uploader must still be able to reach it. The
+        # bound case is unchanged — it delegates straight back to `owns_thread`.
+        return owns_attachment(request, obj)

@@ -52,18 +52,31 @@ class EmailsConfig(AppConfig):
             return
 
         if provider == "smtp":
+            # The TRANSPORT is named explicitly. A host/port pair alone does not tell you
+            # whether the handshake is implicit SSL or STARTTLS, and picking the wrong one
+            # does not error — it hangs until EMAIL_TIMEOUT and is logged as a send
+            # failure, which reads as a credential problem.
             logger.info(
-                "[email-config] delivery ON via SMTP %s:%s as %s, from '%s'.",
+                "[email-config] delivery ON via SMTP %s:%s (%s) as %s, from '%s'.",
                 getattr(settings, "EMAIL_HOST", "?"),
                 getattr(settings, "EMAIL_PORT", "?"),
+                "implicit SSL" if getattr(settings, "EMAIL_USE_SSL", False)
+                else ("STARTTLS" if getattr(settings, "EMAIL_USE_TLS", False) else "cleartext"),
                 getattr(settings, "EMAIL_HOST_USER", "?"),
                 getattr(settings, "DEFAULT_FROM_EMAIL", "?"),
             )
+            if getattr(settings, "EMAIL_TRANSPORT_CONFLICT", False):
+                logger.warning(
+                    "[email-config] EMAIL_USE_SSL and EMAIL_USE_TLS were BOTH set. Django "
+                    "rejects that combination, so TLS has been turned off and SSL kept. "
+                    "Set only one — port 465 wants EMAIL_USE_SSL, port 587 wants "
+                    "EMAIL_USE_TLS."
+                )
             ignored = getattr(settings, "EMAIL_FROM_IGNORED", "")
             if ignored:
                 logger.warning(
                     "[email-config] EMAIL_FROM=%s is set but IGNORED: SMTP sends as the "
-                    "authenticated mailbox %s, because Gmail refuses a From address the "
+                    "authenticated mailbox %s, because the mail server refuses a From the "
                     "credential does not own. Set EMAIL_FROM to %s (or unset it) to make "
                     "the environment agree with what is actually sent.",
                     ignored,

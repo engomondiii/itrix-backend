@@ -225,19 +225,56 @@ def associate_attachments(message, attachment_ids) -> int:
 
     Returns how many were linked. A missing attachment is skipped rather than raising —
     the visitor's words are already on the record and must not be lost to a bad id.
+
+    ── THE LINK IS FILTERED TO THE MESSAGE'S OWN THREAD (2026-08-13) ────────────
+    This used to link whatever id it was handed. That was safe only because the two
+    callers happened to filter first (``agents.views._own_thread_attachments``) or work
+    from an already-scoped list. Now that the PUBLIC ``threads/`` routes call it, an
+    unfiltered link is an IDOR: naming a stranger's attachment id in ``attachment_ids``
+    would attach their document to your own turn, and the turn serializer renders what is
+    linked. So membership is re-checked HERE, against the message's thread, and the
+    boundary no longer depends on each call site remembering to do it.
+
+    A single query resolves the whole list, so a long ``attachment_ids`` costs one round
+    trip rather than one per id.
     """
     if not attachment_ids:
         return 0
     linked = 0
     try:
+        from apps.attachments.models import Attachment
         from apps.conversations.models import MessageAttachment
 
-        for order, attachment_id in enumerate(attachment_ids):
-            if not attachment_id:
-                continue
+        thread_id = getattr(message, "thread_id", None)
+        if thread_id is None:
+            logger.warning(
+                "attachment association skipped: message %s has no thread", message.id
+            )
+            return 0
+
+        wanted = [str(a) for a in attachment_ids if a]
+        if not wanted:
+            return 0
+
+        allowed = {
+            str(pk)
+            for pk in Attachment.objects.filter(
+                id__in=wanted, thread_id=thread_id, deleted_at__isnull=True
+            ).values_list("id", flat=True)
+        }
+        refused = [a for a in wanted if a not in allowed]
+        if refused:
+            logger.warning(
+                "attachment association refused %s id(s) not on thread %s for message %s",
+                len(refused), thread_id, message.id,
+            )
+
+        # Order follows the CALLER's list, not the query, so the transcript shows the
+        # files in the order the visitor attached them.
+        for order, attachment_id in enumerate(a for a in wanted if a in allowed):
             MessageAttachment.objects.get_or_create(
                 message=message,
-                attachment_id=str(attachment_id),
+                attachment_id=attachment_id,
                 defaults={"order": order},
             )
             linked += 1

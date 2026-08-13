@@ -478,7 +478,7 @@ PINECONE_REGION = env("PINECONE_REGION", "us-east-1")
 # created (that is what makes the R66 confirmation gate a single rule rather than
 # something every builder has to remember). It can now deliver through either:
 #
-#   smtp    Django's own mail backend — Gmail / Google Workspace, or any SMTP host
+#   smtp    Django's own mail backend — the gpslab.org mail server, or any SMTP host
 #   resend  the Resend HTTP API, as before
 #
 # EMAIL_PROVIDER selects. "auto" (the default) means: use SMTP when a host user is
@@ -486,7 +486,7 @@ PINECONE_REGION = env("PINECONE_REGION", "us-east-1")
 # deliverable and every send is logged as stubbed.
 #
 # ── THE ENVELOPE SENDER IS DERIVED, NOT ASSUMED ──────────────────────────────
-# Gmail refuses to send with a From address that is neither the authenticated
+# A mail server refuses to send with a From address that is neither the authenticated
 # mailbox nor one of its verified aliases. Leaving EMAIL_FROM pointing at a
 # different domain while authenticating as another mailbox is the single most
 # common way this configuration fails, and it fails at send time with an SMTP
@@ -495,15 +495,53 @@ PINECONE_REGION = env("PINECONE_REGION", "us-east-1")
 # ─────────────────────────────────────────────────────────────────────────────
 RESEND_API_KEY = env("RESEND_API_KEY", "")
 
-EMAIL_HOST = env("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(env("EMAIL_PORT", "587") or 587)
-EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
-EMAIL_HOST_USER = (env("EMAIL_HOST_USER", "gpslab@iwl.kr") or "").strip()
+# ── THE CUSTOM-DOMAIN MAILBOX (2026-08-13) ──────────────────────────────────
+# Outbound mail moves off the Gmail app-password setup and onto the gpslab.org mail
+# server. An app password is a credential tied to one personal Google account: it dies
+# when that account's password changes (which is exactly how it died on 2026-07-31, as a
+# 535 BadCredentials on every verification link), it cannot be delegated, and it makes
+# the sender identity somebody's personal mailbox rather than the organisation's.
+#
+#   host      mail.gpslab.org
+#   SMTP      465, implicit SSL          ← outbound; this is what Django uses
+#   IMAP      993, implicit SSL          ← inbound; NOT used here, see below
+#   mailbox   contact@gpslab.org
+#
+# IMAP IS DEPLOYED NOWHERE IN THIS SETTING BLOCK, AND THAT IS NOT AN OMISSION.
+# Django's mail settings are send-only, and this backend has no inbound mail path at all
+# — nothing reads a mailbox, so there is no consumer for 993. The IMAP half of the
+# provider's instructions is what a desktop client needs; the server needs the SMTP half.
+# Recording 993 here as an unused constant would suggest inbound mail is wired up when it
+# is not, so it is documented rather than declared.
+EMAIL_HOST = env("EMAIL_HOST", "mail.gpslab.org")
+EMAIL_PORT = int(env("EMAIL_PORT", "465") or 465)
+EMAIL_HOST_USER = (env("EMAIL_HOST_USER", "contact@gpslab.org") or "").strip()
 
-# Google shows app passwords in four spaced groups ("abcd efgh ijkl mnop") and people
-# paste them that way. SMTP AUTH would fail on the spaces, so they are stripped here
-# rather than left as a support call.
+# ── 465 IS IMPLICIT SSL, 587 IS STARTTLS, AND THEY ARE MUTUALLY EXCLUSIVE ────
+# Django raises ImproperlyConfigured at send time if EMAIL_USE_TLS and EMAIL_USE_SSL are
+# both true, and Railway still carries no explicit value for either. Reading them as two
+# independent booleans is how a port change silently produces the wrong handshake: 465
+# with STARTTLS hangs until EMAIL_TIMEOUT, which surfaces as "the link never arrived"
+# rather than as a configuration error.
+#
+# So the transport is DERIVED FROM THE PORT unless the environment says otherwise, and
+# the mutual exclusion is enforced here — at boot, where it is visible — rather than
+# discovered in a background task.
+_ssl_by_port = EMAIL_PORT == 465
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", _ssl_by_port)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not _ssl_by_port)
+if EMAIL_USE_SSL and EMAIL_USE_TLS:
+    # An explicit environment wins over the derivation, but it cannot win over Django's
+    # own constraint. SSL is kept because the port is the more reliable signal of intent.
+    EMAIL_USE_TLS = False
+    EMAIL_TRANSPORT_CONFLICT = True
+else:
+    EMAIL_TRANSPORT_CONFLICT = False
+
+# Whitespace is stripped from the password. Google showed app passwords in four spaced
+# groups ("abcd efgh ijkl mnop") and people pasted them that way; control-panel mailbox
+# passwords get the same treatment because a trailing newline from a copy-paste fails SMTP
+# AUTH identically, and the failure looks like a wrong password rather than a stray byte.
 #
 # NO DEFAULT VALUE. A credential with a fallback in source control is a credential in
 # every clone, branch and CI log of this repository — and rotating it then means
@@ -527,9 +565,10 @@ EMAIL_FROM_NAME = env("EMAIL_FROM_NAME", "iTrix Assessment Team")
 
 # ── THE SENDER IS DECIDED BY THE PROVIDER, NOT BY PREFERENCE ────────────────
 # Under SMTP the authenticated mailbox WINS over EMAIL_FROM, and that is not a
-# stylistic choice. Gmail and Google Workspace refuse a From address the credential
-# does not own (553 / SMTPSenderRefused); the message is rejected at send time, in a
-# background task, long after the visitor has been told to check their email.
+# stylistic choice. Mail servers refuse a From address the credential does not own
+# (553 / SMTPSenderRefused) — Google Workspace does, and so does a standard cPanel/Exim
+# mailbox like the gpslab.org one. The message is rejected at send time, in a background
+# task, long after the visitor has been told to check their email.
 #
 # This deployment is exactly that trap: EMAIL_FROM is set to a different domain from
 # EMAIL_HOST_USER. Honouring it would mean every confirmation link failing to send

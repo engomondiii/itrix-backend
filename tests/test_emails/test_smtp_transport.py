@@ -2,7 +2,7 @@
 THE CUSTOM-DOMAIN MAIL TRANSPORT (2026-08-13).
 
 Outbound mail moved off the Gmail app password and onto the gpslab.org mail server:
-mail.gpslab.org, port 465, implicit SSL, authenticating as contact@gpslab.org.
+mail.gpslab.org, port 465, implicit SSL, authenticating as itrix@gpslab.org.
 
 ── WHY THE TRANSPORT IS DERIVED FROM THE PORT ───────────────────────────────
 465 is implicit SSL; 587 is STARTTLS. Django raises ImproperlyConfigured when
@@ -41,7 +41,7 @@ def test_the_defaults_are_the_gpslab_mailbox(monkeypatch):
 
     assert base.EMAIL_HOST == "mail.gpslab.org"
     assert base.EMAIL_PORT == 465
-    assert base.EMAIL_HOST_USER == "contact@gpslab.org"
+    assert base.EMAIL_HOST_USER == "itrix@gpslab.org"
 
 
 def test_port_465_derives_implicit_ssl(monkeypatch):
@@ -91,14 +91,14 @@ def test_the_sender_becomes_the_authenticated_mailbox(monkeypatch):
     )
 
     assert base.EMAIL_PROVIDER == "smtp"
-    assert base.EMAIL_FROM == "contact@gpslab.org"
+    assert base.EMAIL_FROM == "itrix@gpslab.org"
     assert base.EMAIL_FROM_IGNORED == "gpslab@iwl.kr"
-    assert base.DEFAULT_FROM_EMAIL == "iTrix Assessment Team <contact@gpslab.org>"
+    assert base.DEFAULT_FROM_EMAIL == "iTrix Assessment Team <itrix@gpslab.org>"
 
 
 def test_a_matching_email_from_is_not_reported_as_ignored(monkeypatch):
     base = _reload_settings(
-        monkeypatch, EMAIL_HOST_PASSWORD="mailbox-secret", EMAIL_FROM="contact@gpslab.org"
+        monkeypatch, EMAIL_HOST_PASSWORD="mailbox-secret", EMAIL_FROM="itrix@gpslab.org"
     )
 
     assert base.EMAIL_FROM_IGNORED == ""

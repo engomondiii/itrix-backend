@@ -58,6 +58,22 @@ def test_a_first_time_visitor_can_attach_before_a_thread_exists():
     assert res.data["attachmentId"]
 
 
+def test_attachment_processing_stays_inline_when_global_celery_is_enabled(settings):
+    """Railway Celery may stay on while local attachment blobs remain web-service local."""
+    from apps.attachments.models import Attachment, AttachmentExtraction, AttachmentStatus
+
+    settings.ENABLE_CELERY = True
+    settings.ATTACHMENT_PROCESS_INLINE = True
+
+    res = _stage(APIClient(), "celery-safe.txt")
+
+    assert res.status_code == 201, res.data
+    attachment = Attachment.objects.get(id=res.data["attachmentId"])
+    assert attachment.status == AttachmentStatus.READY
+    assert attachment.scans.filter(verdict="clean").exists()
+    assert AttachmentExtraction.objects.filter(attachment=attachment).exists()
+
+
 def test_a_returning_visitor_with_a_session_can_attach_before_a_thread():
     client = APIClient()
     client.cookies[SESSION_COOKIE] = "sess-returning"

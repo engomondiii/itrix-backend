@@ -193,17 +193,32 @@ class AttachmentUploadView(APIView):
 
 
 def _process(attachment) -> None:
-    """Run scan -> extract. Async when Celery is on, inline otherwise."""
+    """Run scan -> extract without crossing a filesystem boundary.
+
+    Railway's backend and Celery worker are separate services. While attachment blobs live
+    on ``ATTACHMENT_BLOB_ROOT`` (the backend service's local filesystem), dispatching this
+    task to Celery makes the worker read a path that does not exist in its container.
+
+    ``ATTACHMENT_PROCESS_INLINE`` therefore defaults to True and keeps ONLY attachment
+    processing in the web service. Global ``ENABLE_CELERY`` remains True for the rest of
+    the application. Once blob storage is genuinely shared between services, the setting
+    can be turned off and this function will use the extraction queue again.
+    """
     from django.conf import settings
 
-    if getattr(settings, "ENABLE_CELERY", False):
+    process_inline = getattr(settings, "ATTACHMENT_PROCESS_INLINE", True)
+    if getattr(settings, "ENABLE_CELERY", False) and not process_inline:
         try:
             from tasks.attachment_tasks import process_attachment
 
             process_attachment.delay(str(attachment.id))
             return
         except Exception:  # noqa: BLE001
-            logger.debug("celery dispatch failed; processing inline")
+            logger.warning(
+                "attachment celery dispatch failed; processing inline for %s",
+                attachment.id,
+                exc_info=True,
+            )
     try:
         intake.process(attachment)
     except Exception:  # noqa: BLE001

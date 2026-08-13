@@ -408,6 +408,14 @@ SUPPORT_SLA_DEFAULT_HOURS = int(env("SUPPORT_SLA_DEFAULT_HOURS", "4"))
 # Blobs live OUTSIDE the web root. Defaulting to MEDIA_ROOT would make every upload
 # publicly fetchable the moment somebody enabled media serving.
 ATTACHMENT_BLOB_ROOT = env("ATTACHMENT_BLOB_ROOT", str(BASE_DIR / "private_blobs" / "attachments"))
+# The current Railway deployment stores attachment bytes on the backend service's local
+# filesystem. A separate Celery worker cannot see that filesystem, even though it shares
+# Postgres and Redis with the web service. Keep the attachment scan/extract pipeline on
+# the backend process until blob storage is moved to a genuinely shared object store.
+# This switch is ATTACHMENT-SPECIFIC: ENABLE_CELERY may remain True for every other
+# background task in production. Set False only after the attachment bytes themselves are
+# reachable from the worker service.
+ATTACHMENT_PROCESS_INLINE = env_bool("ATTACHMENT_PROCESS_INLINE", True)
 # Optional external scanner, e.g. "clamdscan --no-summary". When unset the built-in
 # type-sniffing and archive-bomb checks run, and the engine is recorded honestly as
 # "builtin" so nobody reads a clean verdict as more than it is.
@@ -505,7 +513,7 @@ RESEND_API_KEY = env("RESEND_API_KEY", "")
 #   host      mail.gpslab.org
 #   SMTP      465, implicit SSL          ← outbound; this is what Django uses
 #   IMAP      993, implicit SSL          ← inbound; NOT used here, see below
-#   mailbox   contact@gpslab.org
+#   mailbox   itrix@gpslab.org
 #
 # IMAP IS DEPLOYED NOWHERE IN THIS SETTING BLOCK, AND THAT IS NOT AN OMISSION.
 # Django's mail settings are send-only, and this backend has no inbound mail path at all

@@ -423,6 +423,11 @@ ATTACHMENT_AV_COMMAND = env("ATTACHMENT_AV_COMMAND", "")
 # Extraction sandbox ceilings.
 ATTACHMENT_EXTRACTION_TIMEOUT_SECONDS = int(env("ATTACHMENT_EXTRACTION_TIMEOUT_SECONDS", "30"))
 ATTACHMENT_EXTRACTION_MEMORY_MB = int(env("ATTACHMENT_EXTRACTION_MEMORY_MB", "512"))
+# Daphne serves requests from a multi-threaded ASGI process. Raw ``fork`` from that
+# process can inherit thread locks and a large virtual address space, making a perfectly
+# valid DOCX intermittently fall back to metadata-only. ``forkserver`` starts extraction
+# from a clean single-threaded helper on Railway/Linux; platforms without it use spawn.
+ATTACHMENT_EXTRACTION_START_METHOD = env("ATTACHMENT_EXTRACTION_START_METHOD", "forkserver")
 ATTACHMENT_MAX_EXTRACTED_CHARS = int(env("ATTACHMENT_MAX_EXTRACTED_CHARS", "400000"))
 ATTACHMENT_RETENTION_DAYS = int(env("ATTACHMENT_RETENTION_DAYS", "365"))
 
@@ -756,6 +761,11 @@ AGENT_AUTO_APPROVE_MAX_LEVEL = int(env("AGENT_AUTO_APPROVE_MAX_LEVEL", "2"))
 AI_CALL_TIMEOUT_SECONDS = int(env("AI_CALL_TIMEOUT_SECONDS", "20"))
 # SDK-level retry cap for a single Claude call (kept small so total latency stays bounded).
 AI_CALL_MAX_RETRIES = int(env("AI_CALL_MAX_RETRIES", "1"))
+# Concierge replies were capped at 700 output tokens in code. A normal document answer
+# could hit that ceiling mid-JSON, which surfaced the raw partial object to the visitor.
+# Keep the provider timeout separate from the OUTPUT budget: the former bounds wall-clock
+# time, this one bounds how much of a complete answer Claude is allowed to produce.
+CONCIERGE_MAX_TOKENS = int(env("CONCIERGE_MAX_TOKENS", "1800"))
 # Whether the internal lead summary may use Claude on the (synchronous) creation path.
 # OFF by default so lead creation is instant; the deterministic summary is always safe.
 LEAD_SUMMARY_USE_AI = env_bool("LEAD_SUMMARY_USE_AI", False)

@@ -559,6 +559,7 @@ def _generate_assistant_turn(thread, body: str):
 
     text = ""
     degraded = False
+    can_continue = False
     if envelope.may_stream:
         try:
             from apps.agents.services.concierge import ConciergeAgent
@@ -567,6 +568,7 @@ def _generate_assistant_turn(thread, body: str):
             out = agent.run(ctx)
             payload = out.payload or {}
             text = (payload.get("reply") or "").strip() or agent.fallback_reply
+            can_continue = bool(payload.get("canContinue", False))
         except Exception:  # noqa: BLE001
             logger.exception("assistant generation failed for thread %s", thread.id)
             degraded = True
@@ -587,6 +589,7 @@ def _generate_assistant_turn(thread, body: str):
         text = stream_envelope.UNDER_REVIEW_WORDING
         status = StreamingStatus.UNDER_REVIEW
         governance_status = "pending"
+        can_continue = False
     else:
         # PART 3 — settle.
         try:
@@ -602,6 +605,7 @@ def _generate_assistant_turn(thread, body: str):
         status = StreamingStatus.SETTLED if deliverable else StreamingStatus.UNDER_REVIEW
         if not deliverable:
             text = stream_envelope.UNDER_REVIEW_WORDING
+            can_continue = False
 
     # Internal names never reach a visitor: the prompt teaches the public term, and
     # this is the deterministic guarantee (same shape as the two appends below).
@@ -636,6 +640,7 @@ def _generate_assistant_turn(thread, body: str):
         claim_level=1,
         thread=thread,
         streaming_status=status,
+        meta={"can_continue": can_continue},
     )
 
     # COUNT THE ASK DOWN. Only now, and only for a turn the visitor will actually

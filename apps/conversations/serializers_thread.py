@@ -39,6 +39,8 @@ class ThreadTurnSerializer(serializers.ModelSerializer):
     streamingStatus = serializers.CharField(source="streaming_status", read_only=True)
     contextNote = serializers.CharField(source="context_note", read_only=True)
     underReview = serializers.SerializerMethodField()
+    canContinue = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
     body = serializers.SerializerMethodField()
     at = serializers.DateTimeField(source="created_at", read_only=True)
 
@@ -54,12 +56,56 @@ class ThreadTurnSerializer(serializers.ModelSerializer):
             "streamingStatus",
             "contextNote",
             "underReview",
+            "canContinue",
+            "attachments",
             "at",
         ]
         read_only_fields = fields
 
     def get_underReview(self, obj) -> bool:
         return not obj.is_deliverable
+
+    def get_canContinue(self, obj) -> bool:
+        """Whether this assistant turn ended because the model hit its output ceiling."""
+        if obj.sender_kind != "agent" or not obj.is_deliverable:
+            return False
+        return bool((obj.meta or {}).get("can_continue", False))
+
+    def get_attachments(self, obj) -> list[dict]:
+        """Safe attachment metadata for files sent WITH this visitor turn.
+
+        The link table deliberately stores plain ids so conversations has no hard app
+        dependency. Resolve them lazily and expose only visitor-safe display fields —
+        never blob keys, hashes, risk flags, scanner detail or uploader ids.
+        """
+        if obj.sender_kind not in ("visitor", "client"):
+            return []
+        try:
+            links = list(obj.attachment_links.all().order_by("order", "created_at"))
+            wanted = [str(link.attachment_id) for link in links]
+            if not wanted:
+                return []
+
+            from apps.attachments.models import Attachment
+
+            rows = Attachment.objects.filter(
+                id__in=wanted,
+                thread_id=obj.thread_id,
+                deleted_at__isnull=True,
+            ).only("id", "filename", "bytes", "detected_mime")
+            by_id = {str(row.id): row for row in rows}
+            return [
+                {
+                    "attachmentId": str(by_id[attachment_id].id),
+                    "filename": by_id[attachment_id].filename,
+                    "sizeBytes": int(by_id[attachment_id].bytes or 0),
+                    "detectedType": by_id[attachment_id].detected_mime or "",
+                }
+                for attachment_id in wanted
+                if attachment_id in by_id
+            ]
+        except Exception:  # noqa: BLE001 - attachments are optional/flag-gated
+            return []
 
     def get_body(self, obj) -> str:
         """

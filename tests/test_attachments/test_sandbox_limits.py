@@ -10,6 +10,7 @@ assert the boundary exists and holds — not that the parsers are correct.
 from __future__ import annotations
 
 import pytest
+from django.test import override_settings
 
 from workers import extraction_entrypoint as sandbox
 
@@ -28,6 +29,7 @@ def test_an_unknown_handler_degrades_to_opaque():
     assert result.metadata_only is True
 
 
+@override_settings(ATTACHMENT_EXTRACTION_START_METHOD="fork")
 def test_a_timeout_produces_an_honest_result_not_an_exception():
     """
     A hung parser must not occupy a worker, and must not surface as a crash the caller
@@ -54,6 +56,7 @@ def test_a_timeout_produces_an_honest_result_not_an_exception():
         text_handler.extract = original
 
 
+@override_settings(ATTACHMENT_EXTRACTION_START_METHOD="fork")
 def test_the_child_cannot_open_a_socket():
     """
     NO NETWORK EGRESS. A compromised parser cannot exfiltrate what it just read.

@@ -19,22 +19,19 @@ Three controls, and each closes a different outcome:
                         indefinitely
 
 ── HOW ISOLATION IS ACHIEVED ────────────────────────────────────────────────
-A forked child process with ``resource`` limits applied BEFORE the handler is imported,
-and socket creation disabled in the child. Fork is used rather than a thread because a
-thread shares the parent's address space and cannot have its memory capped
-independently — a thread-based "sandbox" is a comment, not a boundary.
-
-On platforms without ``fork`` the module degrades to in-process extraction with the
-timeout still applied, and SAYS SO in the result. A degraded sandbox that claims to be a
-sandbox is worse than one that admits it.
+A separate child process with ``resource`` limits applied BEFORE the handler is
+imported, and socket creation disabled in the child. On Railway/Linux the default start
+method is ``forkserver`` rather than raw ``fork``: Daphne is multi-threaded, and forking
+that live process can inherit locks and a large virtual address space, which can make a
+valid document fail extraction intermittently. The fork server starts children from a
+clean, single-threaded helper while preserving process isolation. Platforms without
+``forkserver`` use ``spawn``.
 """
 
 from __future__ import annotations
 
 import logging
 import multiprocessing
-import os
-import sys
 
 logger = logging.getLogger("itrix")
 
@@ -95,7 +92,7 @@ def _disable_network() -> None:
 
 
 def _child(handler_name, data, filename, limit, memory_mb, pipe):
-    """Runs in the forked child. Everything here is inside the sandbox."""
+    """Runs in the isolated child. Everything here is inside the sandbox."""
     try:
         _apply_limits(memory_mb)
         _disable_network()
@@ -140,17 +137,22 @@ def run_sandboxed(handler_name: str, data: bytes, *, filename: str = "",
     """
     from apps.attachments.services.handlers import ExtractionResult
 
-    if not _can_fork():
-        return _in_process(handler_name, data, filename, limit)
-
     parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
-    context = multiprocessing.get_context("fork")
+    context = multiprocessing.get_context(_start_method())
     process = context.Process(
         target=_child,
         args=(handler_name, data, filename, limit, memory_mb, child_conn),
         daemon=True,
     )
-    process.start()
+    try:
+        process.start()
+    except Exception as exc:  # noqa: BLE001
+        parent_conn.close()
+        child_conn.close()
+        return ExtractionResult(
+            handler=handler_name, metadata_only=True,
+            error=f"extraction sandbox could not start: {exc}"[:200],
+        )
     child_conn.close()
 
     payload = None
@@ -187,15 +189,37 @@ def run_sandboxed(handler_name: str, data: bytes, *, filename: str = "",
     )
 
 
+def _start_method() -> str:
+    """Choose a process start method safe for a multi-threaded ASGI server."""
+    available = set(multiprocessing.get_all_start_methods())
+    try:
+        from django.conf import settings
+
+        requested = str(
+            getattr(settings, "ATTACHMENT_EXTRACTION_START_METHOD", "forkserver") or ""
+        ).strip().lower()
+    except Exception:  # noqa: BLE001
+        requested = "forkserver"
+
+    if requested in available:
+        return requested
+    if "forkserver" in available:
+        return "forkserver"
+    if "spawn" in available:
+        return "spawn"
+    return multiprocessing.get_start_method()
+
+
 def _can_fork() -> bool:
-    return hasattr(os, "fork") and sys.platform != "win32"
+    """Compatibility helper retained for existing tests/callers."""
+    return "fork" in multiprocessing.get_all_start_methods()
 
 
 def _in_process(handler_name: str, data: bytes, filename: str, limit: int):
     """
-    Degraded path for platforms without fork.
+    Explicit degraded/debug path. Normal production extraction uses a child process.
 
-    The result SAYS the sandbox was unavailable. Silently running unsandboxed while
+    The result SAYS isolation was unavailable. Silently running unsandboxed while
     everything upstream believes there is a sandbox is the worse failure.
     """
     from apps.attachments.services.handlers import ExtractionResult

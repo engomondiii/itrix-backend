@@ -192,3 +192,30 @@ def test_the_reveal_explains_what_happens_next():
     assert WHAT_HAPPENS_NEXT in out
     assert "starting point, not a" in out
     assert "non-confidential until an NDA" in out
+
+
+# ── generation completeness ─────────────────────────────────────────────────
+
+
+def test_truncated_json_is_salvaged_as_clean_prose_not_raw_json():
+    from apps.agents.services.concierge import ConciergeAgent
+
+    raw = '{"reply": "First paragraph.\n\nSecond paragraph that ends mid-sentence'
+    reply, suggest_nda = ConciergeAgent._parse_reply(raw, truncated=True)
+
+    assert reply.startswith("First paragraph.")
+    assert "Second paragraph" in reply
+    assert not reply.lstrip().startswith("{")
+    assert suggest_nda is False
+    assert reply.endswith("…")
+
+
+def test_valid_concierge_json_keeps_the_contract():
+    from apps.agents.services.concierge import ConciergeAgent
+
+    reply, suggest_nda = ConciergeAgent._parse_reply(
+        '{"reply": "Complete answer.", "suggestNda": true}', truncated=False
+    )
+
+    assert reply == "Complete answer."
+    assert suggest_nda is True

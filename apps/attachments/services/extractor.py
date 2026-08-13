@@ -121,6 +121,12 @@ def run(attachment) -> AttachmentExtraction:
         "attachment.extract %s handler=%s chars=%s metadata_only=%s in %sms",
         attachment.id, result.handler, result.char_count, result.metadata_only, duration_ms,
     )
+    if result.metadata_only and result.error:
+        # Team-visible diagnostics only; the visitor keeps the approved generic note.
+        logger.warning(
+            "attachment.extract metadata-only %s handler=%s reason=%s",
+            attachment.id, result.handler, result.error[:200],
+        )
     return extraction
 
 

@@ -25,6 +25,7 @@ never blocks the event loop.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Iterator
 
 from django.conf import settings
@@ -34,6 +35,14 @@ logger = logging.getLogger("itrix")
 
 class AIEngineDisabled(RuntimeError):
     """Raised when an AI call is attempted while the engine is disabled / unconfigured."""
+
+
+@dataclass(frozen=True)
+class CompletionResult:
+    """Text plus the provider's reason for stopping generation."""
+
+    text: str
+    stop_reason: str
 
 
 def _timeout_seconds() -> float:
@@ -71,8 +80,10 @@ class ClaudeClient:
             )
         return self._client
 
-    def complete(self, *, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.2) -> str:
-        """Return Claude's text completion, or raise ``AIEngineDisabled`` when off/slow/failed."""
+    def complete_with_meta(
+        self, *, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.2
+    ) -> CompletionResult:
+        """Return text AND Claude's stop reason, preserving truncation information."""
         if not self.enabled:
             raise AIEngineDisabled("AI engine disabled or ANTHROPIC_API_KEY missing.")
         try:
@@ -86,13 +97,22 @@ class ClaudeClient:
                 timeout=_timeout_seconds(),
             )
             parts = [block.text for block in resp.content if getattr(block, "type", "") == "text"]
-            return "\n".join(parts).strip()
+            return CompletionResult(
+                text="\n".join(parts).strip(),
+                stop_reason=str(getattr(resp, "stop_reason", "") or ""),
+            )
         except AIEngineDisabled:
             raise
         except Exception as exc:  # noqa: BLE001
             # Includes anthropic.APITimeoutError — treat every failure as "degrade now".
             logger.warning("Claude completion failed/timed out (%s); using fallback.", type(exc).__name__)
             raise AIEngineDisabled(str(exc)) from exc
+
+    def complete(self, *, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.2) -> str:
+        """Backward-compatible text-only completion for callers that do not need metadata."""
+        return self.complete_with_meta(
+            system=system, user=user, max_tokens=max_tokens, temperature=temperature
+        ).text
 
     def stream(
         self, *, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.2

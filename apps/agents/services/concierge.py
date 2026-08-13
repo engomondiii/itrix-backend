@@ -19,7 +19,10 @@ deterministic ``run_fallback`` reply.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Iterator
+
+from django.conf import settings
 
 from apps.agents.services.base import BaseAgent
 from apps.agents.services.context import AgentContext
@@ -63,6 +66,14 @@ _ROUTE_TO_NAMESPACE = {
     "both": "alpha-compute",
     "general": "general",
 }
+
+
+def _max_tokens() -> int:
+    """Output budget for a concierge reply; independent of the wall-clock timeout."""
+    try:
+        return max(256, int(getattr(settings, "CONCIERGE_MAX_TOKENS", 1800)))
+    except (TypeError, ValueError):
+        return 1800
 
 
 class ConciergeAgent(BaseAgent):
@@ -261,13 +272,20 @@ class ConciergeAgent(BaseAgent):
             # nothing to subvert.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_INSTRUCTION)
-            raw = ClaudeClient().complete(system=system, user=user, max_tokens=700)
+            completion = ClaudeClient().complete_with_meta(
+                system=system, user=user, max_tokens=_max_tokens()
+            )
         except AIEngineDisabled:
             return AgentOutput(payload={}, used_ai=False)
 
-        reply, suggest_nda = self._parse_reply(raw)
+        truncated = completion.stop_reason == "max_tokens"
+        reply, suggest_nda = self._parse_reply(completion.text, truncated=truncated)
         return AgentOutput(
-            payload={"reply": reply, "suggestNda": suggest_nda},
+            payload={
+                "reply": reply,
+                "suggestNda": suggest_nda,
+                "canContinue": truncated,
+            },
             chunk_ids=[c.get("chunk_id", "") for c in chunks if c.get("chunk_id")],
             used_ai=True,
             claim_level=self.default_claim_level,
@@ -338,7 +356,7 @@ class ConciergeAgent(BaseAgent):
             # realtime happened to be on.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
-            yield from ClaudeClient().stream(system=system, user=user, max_tokens=700)
+            yield from ClaudeClient().stream(system=system, user=user, max_tokens=_max_tokens())
         except AIEngineDisabled:
             return
         except Exception:  # noqa: BLE001 - streaming must never propagate
@@ -346,7 +364,15 @@ class ConciergeAgent(BaseAgent):
             return
 
     @staticmethod
-    def _parse_reply(raw: str) -> tuple[str, bool]:
+    def _parse_reply(raw: str, *, truncated: bool = False) -> tuple[str, bool]:
+        """Parse the JSON contract without ever leaking a half-written JSON object.
+
+        When Claude reaches ``max_tokens`` the JSON envelope may be cut before its
+        closing quote/brace. The old fallback rendered that raw object verbatim. For a
+        truncated response we salvage the already-generated ``reply`` string and mark
+        the turn continuable upstream; malformed non-JSON prose still degrades exactly
+        as before.
+        """
         import json
 
         text = (raw or "").strip()
@@ -358,6 +384,36 @@ class ConciergeAgent(BaseAgent):
             data = json.loads(text)
             return str(data.get("reply", "")).strip() or _FALLBACK_REPLY, bool(data.get("suggestNda", False))
         except Exception:  # noqa: BLE001
+            # A truncated JSON object is still useful text; extract only the value of
+            # `reply` instead of showing `{"reply": ...` to the visitor.
+            match = re.search(r'"reply"\s*:\s*"', text)
+            if match:
+                fragment = text[match.end():]
+                # If the model did finish the string but not the object, drop the
+                # following JSON fields before decoding. With a true token cut there is
+                # no closing quote, so the whole remaining fragment is the answer.
+                closing = re.search(r'(?<!\\)"\s*,\s*"suggestNda"', fragment)
+                if closing:
+                    fragment = fragment[:closing.start()]
+                # A final lone backslash is an incomplete JSON escape; omitting that one
+                # character is safer than exposing the envelope.
+                if fragment.endswith("\\"):
+                    fragment = fragment[:-1]
+                try:
+                    reply = json.loads(f'"{fragment}"')
+                except Exception:  # noqa: BLE001
+                    reply = (
+                        fragment.replace("\\n", "\n")
+                        .replace("\\r", "\r")
+                        .replace("\\t", "\t")
+                        .replace('\\"', '"')
+                        .replace("\\/", "/")
+                    )
+                reply = str(reply).strip()
+                if reply:
+                    if truncated and reply[-1:] not in ".!?…":
+                        reply += "…"
+                    return reply, False
             # Model returned prose — use it directly if it's plausibly safe text.
             return (text or _FALLBACK_REPLY), False
 

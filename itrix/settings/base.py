@@ -515,7 +515,7 @@ RESEND_API_KEY = env("RESEND_API_KEY", "")
 # is not, so it is documented rather than declared.
 EMAIL_HOST = env("EMAIL_HOST", "mail.gpslab.org")
 EMAIL_PORT = int(env("EMAIL_PORT", "465") or 465)
-EMAIL_HOST_USER = (env("EMAIL_HOST_USER", "contact@gpslab.org") or "").strip()
+EMAIL_HOST_USER = (env("EMAIL_HOST_USER", "itrix@gpslab.org") or "").strip()
 
 # ── 465 IS IMPLICIT SSL, 587 IS STARTTLS, AND THEY ARE MUTUALLY EXCLUSIVE ────
 # Django raises ImproperlyConfigured at send time if EMAIL_USE_TLS and EMAIL_USE_SSL are

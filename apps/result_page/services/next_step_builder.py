@@ -16,9 +16,9 @@ _TIER_NEXT_STEP = {
 }
 
 _ROUTE_HINT = {
-    "alpha_compute": " We'd begin with an ALPHA Compute representation diagnosis.",
-    "alpha_core": " We'd begin with an ALPHA Core runtime-fit review.",
-    "both": " We'd typically begin with a Compute diagnosis, then a Core review.",
+    "alpha_compute": " We'd begin with an ALPHA Compute eligibility and software-path assessment.",
+    "alpha_core": " We'd establish the ALPHA Compute software proof first, then evaluate whether an ALPHA Core hardware path adds value.",
+    "both": " We'd begin with ALPHA Compute in software; ALPHA Core remains an optional hardware extension.",
     "general": "",
 }
 

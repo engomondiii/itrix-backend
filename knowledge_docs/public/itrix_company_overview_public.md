@@ -132,29 +132,19 @@ operations are expressed in.
 
 ## The products
 
-### ALPHA Compute — representation diagnosis
+### ALPHA Compute — independent software computational infrastructure
 
-ALPHA Compute is the entry point and the adoption wedge. It is a **diagnostic**: it
-examines whether a workload carries structural overhead in how it is represented,
-and where the highest-leverage opportunities for change might lie.
+ALPHA Compute is the independent software product. It diagnoses structural inefficiency, determines mathematical eligibility, selects and applies an appropriate ALPHA route, transforms eligible workloads, executes or routes the transformed structure through the software ecosystem, reconstructs and verifies the result, measures advantage, and can remain deployed in production on existing hardware without ALPHA Core.
 
-It produces a transformation hypothesis, not a promise. Any quantitative claim has
-to be validated against the specific workload through evaluation.
+Assessment and representation diagnosis are important modules inside ALPHA Compute, but they are not the whole product. ALPHA Compute is not merely a diagnostic pre-stage for hardware.
 
-### ALPHA Core — runtime and execution
+### ALPHA Core — optional hardware-layer infrastructure
 
-ALPHA Core is the execution and validation layer: the runtime that applies a
-transformation, and the proof-of-concept apparatus that measures whether it did what
-the hypothesis said it would.
+ALPHA Core is the separate hardware-layer product. It implements or accelerates validated ALPHA computational structures more deeply in FPGA, ASIC, NPU, accelerator, memory/data-path, SoC or other chip/system architectures when deeper hardware value is justified.
 
-The division is worth stating plainly, because it is easy to blur: **ALPHA Compute
-diagnoses and proposes a transformation. ALPHA Core executes and validates it.**
+ALPHA Core is not a required runtime/SDK stage after ALPHA Compute and is not a prerequisite for production software value.
 
-*(Some older itriX material describes ALPHA Core as hardware-facing intellectual
-property for future silicon. The current approved position is the one above: ALPHA
-Core is the runtime and validation layer. If asked, describe it that way.)*
-
----
+The relationship is therefore: **complementary but independent**. ALPHA Compute can be the complete software production solution. ALPHA Core is an optional hardware extension when validated evidence supports deeper hardware integration.
 
 ## How itriX engages commercially
 
@@ -261,14 +251,10 @@ whether we are expressing the thing we need to compute in the right form.
 ## Frequently asked questions
 
 **What does itriX actually sell?**
-Two products. ALPHA Compute, a representation diagnostic that identifies whether a
-workload carries structural overhead. ALPHA Core, the runtime that applies a
-transformation and the apparatus that validates it.
+Two complementary but independent infrastructure products. ALPHA Compute is the software computational infrastructure product that can diagnose, transform, execute or route, verify, measure and deploy eligible workloads on existing hardware. ALPHA Core is the optional hardware-layer product for implementing or accelerating validated ALPHA structures more deeply in hardware.
 
 **Is this a chip, a compiler, or a library?**
-None of those exactly. It is mathematics about the form a computation takes,
-delivered as a diagnostic and a runtime. The principle can be implemented on both
-CPU and GPU; part of the diagnosis is which suits a given shape of work.
+The ALPHA system spans software and, optionally, hardware. ALPHA Compute is software computational infrastructure that can reuse existing libraries, solvers, compilers, vendor kernels and hardware. ALPHA Core is a separate optional hardware-layer path when deeper implementation is justified.
 
 **Do I need to share confidential information to start?**
 No. The first conversation is a non-confidential description of where computational

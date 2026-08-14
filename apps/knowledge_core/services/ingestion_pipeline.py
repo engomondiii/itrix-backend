@@ -108,8 +108,22 @@ def ingest_document(document: KnowledgeDocument, *, dry_run: bool = False) -> In
                 }
             )
 
-        # Upsert to Pinecone (no-op when disabled).
-        PineconeUpserter().upsert(namespace=namespace, vectors=vectors_payload)
+        # A single-document re-ingest can shrink. Remove its old remote ids first so
+        # chunks that no longer exist cannot remain searchable in Pinecone.
+        upserter = PineconeUpserter()
+        old_vector_ids = list(
+            document.chunks.exclude(vector_id="").values_list("vector_id", flat=True)
+        )
+        if old_vector_ids:
+            upserter.delete_ids(namespace=namespace, ids=list(old_vector_ids))
+
+        # Remote persistence is load-bearing when the AI engine is enabled.  A failed
+        # upsert must mark the document FAILED, never COMPLETE with zero real vectors.
+        upserted = upserter.upsert(namespace=namespace, vectors=vectors_payload)
+        if upserter.enabled and upserted != len(vectors_payload):
+            raise RuntimeError(
+                f"Pinecone persisted {upserted}/{len(vectors_payload)} vectors"
+            )
 
         # Persist chunks + finalise document atomically.
         with transaction.atomic():

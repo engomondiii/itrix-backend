@@ -18,6 +18,10 @@ from django.conf import settings
 logger = logging.getLogger("itrix")
 
 
+class PineconeUpsertError(RuntimeError):
+    """Remote Pinecone persistence did not complete."""
+
+
 class PineconeUpserter:
     def __init__(self):
         self.enabled = settings.ENABLE_AI_ENGINE and bool(settings.PINECONE_API_KEY)
@@ -60,9 +64,29 @@ class PineconeUpserter:
                 total += len(batch)
             logger.info("Upserted %d vectors to Pinecone namespace '%s'", total, namespace)
             return total
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             logger.exception("Pinecone upsert failed for namespace '%s'", namespace)
-            return 0
+            raise PineconeUpsertError(
+                f"Pinecone upsert failed for namespace {namespace!r}: {exc}"
+            ) from exc
+
+    def delete_ids(self, *, namespace: str, ids: list[str]) -> bool:
+        """Delete specific stale vectors before a single-document re-ingest."""
+        ids = [str(i) for i in ids if i]
+        if not ids:
+            return True
+        if not self.enabled:
+            logger.info("[pinecone-disabled] would delete %d ids from '%s'", len(ids), namespace)
+            return True
+        try:
+            for i in range(0, len(ids), 1000):
+                self.index.delete(ids=ids[i : i + 1000], namespace=namespace)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Pinecone id delete failed for namespace '%s'", namespace)
+            raise PineconeUpsertError(
+                f"Pinecone stale-vector delete failed for namespace {namespace!r}: {exc}"
+            ) from exc
 
     def delete_namespace(self, namespace: str) -> bool:
         """

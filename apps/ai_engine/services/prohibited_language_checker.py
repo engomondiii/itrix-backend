@@ -25,16 +25,9 @@ PROHIBITED_CLAIMS = [
     "replaces your hardware",
 ]
 
-# ── Appendix-B canonical-wording substitutions (Backend v4 §5.2, §6) ──────────
-# Certain phrasings must ALWAYS be expressed in the approved canonical form. The most
-# important: ALPHA Core is "table-free index-ordered algebraic execution" and must NEVER
-# be described as "lookup-table execution" (or table/lookup-based execution). These are
-# applied as hard substitutions on every outbound message.
+# Output-style substitutions only. Product/technology definitions are intentionally NOT
+# hardcoded here; factual doctrine must come from the retrieved knowledge corpus.
 CANONICAL_SUBSTITUTIONS = [
-    (r"lookup[- ]?table execution", "table-free index-ordered algebraic execution"),
-    (r"table[- ]?based execution", "table-free index-ordered algebraic execution"),
-    (r"lookup[- ]?table[- ]?based", "table-free index-ordered algebraic"),
-    (r"uses a lookup table", "uses table-free index-ordered algebraic execution"),
     (r"\bmagic\b", "engineered"),
     (r"\bsilver bullet\b", "a strong potential fit"),
     (r"\bcure[- ]?all\b", "broadly applicable approach"),

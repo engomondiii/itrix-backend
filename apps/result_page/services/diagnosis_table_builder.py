@@ -19,7 +19,7 @@ _DIAGNOSIS = {
     "speed": {
         "observation": "Runtime is too slow for the iteration cadence you need.",
         "itrixInterpretation": "Latency is often set by how the computation is structured before it is set by raw hardware speed.",
-        "alphaRole": "ALPHA Compute identifies structural slowdowns; ALPHA Core targets the execution path.",
+        "alphaRole": "ALPHA Compute can diagnose, transform and validate the software execution route; ALPHA Core is optional for deeper hardware acceleration.",
     },
     "energy": {
         "observation": "Power or cooling is a binding constraint on how much you can run.",
@@ -29,17 +29,17 @@ _DIAGNOSIS = {
     "stability_accuracy": {
         "observation": "Numerical stability or accuracy degrades as the problem scales.",
         "itrixInterpretation": "Drift at scale frequently traces back to how state and dynamics are represented.",
-        "alphaRole": "ALPHA Compute diagnoses the representation; ALPHA Core preserves it through execution.",
+        "alphaRole": "ALPHA Compute includes transformation, execution/routing, verification and reconstruction in software; ALPHA Core is optional hardware implementation.",
     },
     "memory_data_movement": {
         "observation": "Most of the runtime is spent moving data rather than computing on it.",
         "itrixInterpretation": "Data-movement-bound runtimes usually point to an execution/runtime issue.",
-        "alphaRole": "ALPHA Core targets the execution path to reduce avoidable data movement.",
+        "alphaRole": "ALPHA Compute evaluates whether representation and software execution can reduce avoidable movement; ALPHA Core is considered only for additional hardware-level value.",
     },
     "hardware_utilization": {
         "observation": "Accelerators are underused relative to what you're paying for.",
         "itrixInterpretation": "Low utilisation is typically an execution-mapping problem, not a capacity problem.",
-        "alphaRole": "ALPHA Core focuses on how the computation maps onto the hardware you have.",
+        "alphaRole": "ALPHA Compute establishes and validates the software route on existing hardware; ALPHA Core can later implement validated structures more deeply in hardware.",
     },
     "architecture": {
         "observation": "You keep hitting the same ceiling regardless of incremental tuning.",
@@ -51,7 +51,7 @@ _DIAGNOSIS = {
 _DEFAULT_ROW = {
     "observation": "A computation bottleneck is limiting throughput or cost.",
     "itrixInterpretation": "Bottlenecks like this usually begin in representation before they are about scale.",
-    "alphaRole": "ALPHA Compute provides the representation-level diagnosis as the entry point.",
+    "alphaRole": "ALPHA Compute provides the software path from diagnosis and eligibility through transformation, verification and measured deployment.",
 }
 
 

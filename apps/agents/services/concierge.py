@@ -60,14 +60,6 @@ _FALLBACK_REPLY = (
     "NDA is in place."
 )
 
-_ROUTE_TO_NAMESPACE = {
-    "alpha_compute": "alpha-compute",
-    "alpha_core": "alpha-core",
-    "both": "alpha-compute",
-    "general": "general",
-}
-
-
 def _max_tokens() -> int:
     """Output budget for a concierge reply; independent of the wall-clock timeout."""
     try:
@@ -80,9 +72,6 @@ class ConciergeAgent(BaseAgent):
     key = "concierge"
     name = "Concierge agent"
     default_claim_level = 1  # conversational, qualitative — auto-approves at default
-
-    def _namespace(self, ctx: AgentContext) -> str:
-        return _ROUTE_TO_NAMESPACE.get(ctx.product_route, "general")
 
     def _retrieval_context(self, ctx: AgentContext) -> str:
         """SECURITY INVARIANT 2 — the plane sets the ceiling, not the display label."""
@@ -245,10 +234,12 @@ class ConciergeAgent(BaseAgent):
         # they are associated with, so it retrieves on generic similarity and finds
         # generic chunks. The expansion appends the relevant workload families; the
         # visitor's own words stay first and are never replaced.
+        from apps.ai_engine.services.knowledge_retriever import VISITOR_KNOWLEDGE_NAMESPACES
+
         chunks = KnowledgeRetriever().retrieve(
             self._retrieval_query(question),
-            namespace=self._namespace(ctx),
-            top_k=6,
+            namespaces=VISITOR_KNOWLEDGE_NAMESPACES,
+            top_k=8,
             context=retrieval_context,
         )
         try:
@@ -345,10 +336,12 @@ class ConciergeAgent(BaseAgent):
         retrieval_context = self._retrieval_context(ctx)
         self._last_chunk_ids = []
         try:
+            from apps.ai_engine.services.knowledge_retriever import VISITOR_KNOWLEDGE_NAMESPACES
+
             chunks = KnowledgeRetriever().retrieve(
                 self._retrieval_query(question),
-                namespace=self._namespace(ctx),
-                top_k=6,
+                namespaces=VISITOR_KNOWLEDGE_NAMESPACES,
+                top_k=8,
                 context=retrieval_context,
             )
             self._last_chunk_ids = [

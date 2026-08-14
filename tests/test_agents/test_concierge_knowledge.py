@@ -229,3 +229,40 @@ def test_valid_concierge_json_keeps_the_contract():
 
     assert reply == "Complete answer."
     assert suggest_nda is True
+
+# ── current document doctrine / no hardcoded product facts ──────────────────
+
+def test_brand_core_does_not_hardcode_the_retired_product_split():
+    from apps.ai_engine.services.system_prompt_builder import _BRAND_CORE
+
+    assert "representation diagnosis — the adoption wedge" not in _BRAND_CORE
+    assert "ALPHA Core (runtime/execution)" not in _BRAND_CORE
+    assert "retrieved KNOWLEDGE CONTEXT is the source of truth" in _BRAND_CORE
+
+
+def test_context_labels_current_canonical_sources_for_the_model():
+    prompt = _prompt(
+        "What are the two products?",
+        chunks=[
+            {
+                "document_title": "WP ALPHA Compute Core v2.4",
+                "heading": "Canonical Definitions",
+                "text": "ALPHA Compute is an independent software computational infrastructure product.",
+                "canonical_priority": 100,
+                "retrieval_backend": "pinecone",
+            }
+        ],
+    )
+    assert "CANONICAL/CURRENT" in prompt
+    assert "WP ALPHA Compute Core v2.4" in prompt
+    assert "via pinecone" in prompt
+
+
+def test_concierge_uses_the_full_visitor_knowledge_corpus_not_route_namespace():
+    from apps.ai_engine.services.knowledge_retriever import VISITOR_KNOWLEDGE_NAMESPACES
+
+    assert "company" in VISITOR_KNOWLEDGE_NAMESPACES
+    assert "technology" in VISITOR_KNOWLEDGE_NAMESPACES
+    assert "alpha-compute" in VISITOR_KNOWLEDGE_NAMESPACES
+    assert "alpha-core" in VISITOR_KNOWLEDGE_NAMESPACES
+    assert "general" not in VISITOR_KNOWLEDGE_NAMESPACES

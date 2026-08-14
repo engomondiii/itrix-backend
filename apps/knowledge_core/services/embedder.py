@@ -14,8 +14,8 @@ the DB records, and the upsert path are all exercised and demoable offline.
 The OpenAI client is created with a hard timeout + small retry cap. Retries no longer
 sleep on the request path: ingestion (a batch/offline job) may retry a few times, but
 single-query embedding used during a live request (``embed_one``) does at most one bounded
-attempt before falling back to a deterministic vector, so a slow OpenAI call can never tie
-up a web worker.
+attempt. If that real embedding fails, it raises and the retriever falls back to PostgreSQL
+keyword retrieval instead of querying Pinecone with a meaningless pseudo-vector.
 """
 
 from __future__ import annotations
@@ -65,6 +65,9 @@ def _deterministic_vector(text: str, dim: int) -> list[float]:
     norm = sum(v * v for v in values) ** 0.5 or 1.0
     return [v / norm for v in values]
 
+
+class EmbeddingUnavailable(RuntimeError):
+    """A real embedding was required but OpenAI did not return one."""
 
 class Embedder:
     def __init__(self):
@@ -127,17 +130,18 @@ class Embedder:
                         )
 
         logger.error(
-            "OpenAI embedding failed after %d attempt(s); falling back to deterministic vectors: %s",
+            "OpenAI embedding failed after %d attempt(s); refusing pseudo-vectors while AI is enabled: %s",
             attempts, last_exc,
         )
-        return [_deterministic_vector(t, self.dim) for t in texts]
+        raise EmbeddingUnavailable(str(last_exc) or "OpenAI embedding failed") from last_exc
 
     def embed_one(self, text: str) -> list[float]:
         """
         Single-query embedding for the LIVE request path (RAG retrieval).
 
-        Bounded and sleep-free: at most one attempt (plus the client's own hard timeout),
-        then a deterministic fallback. This guarantees retrieval can never stall a request.
+        Bounded and sleep-free: at most one attempt (plus the client's own hard timeout).
+        Failure raises ``EmbeddingUnavailable`` so the retriever uses its deterministic
+        keyword fallback rather than sending a pseudo-vector to Pinecone.
         """
         return self.embed([text], retries=0, backoff=False)[0]
 

@@ -19,6 +19,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count
 
 from apps.knowledge_core.models import IngestionStatus, KnowledgeChunk, KnowledgeDocument
+from apps.knowledge_core.services.namespace_router import CANONICAL_NAMESPACES
 
 
 class Command(BaseCommand):
@@ -86,6 +87,68 @@ class Command(BaseCommand):
         }
         for ns in sorted(set(ns_docs) | set(ns_chunks)):
             self.stdout.write(f"  {ns:<18} docs={ns_docs.get(ns, 0):<4} chunks={ns_chunks.get(ns, 0)}")
+
+        # ── Current product doctrine ─────────────────────────────────────────
+        self.stdout.write(self.style.MIGRATE_HEADING("Canonical product source"))
+        canonical = KnowledgeDocument.objects.filter(
+            title__icontains="WP ALPHA Compute Core v2.4",
+            ingestion_status=IngestionStatus.COMPLETE,
+            disclosure_level="public",
+        )
+        if not canonical.exists():
+            # title_for preserves punctuation slightly differently across export names;
+            # fall back to the file path, which is deterministic in this repo.
+            canonical = KnowledgeDocument.objects.filter(
+                file_path__icontains="WP_ALPHA_Compute_Core_v2.4",
+                ingestion_status=IngestionStatus.COMPLETE,
+                disclosure_level="public",
+            )
+        if canonical.exists():
+            doc = canonical.first()
+            self.stdout.write(self.style.SUCCESS(f"  current: {doc.title} ({doc.chunk_count} chunks)"))
+        else:
+            self.stdout.write(self.style.ERROR("  ! Current ALPHA Compute/Core v2.4 source is not COMPLETE + public."))
+            problems += 1
+
+        # Product/research source folders are visitor-readable by policy. Operational
+        # internal_only and customer_contract are intentionally exempt.
+        non_public_product_sources = KnowledgeDocument.objects.filter(
+            file_path__regex=r"^knowledge_docs/(public|controlled_public|nda_only)/",
+        ).exclude(disclosure_level="public")
+        if non_public_product_sources.exists():
+            problems += non_public_product_sources.count()
+            self.stdout.write(self.style.ERROR(
+                f"  ! {non_public_product_sources.count()} product/research source(s) are not public."
+            ))
+
+        # ── Live Pinecone parity ──────────────────────────────────────────────
+        if settings.ENABLE_AI_ENGINE and settings.PINECONE_API_KEY:
+            self.stdout.write(self.style.MIGRATE_HEADING("Pinecone parity"))
+            try:
+                from pinecone import Pinecone
+
+                stats = Pinecone(api_key=settings.PINECONE_API_KEY).Index(
+                    settings.PINECONE_INDEX
+                ).describe_index_stats()
+                remote_obj = getattr(stats, "namespaces", {}) or {}
+                remote = {}
+                for ns, summary in remote_obj.items():
+                    remote[ns] = int(
+                        getattr(summary, "vector_count", 0)
+                        if not isinstance(summary, dict)
+                        else summary.get("vector_count", 0)
+                    )
+                all_ns = sorted(set(ns_chunks) | set(remote) | CANONICAL_NAMESPACES)
+                for ns in all_ns:
+                    local_n = int(ns_chunks.get(ns, 0))
+                    remote_n = int(remote.get(ns, 0))
+                    marker = "OK" if local_n == remote_n else "MISMATCH"
+                    self.stdout.write(f"  {ns:<18} db={local_n:<5} pinecone={remote_n:<5} {marker}")
+                    if local_n != remote_n:
+                        problems += 1
+            except Exception as exc:  # noqa: BLE001
+                problems += 1
+                self.stdout.write(self.style.ERROR(f"  ! Pinecone parity check failed: {exc}"))
 
         # ── Verdict ──────────────────────────────────────────────────────────
         if problems:

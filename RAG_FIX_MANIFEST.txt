@@ -1,0 +1,31 @@
+itriX RAG grounding fix — 2026-08-14
+
+Scope intentionally changed:
+- shared Knowledge Core document registration/ingestion
+- Pinecone retrieval and live parity validation
+- visitor-facing product/company grounding prompt
+- canonical ALPHA Compute/Core v2.4 source material
+- read-only RAG/AI/attachment verification commands
+- static product-role copy that contradicted the canonical source
+
+Explicitly NOT changed:
+- conversation/journey state transitions
+- contact/email capture
+- personalised page generation/reveal
+- lead qualification/gating
+- websocket state flow
+- attachment upload/extraction pipeline (verification command only)
+- frontend repository
+
+No Django schema migration is required for this patch.
+
+After copying this patch into the backend repository, with production DB/OpenAI/Pinecone
+settings loaded, run:
+  python manage.py rebuild_knowledge_corpus --yes
+  python manage.py validate_knowledge_core
+  python manage.py verify_rag_grounding
+  python manage.py verify_ai_answer
+
+After one live browser test:
+  python manage.py audit_ai_grounding --contains "ALPHA Compute" --limit 10
+  python manage.py verify_latest_attachment --question "What does this document say about ALPHA Compute and ALPHA Core?"

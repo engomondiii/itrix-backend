@@ -55,3 +55,18 @@ def test_retrieved_chunks_expose_the_message_citation_key():
     chunk = _row_to_dict(row)
     assert chunk["id"] == "vector-chunk-1"
     assert chunk["chunk_id"] == "vector-chunk-1"
+
+
+def test_public_pinecone_filter_is_applied_before_top_k():
+    from apps.ai_engine.services.knowledge_retriever import _pinecone_filter
+
+    assert _pinecone_filter("public") == {"disclosure_level": {"$in": ["public"]}}
+
+
+def test_default_retrieval_searches_all_visitor_namespaces():
+    from apps.ai_engine.services.knowledge_retriever import (
+        VISITOR_KNOWLEDGE_NAMESPACES,
+        _normalise_namespaces,
+    )
+
+    assert _normalise_namespaces(None, None) == VISITOR_KNOWLEDGE_NAMESPACES

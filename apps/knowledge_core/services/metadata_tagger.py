@@ -27,6 +27,10 @@ def build_chunk_metadata(*, document, chunk) -> dict:
         "problemology_core": _problemology_core(document, chunk),
         "audience": _audience(document, chunk),
         "claim_level": _claim_level(document, chunk),
+        # Canonical/current product doctrine gets a small retrieval rerank boost.
+        # This does not fabricate facts; it only resolves conflicts between old and
+        # current source documents in favour of the explicitly current source.
+        "canonical_priority": _canonical_priority(document),
     }
 
 
@@ -74,6 +78,20 @@ def _claim_level(document, chunk) -> int:
         "internal_only": 4,
     }.get(disclosure, 1)
 
+
+
+def _canonical_priority(document) -> int:
+    """Return a source-priority hint used only to resolve conflicting corpus versions."""
+    blob = f"{getattr(document, 'title', '')} {getattr(document, 'file_path', '')}".lower()
+    if "wp_alpha_compute_core_v2.4" in blob or "wp alpha compute core v2.4" in blob:
+        return 100
+    if "itrix_product_canonical_v2_4" in blob or "itrix product canonical v2 4" in blob:
+        return 100
+    if "itrix_company_overview_public" in blob or "itrix company overview public" in blob:
+        return 90
+    if any(token in blob for token in ("axiom_overview", "cre_overview", "fqnm_overview", "unified mathematical")):
+        return 60
+    return 10
 
 # ─────────────────────────────────────────────────────────────────────────────
 # v6.0 Phase 2: customer_scope for the sixth tier

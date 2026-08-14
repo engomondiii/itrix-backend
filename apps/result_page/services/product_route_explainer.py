@@ -22,16 +22,14 @@ _ROUTE_TECHS = {
 
 _ROUTE_RATIONALE = {
     "alpha_compute": (
-        "Your problem looks representation-shaped, so ALPHA Compute — representation-level "
-        "diagnosis — is the natural entry point."
+        "Your problem looks representation-shaped, so ALPHA Compute — the independent software "
+        "computational-infrastructure product — is the natural entry point for eligibility, transformation and proof."
     ),
     "alpha_core": (
-        "Your problem looks execution-shaped, so ALPHA Core — the runtime/execution layer — "
-        "is the natural entry point."
+        "Your problem looks hardware-integration-shaped, so an ALPHA Core hardware-layer evaluation may be relevant after a validated ALPHA software route is established."
     ),
     "both": (
-        "Your problem spans representation and execution, so both ALPHA Compute and ALPHA Core "
-        "are relevant; we'd typically start with a Compute diagnosis."
+        "Your problem spans software representation and possible deeper hardware integration. ALPHA Compute can stand alone in software; ALPHA Core is considered only where hardware implementation adds verified value."
     ),
     "general": (
         "A general ALPHA review is the right first step to locate where the bottleneck really sits."

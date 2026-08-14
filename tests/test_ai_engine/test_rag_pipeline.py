@@ -36,3 +36,22 @@ def test_retrieval_only_chunks_are_disclosure_filtered():
         pressures=["cost"],
     )
     assert all(c.get("disclosure_level") != "internal_only" for c in result.chunks)
+
+def test_retrieved_chunks_expose_the_message_citation_key():
+    """Grounding and persisted citations must use the same chunk identifier contract."""
+    from types import SimpleNamespace
+
+    from apps.ai_engine.services.knowledge_retriever import _row_to_dict
+
+    row = SimpleNamespace(
+        id="db-chunk",
+        vector_id="vector-chunk-1",
+        text="Grounded text",
+        heading="Grounding",
+        namespace="general",
+        disclosure_level="public",
+        document_id="doc-1",
+    )
+    chunk = _row_to_dict(row)
+    assert chunk["id"] == "vector-chunk-1"
+    assert chunk["chunk_id"] == "vector-chunk-1"

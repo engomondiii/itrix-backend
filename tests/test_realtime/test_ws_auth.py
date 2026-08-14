@@ -60,3 +60,22 @@ def test_client_token_is_not_a_team_token():
     client = ClientFactory()
     ctoken = build_tokens_for_client(client)["access"]
     assert _mw()._try_team_token(ctoken) is None
+
+
+def test_client_ws_ticket_resolves_without_exposing_client_jwt():
+    from apps.clients.ws_ticket import mint_client_ws_ticket
+
+    client = ClientFactory()
+    ticket = mint_client_ws_ticket(client)
+    resolved = _mw()._try_client_ws_ticket(ticket)
+    assert resolved is not None
+    assert resolved.id == client.id
+    assert _mw()._try_team_token(ticket) is None
+
+
+def test_tampered_client_ws_ticket_is_rejected():
+    from apps.clients.ws_ticket import mint_client_ws_ticket
+
+    client = ClientFactory()
+    ticket = mint_client_ws_ticket(client)
+    assert _mw()._try_client_ws_ticket(f"{ticket}tampered") is None

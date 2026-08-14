@@ -92,6 +92,18 @@ class ConciergeAgent(BaseAgent):
         return (ctx.extra or {}).get("message", "") or ctx.prompt
 
     @staticmethod
+    def _retrieval_query(question: str) -> str:
+        """Use one retrieval query policy on both request/response and streaming paths."""
+        from apps.ai_engine.services import entity_context
+
+        return entity_context.expand_query(question)
+
+    @property
+    def last_chunk_ids(self) -> list[str]:
+        """Chunk ids used by the most recent streamed reply, for persisted citations."""
+        return list(getattr(self, "_last_chunk_ids", []) or [])
+
+    @staticmethod
     def _thread(ctx: AgentContext):
         """
         The Thread this turn belongs to, or None.
@@ -233,10 +245,8 @@ class ConciergeAgent(BaseAgent):
         # they are associated with, so it retrieves on generic similarity and finds
         # generic chunks. The expansion appends the relevant workload families; the
         # visitor's own words stay first and are never replaced.
-        from apps.ai_engine.services import entity_context
-
         chunks = KnowledgeRetriever().retrieve(
-            entity_context.expand_query(question),
+            self._retrieval_query(question),
             namespace=self._namespace(ctx),
             top_k=6,
             context=retrieval_context,
@@ -333,10 +343,19 @@ class ConciergeAgent(BaseAgent):
 
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
+        self._last_chunk_ids = []
         try:
             chunks = KnowledgeRetriever().retrieve(
-                question, namespace=self._namespace(ctx), top_k=6, context=retrieval_context
+                self._retrieval_query(question),
+                namespace=self._namespace(ctx),
+                top_k=6,
+                context=retrieval_context,
             )
+            self._last_chunk_ids = [
+                c.get("chunk_id") or c.get("id")
+                for c in chunks
+                if c.get("chunk_id") or c.get("id")
+            ]
             # CONVERSATIONAL, not result-page. The shared builder's default TASK tells
             # the model to produce a diagnosis for a result page, which is why an
             # ordinary question ("what is itriX?") came back reframed as bottleneck

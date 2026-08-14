@@ -25,8 +25,14 @@ logger = logging.getLogger("itrix")
 
 
 def _row_to_dict(row: KnowledgeChunk) -> dict:
+    chunk_id = row.vector_id or str(row.id)
     return {
-        "id": row.vector_id or str(row.id),
+        # `id` is the Pinecone-facing identifier; `chunk_id` is the agent/message
+        # citation contract. Keeping both fixes an old seam where retrieval was grounded
+        # correctly but every agent persisted an empty citation list because it looked
+        # for a key the retriever never emitted.
+        "id": chunk_id,
+        "chunk_id": chunk_id,
         "text": row.text,
         "heading": row.heading,
         "namespace": row.namespace,
@@ -106,6 +112,7 @@ class KnowledgeRetriever:
                         chunks.append(
                             {
                                 "id": m.get("id"),
+                                "chunk_id": m.get("id"),
                                 "text": md.get("preview", ""),
                                 "heading": md.get("heading", ""),
                                 "namespace": md.get("namespace", ""),

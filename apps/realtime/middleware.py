@@ -99,14 +99,22 @@ class WSAuthMiddleware:
             scope["client"] = client
             return
 
-        # 2) Try a team-JWT (audience=team).
+        # 2) Try the narrow client WebSocket ticket minted through the authenticated
+        # portal HTTP session.  This keeps the httpOnly client JWT out of browser JS.
+        client = await database_sync_to_async(self._try_client_ws_ticket)(token)
+        if client is not None:
+            scope["plane"] = "client"
+            scope["client"] = client
+            return
+
+        # 3) Try a team-JWT (audience=team).
         team_user = await database_sync_to_async(self._try_team_token)(token)
         if team_user is not None:
             scope["plane"] = "team"
             scope["team_user"] = team_user
             return
 
-        # 3) Try a capability token (public plane reach: client_page / portal).
+        # 4) Try a capability token (public plane reach: client_page / portal).
         payload = self._try_capability_token(token)
         if payload is not None:
             scope["plane"] = "public"
@@ -124,6 +132,15 @@ class WSAuthMiddleware:
                 return None
             return Client.objects.filter(id=payload.get("client_id"), is_active=True).first()
         except Exception:  # noqa: BLE001 - not a client token
+            return None
+
+    @staticmethod
+    def _try_client_ws_ticket(token: str):
+        try:
+            from apps.clients.ws_ticket import resolve_client_ws_ticket
+
+            return resolve_client_ws_ticket(token)
+        except Exception:  # noqa: BLE001 - not a client WS ticket
             return None
 
     @staticmethod

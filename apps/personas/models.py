@@ -96,6 +96,14 @@ class Persona(BaseModel):
     likely_objection = models.TextField(blank=True, default="")
     response_angle = models.TextField(blank=True, default="")
 
+    # The v2 persona workbook turns claim discipline into an executable three-part
+    # contract. These are INTERNAL planning fields: they qualify the workload, freeze
+    # the proof conditions, and define when evidence may be expanded beyond the first
+    # bounded test. They are never exposed on the visitor/client plane.
+    eligibility_gate = models.TextField(blank=True, default="")
+    proof_contract = models.TextField(blank=True, default="")
+    expansion_rule = models.TextField(blank=True, default="")
+
     # Commercial routing.
     first_value_artifact = models.CharField(max_length=200, blank=True, default="")
     personalized_cta = models.CharField(max_length=200, blank=True, default="")

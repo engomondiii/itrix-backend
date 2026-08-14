@@ -206,6 +206,24 @@ class ClientMeView(APIView):
 
 
 # ── Portal data endpoints ────────────────────────────────────────────────────
+class PortalWSTicketView(APIView):
+    """POST portal/ws-ticket/ — CLIENT. Mint a short-lived WS-only credential."""
+
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
+    def post(self, request):
+        from apps.clients.ws_ticket import WS_TICKET_MAX_AGE_SECONDS, mint_client_ws_ticket
+
+        return Response(
+            {
+                "ticket": mint_client_ws_ticket(request.user),
+                "expiresIn": WS_TICKET_MAX_AGE_SECONDS,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class PortalOverviewView(APIView):
     """GET portal/overview/ — CLIENT. The personalized workspace payload."""
 

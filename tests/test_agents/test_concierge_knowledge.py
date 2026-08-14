@@ -102,6 +102,16 @@ def test_the_query_is_widened_with_the_relevant_workloads():
     assert "autonomous driving" in widened.lower()
 
 
+
+
+def test_streaming_and_non_streaming_share_the_same_entity_expansion_policy():
+    """Live WebSocket answers must retrieve the same named-entity context as HTTP answers."""
+    from apps.agents.services.concierge import ConciergeAgent
+
+    widened = ConciergeAgent._retrieval_query("Would this be useful to Elon Musk?")
+    assert "aerospace" in widened
+    assert "autonomous driving" in widened.lower()
+
 def test_an_unrecognised_message_is_left_exactly_as_it_was():
     text = "Our inference cost is climbing."
     assert entity_context.expand_query(text) == text

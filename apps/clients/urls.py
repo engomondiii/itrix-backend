@@ -25,6 +25,7 @@ from apps.clients.views_auth import (
 )
 from apps.clients.views import (
     PortalNextBestActionView,
+    PortalWSTicketView,
     ClientLoginView,
     ClientLogoutView,
     ClientMeView,
@@ -67,6 +68,7 @@ urlpatterns = [
     path("client/auth/logout/", ClientLogoutView.as_view(), name="client-logout"),
     path("client/me/", ClientMeView.as_view(), name="client-me"),
     # Portal data endpoints (CLIENT)
+    path("portal/ws-ticket/", PortalWSTicketView.as_view(), name="portal-ws-ticket"),
     path("portal/overview/", PortalOverviewView.as_view(), name="portal-overview"),
     path("portal/conversations/", PortalConversationListView.as_view(), name="portal-conversations"),
     path(

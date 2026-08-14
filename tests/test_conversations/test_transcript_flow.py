@@ -188,3 +188,31 @@ def test_reveal_stash_clears_on_the_turn_after_the_reveal():
     # Same instance, next turn — exactly the consumer's situation.
     _visitor(thread, "thank you, this looks great")
     assert getattr(thread, "_client_page_reveal", None) is None
+
+
+@override_settings(ENABLE_ADAPTIVE_QUESTIONS=True, FRONTEND_WEB_URL="https://web.example")
+def test_websocket_email_turn_returns_clickable_page_link_in_same_reply(monkeypatch):
+    """The live socket must carry the same reveal/contact directives as the HTTP path."""
+    from apps.realtime.consumers import thread as thread_consumer
+
+    thread = thread_svc.create_thread(visitor_session="transcript-ws-page")
+    _replay(thread, with_replies=False)
+    _visitor(thread, EMAIL_TURN)
+
+    ctx = thread_consumer._build_agent_context(thread, EMAIL_TURN)
+    reveal = ctx.extra.get("client_page_reveal") or {}
+    assert reveal.get("url", "").startswith("https://web.example/c/")
+
+    monkeypatch.setattr(
+        thread_consumer,
+        "_govern",
+        lambda text, _ctx: {"status": "auto_approved", "text": text},
+    )
+    settled = thread_consumer._settle(thread, "Thank you. Your personalised review is ready.", ctx)
+
+    assert settled["under_review"] is False
+    assert f'<{reveal["url"]}>' in settled["body"]
+    assert "work email" not in settled["body"].lower()
+    # One email turn is sufficient; the visitor is already on the client-page state.
+    thread.refresh_from_db()
+    assert thread_state.current_state_key(thread) == "CLIENT_PAGE"

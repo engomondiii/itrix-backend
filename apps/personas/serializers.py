@@ -77,6 +77,9 @@ class PersonaDetailSerializer(PersonaSummarySerializer):
     likelyBlocker = serializers.CharField(source="likely_blocker", read_only=True)
     likelyObjection = serializers.CharField(source="likely_objection", read_only=True)
     responseAngle = serializers.CharField(source="response_angle", read_only=True)
+    eligibilityGate = serializers.CharField(source="eligibility_gate", read_only=True)
+    proofContract = serializers.CharField(source="proof_contract", read_only=True)
+    expansionRule = serializers.CharField(source="expansion_rule", read_only=True)
     disclosureCeiling = serializers.CharField(source="disclosure_ceiling", read_only=True)
     departmentConfidence = serializers.CharField(source="department_confidence", read_only=True)
     pitchRoom = PitchRoomSerializer(source="pitch_room", read_only=True)
@@ -97,6 +100,9 @@ class PersonaDetailSerializer(PersonaSummarySerializer):
             "likelyBlocker",
             "likelyObjection",
             "responseAngle",
+            "eligibilityGate",
+            "proofContract",
+            "expansionRule",
             "first_value_artifact",
             "personalized_cta",
             "commercial_route",

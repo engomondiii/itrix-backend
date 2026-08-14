@@ -157,6 +157,7 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
         ctx = await database_sync_to_async(_build_agent_context)(self.thread, body)
         guard = stream_guard.new_state()
         collected: list[str] = []
+        cited_chunk_ids: list[str] = []
         seq = 0
         halted = False
 
@@ -201,6 +202,7 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
                         },
                     }
                 )
+            cited_chunk_ids = agent.last_chunk_ids
         except Exception:  # noqa: BLE001
             logger.exception("thread stream failed; falling back to a settled reply")
             collected = []
@@ -215,7 +217,7 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
 
         # 3) SETTLE. The full Claim-Card pipeline runs on the completed message.
         result = await database_sync_to_async(_settle)(
-            self.thread, "".join(collected).strip(), ctx
+            self.thread, "".join(collected).strip(), ctx, cited_chunk_ids
         )
 
         if result["under_review"]:
@@ -359,9 +361,17 @@ def _persist_turn(thread, body: str) -> dict:
 
 def _build_agent_context(thread, body: str):
     from apps.agents.services.context import PLANE_PUBLIC, AgentContext
+    from apps.conversations.services import conversation_context
 
     lead = thread.lead
     session = getattr(lead, "review_session", None) if lead else None
+    # IMPORTANT: use the SAME turn-extra builder as the HTTP path.  `ingest_inbound`
+    # has already advanced qualification by this point and stashed either
+    # `_client_page_reveal` or `_contact_ask` on this exact Thread instance.  Passing
+    # a hand-written {message, thread_id} object here used to throw both decisions
+    # away on the live WebSocket path, which is why an email could reveal a page in
+    # the database while the reply still said it was "being prepared".
+    extra = conversation_context.build_turn_extra(thread, body)
     return AgentContext(
         lead_id=str(lead.id) if lead else None,
         prompt=getattr(session, "prompt", "") or body,
@@ -372,7 +382,7 @@ def _build_agent_context(thread, body: str):
         # regardless of what their thread has reached.
         plane=PLANE_PUBLIC,
         context_label="anonymous_review",
-        extra={"message": body, "thread_id": str(thread.id)},
+        extra=extra,
     )
 
 
@@ -388,7 +398,7 @@ def _record_halt(guard, message_id: str, thread_id: str, ctx) -> None:
     )
 
 
-def _settle(thread, streamed_text: str, ctx) -> dict:
+def _settle(thread, streamed_text: str, ctx, streamed_cited_chunk_ids=None) -> dict:
     """
     STREAMING GOVERNANCE, PART 3 — settle.
 
@@ -403,7 +413,7 @@ def _settle(thread, streamed_text: str, ctx) -> dict:
     from apps.governance.services.stream_envelope import UNDER_REVIEW_WORDING
 
     agent = ConciergeAgent()
-    cited: list[str] = []
+    cited: list[str] = [c for c in (streamed_cited_chunk_ids or []) if c]
     degraded = False
 
     if streamed_text:
@@ -427,6 +437,28 @@ def _settle(thread, streamed_text: str, ctx) -> dict:
             governance_status = "auto_approved"
 
     deliverable = governance_status in ("auto_approved", "approved")
+
+    # Transport parity with views_thread + the older review consumer.  The journey
+    # decision is deterministic and was made BEFORE generation; the transport owns
+    # the final guarantee that the visitor actually receives it.  This makes the
+    # email turn atomic from the visitor's perspective: email in -> page link out,
+    # with no second email prompt and no model-dependent promise of later work.
+    from apps.conversations.services import terminology
+
+    body = terminology.normalise_outbound(body)
+    extra = getattr(ctx, "extra", None) or {}
+    reveal = extra.get("client_page_reveal") or {}
+    if deliverable and reveal.get("url"):
+        from apps.conversations.views_thread import _append_client_page_link
+
+        body = _append_client_page_link(body, reveal["url"])
+
+    contact_decision = extra.get("contact_ask") or {}
+    if deliverable and contact_decision.get("ask"):
+        from apps.conversations.services import contact_ask
+
+        body = contact_ask.append_ask(body, contact_decision)
+
     message = ingest.ingest_agent_message(
         thread.conversation,
         agent_key="concierge",
@@ -439,6 +471,12 @@ def _settle(thread, streamed_text: str, ctx) -> dict:
             StreamingStatus.SETTLED if deliverable else StreamingStatus.UNDER_REVIEW
         ),
     )
+
+    if deliverable and contact_decision.get("ask"):
+        from apps.conversations.services import contact_ask
+
+        contact_ask.record_asked(thread, contact_decision, message=message)
+
     return {
         "message_id": str(message.id),
         "seq": message.seq,

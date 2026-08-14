@@ -118,27 +118,45 @@ def create_thread(
     return thread
 
 
+MESSAGING_ONLY_CONTEXTS = (ThreadContext.PORTAL, ThreadContext.CUSTOMER_SUCCESS)
+
+
+def _ai_conversation_threads(qs):
+    """
+    Keep the AI conversation rail separate from the client↔itriX inbox.
+
+    ``portal``/``customer_success`` threads back the Messaging product. They may contain
+    team-authored or automated itriX messages, but they are not AI review conversations
+    and must never appear under "Your conversations" or become the workspace Home chat.
+    """
+    return qs.exclude(context__in=MESSAGING_ONLY_CONTEXTS)
+
+
 def list_for_session(visitor_session: str):
     """
-    Threads owned by this anonymous session — and ONLY this session.
+    AI conversations owned by this anonymous session — and ONLY this session.
 
     The isolation is in the QUERY. A serializer-level filter would be one refactor away
     from leaking another visitor's conversation list.
     """
     if not visitor_session:
         return Thread.objects.none()
-    return Thread.objects.filter(
-        visitor_session=str(visitor_session),
-        owner_kind=ThreadOwnerKind.SESSION,
-        client__isnull=True,
+    return _ai_conversation_threads(
+        Thread.objects.filter(
+            visitor_session=str(visitor_session),
+            owner_kind=ThreadOwnerKind.SESSION,
+            client__isnull=True,
+        )
     ).order_by("-last_activity_at", "-created_at")
 
 
 def list_for_client(client):
-    """Threads owned by this client (including any claimed from an anonymous session)."""
+    """AI conversations owned by this client, including claimed pre-signup reviews."""
     if client is None:
         return Thread.objects.none()
-    return Thread.objects.filter(client=client).order_by("-last_activity_at", "-created_at")
+    return _ai_conversation_threads(Thread.objects.filter(client=client)).order_by(
+        "-last_activity_at", "-created_at"
+    )
 
 
 def list_for_client_and_session(client, visitor_session: str):
@@ -159,7 +177,9 @@ def list_for_client_and_session(client, visitor_session: str):
             owner_kind=ThreadOwnerKind.SESSION,
             client__isnull=True,
         )
-    return Thread.objects.filter(query).order_by("-last_activity_at", "-created_at")
+    return _ai_conversation_threads(Thread.objects.filter(query)).order_by(
+        "-last_activity_at", "-created_at"
+    )
 
 
 def get_for_session(thread_id, visitor_session: str) -> Thread | None:
@@ -167,11 +187,13 @@ def get_for_session(thread_id, visitor_session: str) -> Thread | None:
     if not visitor_session:
         return None
     return (
-        Thread.objects.filter(
-            id=thread_id,
-            visitor_session=str(visitor_session),
-            owner_kind=ThreadOwnerKind.SESSION,
-            client__isnull=True,
+        _ai_conversation_threads(
+            Thread.objects.filter(
+                id=thread_id,
+                visitor_session=str(visitor_session),
+                owner_kind=ThreadOwnerKind.SESSION,
+                client__isnull=True,
+            )
         )
         .select_related("conversation", "lead")
         .first()
@@ -183,7 +205,7 @@ def get_for_client(thread_id, client) -> Thread | None:
     if client is None:
         return None
     return (
-        Thread.objects.filter(id=thread_id, client=client)
+        _ai_conversation_threads(Thread.objects.filter(id=thread_id, client=client))
         .select_related("conversation", "lead")
         .first()
     )

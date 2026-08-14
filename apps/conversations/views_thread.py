@@ -560,6 +560,7 @@ def _generate_assistant_turn(thread, body: str):
     text = ""
     degraded = False
     can_continue = False
+    cited_chunk_ids: list[str] = []
     if envelope.may_stream:
         try:
             from apps.agents.services.concierge import ConciergeAgent
@@ -569,6 +570,7 @@ def _generate_assistant_turn(thread, body: str):
             payload = out.payload or {}
             text = (payload.get("reply") or "").strip() or agent.fallback_reply
             can_continue = bool(payload.get("canContinue", False))
+            cited_chunk_ids = [c for c in (out.chunk_ids or []) if c]
         except Exception:  # noqa: BLE001
             logger.exception("assistant generation failed for thread %s", thread.id)
             degraded = True
@@ -631,6 +633,7 @@ def _generate_assistant_turn(thread, body: str):
         body=text,
         governance_status=governance_status,
         claim_level=1,
+        cited_chunk_ids=cited_chunk_ids,
         thread=thread,
         streaming_status=status,
         meta={"can_continue": can_continue},

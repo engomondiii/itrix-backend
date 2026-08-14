@@ -288,9 +288,17 @@ class PortalConversationListView(APIView):
         from apps.conversations.serializers import ConversationSummarySerializer
         from apps.conversations.services.history import get_or_create_portal_conversation
 
+        from apps.conversations.models import ConversationContext
+
         client = request.user
-        get_or_create_portal_conversation(client)  # ensure at least one exists
-        convs = client.conversations.filter(is_active=True).order_by("-last_message_at")
+        get_or_create_portal_conversation(client)  # ensure at least one inbox thread exists
+        # Messaging is client↔itriX correspondence, not the AI review history. Claimed
+        # review/client-page conversations belong under "Your conversations" and must
+        # never be duplicated into the inbox.
+        convs = client.conversations.filter(
+            is_active=True,
+            context__in=[ConversationContext.PORTAL, ConversationContext.CUSTOMER_SUCCESS],
+        ).order_by("-last_message_at")
         return Response(
             ConversationSummarySerializer(convs, many=True, context={"client": client}).data
         )
@@ -303,14 +311,19 @@ class PortalConversationMessagesView(APIView):
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request, conversation_id):
-        from apps.conversations.models import Conversation
+        from apps.conversations.models import Conversation, ConversationContext
         from apps.conversations.serializers import ConversationThreadSerializer
         from apps.conversations.services.history import mark_read
 
         from apps.conversations.services.history import ensure_portal_thread
 
         client = request.user
-        conv = get_object_or_404(Conversation, id=conversation_id, client=client)
+        conv = get_object_or_404(
+            Conversation,
+            id=conversation_id,
+            client=client,
+            context__in=[ConversationContext.PORTAL, ConversationContext.CUSTOMER_SUCCESS],
+        )
         # Eager: a file can be attached BEFORE the first message is sent, and
         # attachments stage against the thread — so the composer needs its id now.
         ensure_portal_thread(conv, client)
@@ -336,13 +349,18 @@ class PortalConversationMessagesView(APIView):
         — ingest itself only records the ids in meta, and a link that exists
         only in meta renders nothing.
         """
-        from apps.conversations.models import Conversation
+        from apps.conversations.models import Conversation, ConversationContext
         from apps.conversations.serializers import MessageSerializer
         from apps.conversations.services import ingest
         from apps.conversations.services.history import ensure_portal_thread
 
         client = request.user
-        conv = get_object_or_404(Conversation, id=conversation_id, client=client)
+        conv = get_object_or_404(
+            Conversation,
+            id=conversation_id,
+            client=client,
+            context__in=[ConversationContext.PORTAL, ConversationContext.CUSTOMER_SUCCESS],
+        )
 
         body = (request.data.get("body") or "").strip()
         attachment_ids = request.data.get("attachmentIds") or []
@@ -666,6 +684,27 @@ class PortalTeamInviteView(APIView):
                 {"detail": "That address is already on this workspace."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Sending the email is part of the invitation, not an optional side effect.
+        # Previously we wrote the row and returned 201 without attempting delivery, so
+        # Settings displayed "invited" for an address that had received nothing.
+        from apps.emails.models import EmailLog
+        from apps.emails.services.team_invite_builder import build_team_invite_email
+
+        mail = build_team_invite_email(client, invite_email=email)
+        delivery_enabled = bool(getattr(settings, "ENABLE_EMAIL_DELIVERY", False))
+        if delivery_enabled and mail.status != EmailLog.Status.SENT:
+            logger.error(
+                "portal.team_invite delivery failed client=%s email=%s log=%s error=%s",
+                client.id,
+                email,
+                mail.id,
+                mail.error,
+            )
+            return Response(
+                {"detail": "We could not send that invitation. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         ClientTeamInvite.objects.get_or_create(client=client, email=email)
         return Response(_settings_payload(client), status=status.HTTP_201_CREATED)
 

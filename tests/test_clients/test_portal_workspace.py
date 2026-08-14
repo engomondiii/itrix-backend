@@ -16,6 +16,7 @@ until open registration shipped.
 from __future__ import annotations
 
 import pytest
+from unittest.mock import patch
 from django.test import override_settings
 from rest_framework.test import APIClient
 
@@ -95,15 +96,48 @@ def test_settings_patch_updates_profile_and_notifications():
 def test_team_invite_records_and_lists_the_invitation():
     row = ClientFactory()
     api = _authed(row)
-    res = api.post("/api/v1/portal/settings/team/invite/", {"email": "Ally@Example.com"}, format="json")
-    assert res.status_code == 201
-    team = res.json()["team"]
-    assert {"email": "ally@example.com", "status": "invited"} in team
+    from apps.emails.models import EmailLog
+    email_log = EmailLog.objects.create(
+        kind=EmailLog.Kind.VISITOR,
+        to_email="ally@example.com",
+        subject="invite",
+        status=EmailLog.Status.STUBBED,
+    )
+    with patch("apps.emails.services.team_invite_builder.send_email", return_value=email_log) as send:
+        res = api.post("/api/v1/portal/settings/team/invite/", {"email": "Ally@Example.com"}, format="json")
+        assert res.status_code == 201
+        team = res.json()["team"]
+        assert {"email": "ally@example.com", "status": "invited"} in team
 
-    # Idempotent: inviting again is a no-op, not an error or a duplicate.
-    res = api.post("/api/v1/portal/settings/team/invite/", {"email": "ally@example.com"}, format="json")
-    assert res.status_code == 201
-    assert sum(1 for m in res.json()["team"] if m["email"] == "ally@example.com") == 1
+        # Idempotent in storage, but a repeated invite deliberately resends the email.
+        res = api.post("/api/v1/portal/settings/team/invite/", {"email": "ally@example.com"}, format="json")
+        assert res.status_code == 201
+        assert sum(1 for m in res.json()["team"] if m["email"] == "ally@example.com") == 1
+        assert send.call_count == 2
+
+
+@override_settings(ENABLE_EMAIL_DELIVERY=True)
+def test_team_invite_is_not_listed_when_delivery_fails():
+    from apps.clients.models import ClientTeamInvite
+    from apps.emails.models import EmailLog
+
+    row = ClientFactory()
+    failed = EmailLog.objects.create(
+        kind=EmailLog.Kind.VISITOR,
+        to_email="ally@example.com",
+        subject="invite",
+        status=EmailLog.Status.FAILED,
+        error="smtp unavailable",
+    )
+    with patch(
+        "apps.emails.services.team_invite_builder.build_team_invite_email",
+        return_value=failed,
+    ):
+        res = _authed(row).post(
+            "/api/v1/portal/settings/team/invite/", {"email": "ally@example.com"}, format="json"
+        )
+    assert res.status_code == 503
+    assert not ClientTeamInvite.objects.filter(client=row, email="ally@example.com").exists()
 
 
 def test_team_invite_refuses_the_owner_and_junk():
@@ -111,6 +145,18 @@ def test_team_invite_refuses_the_owner_and_junk():
     api = _authed(row)
     assert api.post("/api/v1/portal/settings/team/invite/", {"email": row.email}, format="json").status_code == 400
     assert api.post("/api/v1/portal/settings/team/invite/", {"email": "not-an-email"}, format="json").status_code == 400
+
+
+def test_messaging_inbox_excludes_ai_review_conversations():
+    from apps.conversations.models import Conversation, ConversationContext
+
+    row = ClientFactory()
+    portal = get_or_create_portal_conversation(row)
+    Conversation.objects.create(
+        context=ConversationContext.REVIEW, client=row, lead=row.lead, title="AI review"
+    )
+    data = _authed(row).get("/api/v1/portal/conversations/").json()
+    assert [item["id"] for item in data] == [str(portal.id)]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -158,6 +204,20 @@ def test_portal_send_is_scoped_to_the_owning_client():
         f"/api/v1/portal/conversations/{conv.id}/messages/", {"body": "hi"}, format="json"
     )
     assert res.status_code == 404
+
+
+def test_messaging_endpoint_refuses_an_ai_review_conversation():
+    from apps.conversations.models import Conversation, ConversationContext
+
+    row = ClientFactory()
+    review = Conversation.objects.create(
+        context=ConversationContext.REVIEW, client=row, lead=row.lead, title="AI review"
+    )
+    api = _authed(row)
+    assert api.get(f"/api/v1/portal/conversations/{review.id}/messages/").status_code == 404
+    assert api.post(
+        f"/api/v1/portal/conversations/{review.id}/messages/", {"body": "wrong channel"}, format="json"
+    ).status_code == 404
 
 
 # ─────────────────────────────────────────────────────────────────────────────

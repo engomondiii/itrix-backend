@@ -150,14 +150,14 @@ The relationship is therefore: **complementary but independent**. ALPHA Compute 
 
 ### One-Third Value Participation
 
-itriX prices on **one-third value participation**: itriX participates in one third
-of the validated value created, rather than charging a licence fee up front against
-an unproven benefit.
+For validated production value, itriX uses **one-third value participation**: the
+customer retains 67% of Verified Net Advantage and itriX participates in 33%, subject
+to the agreed baseline and contract.
 
-The reason is structural rather than generous. If the claim is that representation
-can be improved and that any improvement must be validated rather than promised, then
-the commercial model has to sit on the same side of that claim. Value participation
-means itriX is paid when the evaluation shows something, and not before.
+Assessment and proof-of-concept work are separate stages and may carry separately
+agreed fees. Value participation must therefore not be described as meaning that the
+whole engagement has no up-front or pre-production cost; it applies to verified value
+under the commercial agreement.
 
 ### The typical path
 
@@ -264,8 +264,9 @@ conversation.
 
 **How much faster will my workload run?**
 That question cannot be answered honestly before an evaluation. itriX does not
-publish or promise figures outside a validated proof of concept — which is also why
-pricing is value participation rather than an up-front fee.
+publish or promise figures outside a validated proof of concept. Assessment and PoC
+stages may have separately agreed fees; validated production value can then be subject
+to the one-third value-participation model.
 
 **Is the technology proven?**
 The mathematics is published and patented: three granted Korean patents, a

@@ -64,4 +64,4 @@ Mathematical equivalence does not by itself prove runtime, memory, power or econ
 
 ## Commercial progression
 
-A customer can move through assessment, PoC and production software deployment in ALPHA Compute. ALPHA Core is considered only when deeper hardware implementation is expected to add incremental verified value beyond the software-only ALPHA Compute baseline.
+A customer can move through assessment, PoC and production software deployment in ALPHA Compute. Assessment and PoC are paid stages where fees are separately agreed. For validated production value, the standard internal value-sharing rule is that the customer retains 67% of Verified Net Advantage and itriX receives 33%, subject to the agreed baseline and contract. ALPHA Core is considered only when deeper hardware implementation is expected to add incremental verified value beyond the software-only ALPHA Compute baseline.

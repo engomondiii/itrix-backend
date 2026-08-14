@@ -101,3 +101,41 @@ def test_a_signed_in_customer_can_still_open_their_pre_signup_thread():
     row = ClientFactory()
     anon = thread_svc.create_thread(visitor_session=SESSION, title="Pre-signup")
     assert _api(row, session=SESSION).get(f"/api/v1/threads/{anon.id}/").status_code == 200
+
+
+def test_portal_messaging_thread_is_not_listed_as_an_ai_conversation():
+    from apps.conversations.services.history import ensure_portal_thread, get_or_create_portal_conversation
+
+    row = ClientFactory()
+    ai = thread_svc.create_thread(client=row, title="My AI review")
+    portal = get_or_create_portal_conversation(row)
+    messaging = ensure_portal_thread(portal, row)
+
+    ids = [t["threadId"] for t in _api(row).get("/api/v1/threads/").json()["threads"]]
+    assert str(ai.id) in ids
+    assert str(messaging.id) not in ids
+
+
+def test_pre_signup_ai_thread_remains_visible_after_sign_in_while_portal_is_hidden():
+    from apps.conversations.services.history import ensure_portal_thread, get_or_create_portal_conversation
+
+    row = ClientFactory()
+    pre_signup = thread_svc.create_thread(visitor_session=SESSION, title="Before account")
+    portal = get_or_create_portal_conversation(row)
+    messaging = ensure_portal_thread(portal, row)
+
+    ids = [t["threadId"] for t in _api(row, session=SESSION).get("/api/v1/threads/").json()["threads"]]
+    assert str(pre_signup.id) in ids
+    assert str(messaging.id) not in ids
+
+
+def test_portal_messaging_thread_cannot_be_opened_through_ai_thread_routes():
+    from apps.conversations.services.history import ensure_portal_thread, get_or_create_portal_conversation
+
+    row = ClientFactory()
+    messaging = ensure_portal_thread(get_or_create_portal_conversation(row), row)
+    api = _api(row)
+    assert api.get(f"/api/v1/threads/{messaging.id}/").status_code == 404
+    assert api.post(
+        f"/api/v1/threads/{messaging.id}/turns/", {"body": "wrong surface"}, format="json"
+    ).status_code == 404

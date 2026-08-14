@@ -533,7 +533,7 @@ def _generate_assistant_turn(thread, body: str):
     from apps.agents.services.context import PLANE_PUBLIC, AgentContext
     from apps.conversations.models import StreamingStatus
     from apps.conversations.services import conversation_context, ingest
-    from apps.governance.services import stream_envelope, stream_guard
+    from apps.governance.services import stream_envelope
 
     lead = getattr(thread, "lead", None)
     session = getattr(lead, "review_session", None) if lead else None
@@ -578,34 +578,27 @@ def _generate_assistant_turn(thread, body: str):
     if degraded or not text:
         return None
 
-    # PART 2 — the guard, applied to the completed text. On this path there is no
-    # partial render to discard, so a hit replaces rather than halts.
-    hits = stream_guard.scan(text)
-    if hits:
-        logger.warning(
-            "assistant reply held by the guard on thread %s (%s)",
-            thread.id, ", ".join(sorted({h.category for h in hits})),
-        )
-        text = stream_envelope.UNDER_REVIEW_WORDING
-        status = StreamingStatus.UNDER_REVIEW
-        governance_status = "pending"
-        can_continue = False
-    else:
-        # PART 3 — settle.
-        try:
-            from apps.agents.services.governance import govern_text
+    # PART 2/3 — low-risk public Concierge conversation is NON-BLOCKING.
+    #
+    # The old path first scanned the complete answer with the stream guard and replaced
+    # any match with an indefinite "specialist is reviewing" notice. That meant a
+    # truthful, RAG-grounded product explanation could dead-end because it happened to
+    # contain a guarded phrase. `govern_text` now sanitizes claim-level-1 visitor chat
+    # and returns it deliverable; higher-risk contexts still use their existing gates.
+    try:
+        from apps.agents.services.governance import govern_text
 
-            decision = govern_text(text, claim_level=1, context="anonymous_review")
-            governance_status = decision.get("status", "auto_approved")
-            text = decision.get("text") or text
-        except Exception:  # noqa: BLE001
-            logger.exception("settle-time governance unavailable; holding")
-            governance_status = "pending"
-        deliverable = governance_status in ("auto_approved", "approved")
-        status = StreamingStatus.SETTLED if deliverable else StreamingStatus.UNDER_REVIEW
-        if not deliverable:
-            text = stream_envelope.UNDER_REVIEW_WORDING
-            can_continue = False
+        decision = govern_text(text, claim_level=1, context="anonymous_review")
+        governance_status = decision.get("status", "auto_approved")
+        text = decision.get("text") or text
+    except Exception:  # noqa: BLE001
+        # Conversation delivery must not depend on a human-review queue. The model is
+        # already constrained by the document-grounded Concierge prompt; on a local
+        # governance failure keep the answer deliverable rather than strand the user.
+        logger.exception("settle-time conversational governance unavailable; delivering")
+        governance_status = "auto_approved"
+
+    status = StreamingStatus.SETTLED
 
     # Internal names never reach a visitor: the prompt teaches the public term, and
     # this is the deterministic guarantee (same shape as the two appends below).

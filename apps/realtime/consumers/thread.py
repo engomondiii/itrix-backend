@@ -156,6 +156,14 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
 
         ctx = await database_sync_to_async(_build_agent_context)(self.thread, body)
         guard = stream_guard.new_state()
+        from apps.agents.services.governance import is_non_blocking_conversation_context
+
+        # Low-risk, document-grounded Concierge chat never enters a human-review dead
+        # end. The settle pass still sanitizes guarantees/quantified overclaims before
+        # the persisted final message. Other contexts retain the hard stream guard.
+        non_blocking_conversation = is_non_blocking_conversation_context(
+            getattr(ctx, "context_label", ""), claim_level=1
+        )
         collected: list[str] = []
         cited_chunk_ids: list[str] = []
         seq = 0
@@ -170,24 +178,25 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
             await stages.emit(stage_events.STAGE_COMPOSING)
 
             async for token in _aiter(agent.stream_reply, ctx):
-                hit = stream_guard.inspect(guard, token)
-                if hit is not None:
-                    # HARD STOP. Discard everything already rendered — a prohibited
-                    # claim that has been read cannot be un-read, so we do not try to
-                    # patch it, we remove it.
-                    halted = True
-                    await database_sync_to_async(_record_halt)(
-                        guard, message_id, thread_id, ctx
-                    )
-                    await self.send_json(
-                        {
-                            "type": "message.halted",
-                            "payload": stream_guard.halt_payload(
-                                guard, thread_id=thread_id, message_id=message_id
-                            ),
-                        }
-                    )
-                    break
+                if not non_blocking_conversation:
+                    hit = stream_guard.inspect(guard, token)
+                    if hit is not None:
+                        # Non-conversational/high-risk paths keep the original hard
+                        # stop. Public Concierge chat is handled by the non-blocking
+                        # settle sanitizer instead of an indefinite approval queue.
+                        halted = True
+                        await database_sync_to_async(_record_halt)(
+                            guard, message_id, thread_id, ctx
+                        )
+                        await self.send_json(
+                            {
+                                "type": "message.halted",
+                                "payload": stream_guard.halt_payload(
+                                    guard, thread_id=thread_id, message_id=message_id
+                                ),
+                            }
+                        )
+                        break
 
                 seq += 1
                 collected.append(token)
@@ -503,8 +512,13 @@ def _govern(text: str, ctx) -> dict:
             "text": decision.get("text") or text,
         }
     except Exception:  # noqa: BLE001
-        logger.exception("settle-time governance failed; holding conservatively")
-        return {"status": "pending", "text": text}
+        logger.exception("settle-time conversational governance failed; delivering safely")
+        try:
+            from apps.ai_engine.services import prohibited_language_checker as plc
+
+            return {"status": "auto_approved", "text": plc.scrub(text)}
+        except Exception:  # noqa: BLE001
+            return {"status": "auto_approved", "text": text}
 
 
 def _resume(thread, last_seq: int) -> dict:

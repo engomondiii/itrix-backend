@@ -1,0 +1,17 @@
+itriX public conversation non-blocking delivery fix — 2026-08-14
+
+Scope only:
+- visitor/client low-risk Concierge governance
+- anonymous thread streaming guard behavior
+- review/client-page streamed settle fallback
+- HTTP thread settle behavior
+- regression tests
+
+Not touched:
+- journey state transitions
+- email capture
+- client-page generation/reveal
+- RAG/Pinecone retrieval
+- attachment ingestion
+- frontend/sidebar/title code
+- higher-risk proposal/team/artifact governance

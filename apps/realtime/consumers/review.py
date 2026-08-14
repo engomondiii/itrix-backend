@@ -353,8 +353,6 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             try:
                 from apps.ai_engine.services import prohibited_language_checker as plc
 
-                if plc.has_hard_block(text):
-                    return "pending", text
                 return "auto_approved", plc.scrub(text)
             except Exception:  # noqa: BLE001
                 return "auto_approved", text

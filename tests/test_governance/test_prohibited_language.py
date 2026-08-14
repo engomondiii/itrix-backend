@@ -21,10 +21,13 @@ def test_alpha_core_canonical_substitution():
     assert "lookup table execution" not in out.lower()
 
 
-def test_hard_block_benchmarks_and_competitor_numbers():
+def test_hard_block_only_quantified_benchmark_claims():
     assert has_hard_block("10x faster")
     assert has_hard_block("30% cheaper than the alternative")
-    assert has_hard_block("benchmarked against the competition")
+    # Describing the proof method is safe. It must not send a normal product answer
+    # into an indefinite human-review state merely because it names a baseline.
+    assert not has_hard_block("benchmarked against an agreed baseline")
+    assert not has_hard_block("benchmarked against the competition")
     assert not has_hard_block("a qualitative description of fit")
 
 

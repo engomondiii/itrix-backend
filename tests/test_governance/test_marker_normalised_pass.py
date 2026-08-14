@@ -28,7 +28,7 @@ pytestmark = pytest.mark.django_db
 # the shared prohibited set — verified against
 # ``apps.ai_engine.services.prohibited_language_checker``, not invented:
 #
-#     HARD_BLOCK      \d+\s?x faster · \d+%\s+faster · benchmarked against
+#     HARD_BLOCK      \d+\s?x faster · \d+%\s+faster
 #     PROHIBITED_CLAIM  "always faster" · "guarantees lower power"
 #     CANONICAL         \bmagic\b · lookup-table execution
 #     STREAM_ONLY       $-prefixed figures · N% of the value

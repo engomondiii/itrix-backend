@@ -22,3 +22,10 @@ After seeding, log into the dashboard with:
 
 This account is an ADMIN (permission role) / "Admin" (team role), `is_staff=True`, so
 it also works for the Django admin.
+
+## Django admin
+
+The admin at `/admin/` is themed with Jazzmin to the itriX brand and registers every
+model with a consistent posture (editable / append-only / read-only). See
+[`docs/ADMIN.md`](docs/ADMIN.md) for the layout, the design rules it follows, and how to
+add a model. `pytest tests/test_admin` renders every admin page.

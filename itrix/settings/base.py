@@ -53,6 +53,9 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 DJANGO_APPS = [
     # Daphne must load before staticfiles so its runserver command takes over (Channels).
     "daphne",
+    # Jazzmin must load BEFORE django.contrib.admin — it overrides the admin templates.
+    # Theme configuration lives in itrix/settings/admin_theme.py.
+    "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -228,6 +231,8 @@ USE_TZ = True
 # ─────────────────────────────────────────────────────────────────────────────
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Project-level static assets (admin theme, brand marks, self-hosted fonts).
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
@@ -701,6 +706,18 @@ else:
 # Frontends (used for building absolute links in emails / result pages later)
 FRONTEND_WEB_URL = env("FRONTEND_WEB_URL", "http://localhost:3000")
 FRONTEND_DASHBOARD_URL = env("FRONTEND_DASHBOARD_URL", "http://localhost:3001")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Django admin theme (Jazzmin)
+# ─────────────────────────────────────────────────────────────────────────────
+# Branding, sidebar order/icons, and UI tweaks. Kept in its own module because it
+# is ~250 lines of pure presentation data; it reads FRONTEND_* from the env itself.
+from .admin_theme import JAZZMIN_SETTINGS, JAZZMIN_UI_TWEAKS  # noqa: E402,F401
+# Jazzmin's login form carries no hidden ``next`` field, so a direct visit to
+# /admin/login/ would otherwise land on Django's default /accounts/profile/ (404).
+# The API authenticates with JWT and never uses this setting.
+LOGIN_REDIRECT_URL = "admin:index"
+LOGIN_URL = "admin:login"
 
 # ── v4.0 identity plane + agent runtime configuration ────────────────────────
 # Capability tokens (journey reveals) are HMAC-signed with this secret; the client

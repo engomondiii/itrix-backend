@@ -4,6 +4,8 @@ djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
 django-filter
+# Admin theme (AdminLTE 4 / Bootstrap 5 skin for django.contrib.admin); see itrix/settings/admin_theme.py
+django-jazzmin
 python-dotenv
 dj-database-url
 psycopg[binary]

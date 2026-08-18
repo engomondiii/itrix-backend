@@ -1,0 +1,907 @@
+/* ============================================================================
+   itriX admin theme — applied on top of Jazzmin 3 (AdminLTE 4 / Bootstrap 5.3)
+
+   Source of truth: itriX Brand Manual v2.0 §3 (colour), §4 (type), §8.1 (tokens).
+   Where the manual is silent (dark mode, sidebar rail, table chrome) the Staff
+   console (itrix-dashboard/app/globals.css) is the precedent, so an operator
+   moving between the console and this admin sees one system.
+
+   Structure
+     1. Fonts (self-hosted, OFL) + type tokens
+     2. Brand tokens → Bootstrap variables (light)
+     3. Dark mode (data-bs-theme="dark")
+     4. Shell: header, sidebar rail, brand lockup, footer
+     5. Surfaces: cards, tabs, tables, forms, buttons, badges
+     6. Django-admin specifics: changelist, filters, inlines, readonly, JSON
+     7. Login
+   ========================================================================== */
+
+
+/* ----------------------------------------------------------------------------
+   1. Fonts — Inter (UI), Space Grotesk (display), IBM Plex Mono (technical)
+   Files vendored from the dashboard's @fontsource packages (SIL OFL 1.1).
+   Pretendard (Korean) is left to the fallback stack; this is an internal,
+   English-only surface.
+   ------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("../fonts/space-grotesk-latin-wght-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+}
+
+:root {
+  /* Brand Manual §8.1 — type */
+  --itrix-font-primary: "Inter", "Pretendard", "Helvetica Neue", Arial, sans-serif;
+  --itrix-font-display: "Space Grotesk", "Pretendard", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --itrix-font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --itrix-tracking-tight: -0.03em;
+  --itrix-tracking-normal: -0.01em;
+  --itrix-tracking-label: 0.04em;
+
+  /* Brand Manual §3 — palette */
+  --itrix-white: #ffffff;
+  --itrix-signal-white: #f8fafc;   /* page ground */
+  --itrix-mist: #eaf0ff;           /* soft section bg / hover */
+  --itrix-ice: #d6e6ff;            /* borders, selected surface */
+  --itrix-navy: #1f2937;           /* Deep Navy Slate — ink, primary button */
+  --itrix-graphite: #4b5563;       /* secondary text */
+  --itrix-steel: #94a3b8;          /* placeholders, dividers — NOT text on light */
+  --itrix-accent: #8fa8ea;         /* signature accent, <5% of a screen */
+  --itrix-accent-soft: #b7cbf4;
+  --itrix-structure-800: #273343;
+  --itrix-structure-700: #313e50;
+  --itrix-structure-600: #3c4a5e;
+
+  --itrix-error: #b42318;
+  --itrix-error-surface: #fef3f2;
+  --itrix-success: #067647;
+  --itrix-success-surface: #ecfdf3;
+  --itrix-warning: #b54708;
+  --itrix-warning-surface: #fffaeb;
+
+  /* Brand Manual §8.1 — geometry (dashboard-compacted) */
+  --itrix-radius-xs: 6px;
+  --itrix-radius-sm: 10px;
+  --itrix-radius-md: 14px;   /* buttons, inputs */
+  --itrix-radius-lg: 20px;   /* cards */
+  --itrix-shadow-soft: 0 18px 48px rgba(31, 41, 55, 0.08);
+  --itrix-shadow-medium: 0 24px 72px rgba(31, 41, 55, 0.12);
+  --itrix-focus-ring: 0 0 0 4px rgba(148, 163, 184, 0.72);
+  --itrix-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
+/* ----------------------------------------------------------------------------
+   2. Brand tokens → Bootstrap 5.3 variables (light)
+   ------------------------------------------------------------------------- */
+:root,
+[data-bs-theme="light"] {
+  --bs-body-font-family: var(--itrix-font-primary);
+  --bs-body-font-size: 0.875rem;
+  --bs-body-line-height: 1.55;
+  --bs-body-color: var(--itrix-navy);
+  --bs-body-color-rgb: 31, 41, 55;
+  --bs-body-bg: var(--itrix-signal-white);
+  --bs-body-bg-rgb: 248, 250, 252;
+  --bs-emphasis-color: var(--itrix-navy);
+  --bs-emphasis-color-rgb: 31, 41, 55;
+  --bs-secondary-color: var(--itrix-graphite);
+  --bs-secondary-color-rgb: 75, 85, 99;
+  --bs-secondary-bg: var(--itrix-mist);
+  --bs-secondary-bg-rgb: 234, 240, 255;
+  --bs-tertiary-color: var(--itrix-graphite);
+  --bs-tertiary-bg: var(--itrix-signal-white);
+  --bs-tertiary-bg-rgb: 248, 250, 252;
+  --bs-heading-color: var(--itrix-navy);
+  --bs-link-color: var(--itrix-navy);
+  --bs-link-color-rgb: 31, 41, 55;
+  --bs-link-hover-color: #0f172a;
+  --bs-link-hover-color-rgb: 15, 23, 42;
+  --bs-border-color: #d9e2ec;                        /* border-soft flattened on canvas */
+  --bs-border-color-translucent: rgba(148, 163, 184, 0.32);
+  --bs-border-radius: var(--itrix-radius-sm);
+  --bs-border-radius-sm: var(--itrix-radius-xs);
+  --bs-border-radius-lg: var(--itrix-radius-md);
+  --bs-border-radius-xl: var(--itrix-radius-lg);
+  --bs-primary: var(--itrix-navy);
+  --bs-primary-rgb: 31, 41, 55;
+  --bs-primary-text-emphasis: var(--itrix-navy);
+  --bs-primary-bg-subtle: var(--itrix-mist);
+  --bs-primary-border-subtle: var(--itrix-ice);
+  --bs-secondary: var(--itrix-graphite);
+  --bs-secondary-rgb: 75, 85, 99;
+  --bs-success: var(--itrix-success);
+  --bs-success-rgb: 6, 118, 71;
+  --bs-success-bg-subtle: var(--itrix-success-surface);
+  --bs-danger: var(--itrix-error);
+  --bs-danger-rgb: 180, 35, 24;
+  --bs-danger-bg-subtle: var(--itrix-error-surface);
+  --bs-warning: var(--itrix-warning);
+  --bs-warning-rgb: 181, 71, 8;
+  --bs-warning-bg-subtle: var(--itrix-warning-surface);
+  --bs-info: var(--itrix-accent);
+  --bs-info-rgb: 143, 168, 234;
+  --bs-info-bg-subtle: var(--itrix-mist);
+  --bs-dark: var(--itrix-navy);
+  --bs-dark-rgb: 31, 41, 55;
+  --bs-light: var(--itrix-signal-white);
+  --bs-light-rgb: 248, 250, 252;
+  --bs-focus-ring-color: rgba(148, 163, 184, 0.45);
+  --bs-form-valid-color: var(--itrix-success);
+  --bs-form-invalid-color: var(--itrix-error);
+  --bs-code-color: var(--itrix-navy);
+  --bs-font-monospace: var(--itrix-font-mono);
+
+  --itrix-card-bg: var(--itrix-white);
+  --itrix-hover-bg: rgba(214, 230, 255, 0.4);
+  --itrix-selected-bg: var(--itrix-mist);
+  --itrix-thead-bg: var(--itrix-mist);
+  --itrix-json-bg: var(--itrix-signal-white);
+  --itrix-sidebar-bg: var(--itrix-signal-white);
+  --itrix-sidebar-fg: var(--itrix-navy);
+  --itrix-sidebar-muted: rgba(31, 41, 55, 0.62);
+  --itrix-sidebar-hover: var(--itrix-mist);
+  --itrix-sidebar-active-bg: rgba(31, 41, 55, 0.10);   /* dashboard: bg-sidebar-primary/10 */
+  --itrix-sidebar-active-fg: var(--itrix-navy);
+  --itrix-sidebar-border: #d9e2ec;
+  --itrix-header-bg: var(--itrix-white);
+  --itrix-brand-tile: var(--itrix-navy);
+}
+
+
+/* ----------------------------------------------------------------------------
+   3. Dark mode — the dashboard's structure-ramp derivation (10 Aug 2026)
+   ------------------------------------------------------------------------- */
+html[data-bs-theme="dark"] {
+  --bs-body-color: var(--itrix-signal-white);
+  --bs-body-color-rgb: 248, 250, 252;
+  --bs-body-bg: #161c26;
+  --bs-body-bg-rgb: 22, 28, 38;
+  --bs-emphasis-color: #ffffff;
+  --bs-emphasis-color-rgb: 255, 255, 255;
+  --bs-secondary-color: var(--itrix-steel);
+  --bs-secondary-color-rgb: 148, 163, 184;
+  --bs-secondary-bg: var(--itrix-structure-800);
+  --bs-secondary-bg-rgb: 39, 51, 67;
+  --bs-tertiary-color: var(--itrix-steel);
+  --bs-tertiary-bg: #1a2230;
+  --bs-tertiary-bg-rgb: 26, 34, 48;
+  --bs-heading-color: var(--itrix-signal-white);
+  --bs-link-color: var(--itrix-accent);
+  --bs-link-color-rgb: 143, 168, 234;
+  --bs-link-hover-color: var(--itrix-accent-soft);
+  --bs-link-hover-color-rgb: 183, 203, 244;
+  --bs-border-color: var(--itrix-structure-600);
+  --bs-border-color-translucent: rgba(60, 74, 94, 0.6);
+  --bs-primary: var(--itrix-signal-white);
+  --bs-primary-rgb: 248, 250, 252;
+  --bs-primary-text-emphasis: var(--itrix-accent-soft);
+  --bs-primary-bg-subtle: var(--itrix-structure-800);
+  --bs-primary-border-subtle: var(--itrix-structure-600);
+  --bs-secondary: var(--itrix-steel);
+  --bs-secondary-rgb: 148, 163, 184;
+  --bs-success: #35a26e;
+  --bs-success-rgb: 53, 162, 110;
+  --bs-success-bg-subtle: #14342a;
+  --bs-danger: #e0574a;
+  --bs-danger-rgb: 224, 87, 74;
+  --bs-danger-bg-subtle: #3b1e1c;
+  --bs-warning: #f0a04b;
+  --bs-warning-rgb: 240, 160, 75;
+  --bs-warning-bg-subtle: #45301a;
+  --bs-info: var(--itrix-accent);
+  --bs-info-rgb: 143, 168, 234;
+  --bs-info-bg-subtle: var(--itrix-structure-700);
+  --bs-dark: #0f141c;
+  --bs-dark-rgb: 15, 20, 28;
+  --bs-light: var(--itrix-structure-700);
+  --bs-light-rgb: 49, 62, 80;
+  --bs-focus-ring-color: rgba(143, 168, 234, 0.45);
+  --bs-code-color: var(--itrix-accent-soft);
+
+  --itrix-card-bg: var(--itrix-navy);
+  --itrix-hover-bg: rgba(49, 62, 80, 0.55);
+  --itrix-selected-bg: var(--itrix-structure-700);
+  --itrix-thead-bg: var(--itrix-structure-800);
+  --itrix-json-bg: #161c26;
+  --itrix-sidebar-bg: #1a2230;
+  --itrix-sidebar-fg: var(--itrix-signal-white);
+  --itrix-sidebar-muted: rgba(248, 250, 252, 0.6);
+  --itrix-sidebar-hover: var(--itrix-structure-800);
+  --itrix-sidebar-active-bg: rgba(143, 168, 234, 0.14);
+  --itrix-sidebar-active-fg: var(--itrix-accent);
+  --itrix-sidebar-border: #2a3648;
+  --itrix-header-bg: var(--itrix-navy);
+  --itrix-brand-tile: var(--itrix-navy);
+  --itrix-focus-ring: 0 0 0 4px rgba(143, 168, 234, 0.45);
+}
+
+
+/* ----------------------------------------------------------------------------
+   Base typography
+   ------------------------------------------------------------------------- */
+body {
+  font-family: var(--itrix-font-primary);
+  letter-spacing: var(--itrix-tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6,
+.content-header h1, .card-title, .login-box-msg {
+  font-family: var(--itrix-font-display);
+  font-weight: 600;
+  letter-spacing: var(--itrix-tracking-tight);
+  color: var(--bs-heading-color);
+}
+h1, .h1, .content-header h1 { font-size: 1.5rem; line-height: 1.2; }
+h2, .h2 { font-size: 1.25rem; }
+h5, .h5 { font-size: 1rem; }
+h1:lang(ko), h2:lang(ko), h3:lang(ko) { letter-spacing: 0; }
+code, kbd, pre, samp, .font-monospace, .itrix-mono {
+  font-family: var(--itrix-font-mono) !important;
+  font-size: 0.8125rem;
+}
+.text-muted, .quiet, .mini, .helptext, .form-text, small.form-text {
+  color: var(--bs-secondary-color) !important;
+}
+::selection { background: var(--itrix-ice); color: var(--itrix-navy); }
+html[data-bs-theme="dark"] ::selection { background: var(--itrix-structure-600); color: #fff; }
+
+/* Focus is a ring, never an outline (§8.5) */
+:focus-visible {
+  outline: none !important;
+  box-shadow: var(--itrix-focus-ring) !important;
+  border-radius: var(--itrix-radius-xs);
+}
+
+
+/* ----------------------------------------------------------------------------
+   4. Shell — header, sidebar rail, brand lockup, footer
+   ------------------------------------------------------------------------- */
+body.layout-fixed { background: var(--bs-body-bg); }
+
+.app-header,
+.app-header.navbar {
+  background: var(--itrix-header-bg) !important;
+  border-bottom: 1px solid var(--bs-border-color);
+  min-height: 3.5rem;
+  backdrop-filter: none;
+}
+.app-header .nav-link { color: var(--bs-secondary-color); font-weight: 500; font-size: 0.875rem; }
+.app-header .nav-link:hover, .app-header .nav-link:focus { color: var(--bs-body-color); }
+.app-header .navbar-nav .nav-item .nav-link .fas,
+.app-header .navbar-nav .nav-item .nav-link .far { opacity: 0.85; }
+.app-header .navbar-nav .nav-link { white-space: nowrap; }
+.app-header form.d-flex { align-items: center; }
+.app-header form .input-group { flex-wrap: nowrap; width: auto; }
+.app-header .form-control-navbar {
+  border-radius: 999px 0 0 999px !important;
+  border: 1px solid var(--bs-border-color) !important;
+  border-right: 0 !important;
+  background: var(--bs-body-bg);
+  font-size: 0.8125rem;
+  min-height: 2rem;
+  width: 11rem;
+  padding-left: 0.875rem;
+}
+.app-header .form-control-navbar:focus { border-color: var(--itrix-steel) !important; box-shadow: none !important; }
+.app-header .btn-navbar {
+  border-radius: 0 999px 999px 0;
+  border: 1px solid var(--bs-border-color);
+  border-left: 0;
+  background: var(--bs-body-bg);
+  color: var(--bs-secondary-color);
+  min-height: 2rem;
+  padding: 0 0.75rem;
+}
+.app-header .btn-navbar:hover { color: var(--bs-body-color); background: var(--itrix-selected-bg); }
+
+/* --- Sidebar rail -------------------------------------------------------- */
+/* Geometry: one 20px gutter for the brand tile, the avatar and every nav icon;
+   one 56px column for every label. Rail is 17rem (the console's is 16rem, but
+   Django model names run longer than the console's seven nav items). */
+:root, [data-bs-theme="light"], html[data-bs-theme="dark"] { --lte-sidebar-width: 17rem; }
+
+/* Jazzmin stamps data-bs-theme="dark" on the <aside>; win the cascade with a
+   more specific selector so light mode gets the console's light rail. */
+html[data-bs-theme="light"] .app-sidebar,
+html[data-bs-theme="dark"] .app-sidebar,
+.app-sidebar {
+  --bs-body-bg: var(--itrix-sidebar-bg);
+  --bs-secondary-bg: var(--itrix-sidebar-bg);
+  --bs-tertiary-bg: var(--itrix-sidebar-bg);
+  --bs-body-color: var(--itrix-sidebar-fg);
+  --bs-emphasis-color: var(--itrix-sidebar-fg);
+  --bs-emphasis-color-rgb: 31, 41, 55;
+  --bs-border-color: var(--itrix-sidebar-border);
+  --lte-sidebar-color: var(--itrix-sidebar-fg);
+  --lte-sidebar-hover-color: var(--itrix-sidebar-fg);
+  --lte-sidebar-hover-bg: var(--itrix-sidebar-hover);
+  --lte-sidebar-active-color: var(--itrix-sidebar-active-fg);
+  --lte-sidebar-menu-active-bg: var(--itrix-sidebar-active-bg);
+  --lte-sidebar-menu-active-color: var(--itrix-sidebar-active-fg);
+  --lte-sidebar-submenu-bg: transparent;
+  --lte-sidebar-submenu-color: var(--itrix-sidebar-fg);
+  --lte-sidebar-submenu-hover-color: var(--itrix-sidebar-fg);
+  --lte-sidebar-submenu-hover-bg: var(--itrix-sidebar-hover);
+  --lte-sidebar-submenu-active-color: var(--itrix-sidebar-active-fg);
+  --lte-sidebar-submenu-active-bg: var(--itrix-sidebar-active-bg);
+  --lte-sidebar-header-color: var(--itrix-sidebar-muted);
+  --itrix-rail-gutter: 1.25rem;   /* 20px left edge for tile / avatar / icons */
+  --itrix-rail-icon: 1.75rem;     /* 28px icon box = brand tile = avatar */
+  --itrix-rail-gap: 0.5rem;       /* icon → label */
+  background: var(--itrix-sidebar-bg) !important;
+  color: var(--itrix-sidebar-fg);
+  border-right: 1px solid var(--itrix-sidebar-border);
+  box-shadow: none !important;
+}
+html[data-bs-theme="dark"] .app-sidebar { --bs-emphasis-color-rgb: 248, 250, 252; }
+
+/* Brand lockup — the X on an ink tile, the console's 28px mark (app-sidebar.tsx) */
+.app-sidebar .sidebar-brand {
+  height: 3.5rem;
+  justify-content: flex-start;
+  padding: 0 var(--itrix-rail-gutter);
+  border-bottom: 1px solid var(--itrix-sidebar-border);
+}
+.app-sidebar .brand-link { gap: var(--itrix-rail-gap); align-items: center; }
+.app-sidebar .brand-image.itrix-brand-mark {
+  width: var(--itrix-rail-icon) !important;
+  height: var(--itrix-rail-icon) !important;
+  max-height: none;
+  margin: 0 !important;
+  padding: 0.375rem;
+  border-radius: 7px;
+  background: var(--itrix-brand-tile);
+  opacity: 1 !important;
+  box-shadow: none !important;
+  float: none;
+  object-fit: contain;
+}
+html[data-bs-theme="dark"] .app-sidebar .brand-image.itrix-brand-mark { background: var(--itrix-structure-700); }
+.app-sidebar .brand-text {
+  font-family: var(--itrix-font-primary);
+  font-weight: 600 !important;
+  font-size: 0.9375rem;
+  letter-spacing: var(--itrix-tracking-normal);
+  color: var(--itrix-sidebar-fg) !important;
+  margin: 0;
+  line-height: 1.1;
+}
+.app-sidebar .brand-text::after {
+  content: "Admin";
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--itrix-sidebar-muted);
+  letter-spacing: 0;
+}
+.sidebar-collapse .app-sidebar:not(:hover) .brand-text { display: none; }
+
+/* User panel — avatar sits on the same gutter as the brand tile */
+.app-sidebar .user-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--itrix-rail-gap);
+  padding: 0.75rem var(--itrix-rail-gutter);
+  margin: 0;
+  border-bottom: 1px solid var(--itrix-sidebar-border);
+}
+.app-sidebar .user-panel .image { display: flex; align-items: center; justify-content: center; width: var(--itrix-rail-icon); flex: 0 0 var(--itrix-rail-icon); padding: 0; }
+.app-sidebar .user-panel img { width: var(--itrix-rail-icon) !important; height: var(--itrix-rail-icon) !important; object-fit: cover; border-radius: 7px; box-shadow: none !important; }
+.app-sidebar .user-panel .image .fa-user-circle, .app-sidebar .user-panel .user-profile { color: var(--itrix-sidebar-muted); font-size: 1.5rem; }
+.app-sidebar .user-panel .info { padding: 0; min-width: 0; }
+.app-sidebar .user-panel .info a, .app-sidebar .user-panel .info span {
+  display: block; color: var(--itrix-sidebar-fg); font-size: 0.8125rem; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Menu */
+.app-sidebar .sidebar-wrapper { padding: 0; }
+.app-sidebar .sidebar-menu { padding: 0.5rem 0.75rem 1.5rem; margin: 0; }
+.app-sidebar .sidebar-menu .nav-header {
+  color: var(--itrix-sidebar-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: var(--itrix-tracking-label);
+  text-transform: uppercase;
+  padding: 0.75rem 0.5rem 0.25rem;
+}
+.app-sidebar .sidebar-menu .nav-item > .nav-link { margin-bottom: 0.0625rem; }
+.app-sidebar .sidebar-menu .nav-link {
+  display: flex;
+  align-items: center;
+  border-radius: var(--itrix-radius-xs);
+  padding: 0.4375rem calc(var(--itrix-rail-gutter) - 0.75rem);   /* icon lands on the 20px gutter */
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--itrix-sidebar-fg);
+  transition: background 180ms var(--itrix-ease), color 180ms var(--itrix-ease);
+}
+.app-sidebar .sidebar-menu .nav-link .nav-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--itrix-rail-icon); max-width: var(--itrix-rail-icon); height: 1.25rem;
+  margin: 0; font-size: 0.875rem;
+  color: var(--itrix-sidebar-muted);
+}
+.app-sidebar .sidebar-menu .nav-link p {
+  display: block; padding-left: var(--itrix-rail-gap); margin: 0;
+  white-space: normal; overflow: visible; text-overflow: clip; flex: 1 1 auto; min-width: 0;
+}
+.app-sidebar .sidebar-menu .nav-link .nav-arrow { right: 0.75rem; color: var(--itrix-sidebar-muted); font-size: 0.75rem; }
+.app-sidebar .sidebar-menu .nav-link:hover { background: var(--itrix-sidebar-hover); color: var(--itrix-sidebar-fg); }
+.app-sidebar .sidebar-menu .nav-link.active,
+.app-sidebar .sidebar-menu > .nav-item > .nav-link.active:not(:hover),
+.app-sidebar .sidebar-menu .nav-treeview > .nav-item > .nav-link.active {
+  background: var(--itrix-sidebar-active-bg) !important;
+  color: var(--itrix-sidebar-active-fg) !important;
+  font-weight: 600;
+  box-shadow: none;
+}
+.app-sidebar .sidebar-menu .nav-link.active .nav-icon { color: var(--itrix-sidebar-active-fg); }
+.app-sidebar .sidebar-menu > .nav-item.menu-open > .nav-link { color: var(--itrix-sidebar-fg); }
+/* Model links: no icon (the console's sub-nav has none either); label aligns with the parent label */
+.app-sidebar .sidebar-menu .nav-treeview { padding: 0.125rem 0 0.375rem; }
+.app-sidebar .sidebar-menu .nav-treeview > .nav-item > .nav-link {
+  padding-left: calc(var(--itrix-rail-gutter) - 0.75rem + var(--itrix-rail-icon) + var(--itrix-rail-gap));
+  padding-top: 0.375rem; padding-bottom: 0.375rem;
+  font-weight: 450;
+  color: var(--itrix-sidebar-fg);
+}
+.app-sidebar .sidebar-menu .nav-treeview .nav-link .nav-icon { display: none; }
+.app-sidebar .sidebar-menu .nav-treeview .nav-link p { padding-left: 0; }
+.app-sidebar::-webkit-scrollbar { width: 6px; }
+.app-sidebar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 999px; }
+
+/* Theme chooser (Jazzmin's own control): the brand CSS is the only theme, so
+   hide the Bootswatch swap and keep just Light / Dark / Auto. */
+#jazzy-theme-chooser { min-width: 11rem; padding-bottom: 0.25rem; }
+#jazzy-theme-chooser > *:nth-child(-n+4) { display: none; }
+#jazzy-theme-chooser .dropdown-header { font-size: 0.6875rem; font-weight: 600; letter-spacing: var(--itrix-tracking-label); text-transform: uppercase; color: var(--bs-secondary-color); padding-top: 0.5rem; }
+#jazzy-theme-chooser .dropdown-divider { display: none; }
+#jazzy-theme-chooser .form-select { min-height: 2.25rem; font-size: 0.8125rem; }
+
+/* Content */
+.app-main { background: var(--bs-body-bg); }
+.app-content-header, .content-header { padding: 1.25rem 1.5rem 0.25rem; }
+.app-content, .content { padding: 0 1.5rem 1.5rem; }
+.breadcrumb { font-size: 0.8125rem; --bs-breadcrumb-divider-color: var(--itrix-steel); }
+.breadcrumb-item a { color: var(--bs-secondary-color); }
+.breadcrumb-item.active { color: var(--bs-body-color); }
+
+.app-footer, .main-footer {
+  background: var(--bs-body-bg);
+  border-top: 1px solid var(--bs-border-color);
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+  padding: 0.75rem 1.5rem;
+}
+
+
+/* ----------------------------------------------------------------------------
+   5. Surfaces
+   ------------------------------------------------------------------------- */
+.card {
+  --bs-card-bg: var(--itrix-card-bg);
+  --bs-card-border-color: var(--bs-border-color);
+  --bs-card-border-radius: var(--itrix-radius-md);
+  --bs-card-inner-border-radius: calc(var(--itrix-radius-md) - 1px);
+  --bs-card-cap-bg: transparent;
+  --bs-card-cap-padding-y: 0.875rem;
+  --bs-card-cap-padding-x: 1.25rem;
+  --bs-card-spacer-y: 1.25rem;
+  --bs-card-spacer-x: 1.25rem;
+  box-shadow: 0 1px 2px rgba(31, 41, 55, 0.04);
+}
+.card .card-header { border-bottom: 1px solid var(--bs-border-color); }
+.card .card-header h5, .card .card-header .card-title { font-size: 0.9375rem; margin: 0; }
+.card.card-primary.card-outline, .card.card-outline { border-top-width: 1px; border-top-color: var(--bs-border-color); }
+html[data-bs-theme="dark"] .card { box-shadow: none; }
+
+/* Tabs (change-form horizontal_tabs) */
+.nav-tabs {
+  --bs-nav-tabs-border-color: var(--bs-border-color);
+  --bs-nav-tabs-link-active-bg: transparent;
+  --bs-nav-tabs-link-active-color: var(--bs-body-color);
+  --bs-nav-tabs-link-active-border-color: transparent transparent var(--itrix-navy);
+  --bs-nav-tabs-link-hover-border-color: transparent transparent var(--itrix-steel);
+  --bs-nav-link-color: var(--bs-secondary-color);
+  --bs-nav-link-hover-color: var(--bs-body-color);
+  --bs-nav-link-font-weight: 500;
+  --bs-nav-link-padding-x: 0.875rem;
+  --bs-nav-link-padding-y: 0.625rem;
+  gap: 0.125rem;
+}
+.nav-tabs .nav-link { border-width: 0 0 2px; border-radius: 0; margin-bottom: -1px; font-size: 0.875rem; }
+.nav-tabs .nav-link.active { border-bottom: 2px solid var(--itrix-navy); font-weight: 600; }
+html[data-bs-theme="dark"] .nav-tabs .nav-link.active { border-bottom-color: var(--itrix-accent); }
+#jazzy-tabs .nav-link[data-bs-toggle="pill"].active { background: transparent; color: var(--bs-body-color); }
+
+/* Tables — Brand Manual §6.3: header on Mist, 1px Ice borders, ≥12px padding */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-striped-bg: rgba(234, 240, 255, 0.35);
+  --bs-table-hover-bg: var(--itrix-hover-bg);
+  --bs-table-hover-color: var(--bs-body-color);
+  font-size: 0.8125rem;
+  vertical-align: middle;
+}
+html[data-bs-theme="dark"] .table { --bs-table-striped-bg: rgba(39, 51, 67, 0.4); }
+.table > thead > tr > th, .table thead th, #result_list thead th {
+  background: var(--itrix-thead-bg);
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: var(--itrix-tracking-label);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 0.625rem 0.75rem;
+  white-space: nowrap;
+}
+.table > thead > tr > th a { color: inherit; }
+.table > thead > tr > th.sorted, .table > thead > tr > th.sorted a { color: var(--bs-body-color); }
+.table > tbody > tr > td, .table > tbody > tr > th { padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--bs-border-color); }
+.table > tbody > tr:last-child > td { border-bottom: 0; }
+.table > tbody > tr:hover > td { background: var(--itrix-hover-bg); }
+.table td.field-created_at, .table td.field-updated_at, .table td[class*="field-"][class*="_at"],
+.table td.field-score, .table td.field-bytes, .table td.field-seq, .table td.field-version,
+.table td.field-duration_ms, .table td.field-chunk_count, .table td.field-token_estimate {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table td.field-id, .table td[class*="short_id"], .table td.field-persona_id, .table td.field-pitch_room_id,
+.table td.field-client_id, .table td.field-sha256, .table td.field-vector_id, .table td.field-key {
+  font-family: var(--itrix-font-mono);
+  font-size: 0.75rem;
+}
+#result_list tbody th a, #result_list tbody td a { font-weight: 500; }
+.table td .badge { font-weight: 600; }
+
+/* Forms — 40px inputs, radius 10, ring focus (§8.5 compacted for admin) */
+.form-control, .form-select, .vTextField, .vURLField, .vIntegerField, .vDateField, .vTimeField,
+.vLargeTextField, textarea, select:not(.form-select):not([multiple]) {
+  border-radius: var(--itrix-radius-sm) !important;
+  border: 1px solid var(--bs-border-color) !important;
+  background-color: var(--itrix-card-bg);
+  color: var(--bs-body-color);
+  font-size: 0.875rem;
+  min-height: 2.5rem;
+  transition: border-color 180ms var(--itrix-ease), box-shadow 180ms var(--itrix-ease);
+}
+html[data-bs-theme="dark"] .form-control, html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] textarea, html[data-bs-theme="dark"] select:not(.form-select):not([multiple]) {
+  background-color: var(--bs-body-bg);
+}
+.form-control:focus, .form-select:focus, textarea:focus, select:not(.form-select):focus, .vLargeTextField:focus {
+  border-color: var(--itrix-steel) !important;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.28) !important;
+  outline: none;
+}
+.form-control::placeholder, textarea::placeholder { color: var(--itrix-steel); }
+.form-control[readonly], .form-control:disabled { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+label, .form-group label, .col-form-label { font-weight: 500; font-size: 0.8125rem; color: var(--bs-body-color); }
+label.required::after, .form-group .required label::after { content: " *"; color: var(--itrix-error); }
+.form-check-input { border-color: var(--itrix-steel); border-radius: 4px; }
+.form-check-input:checked { background-color: var(--itrix-navy); border-color: var(--itrix-navy); }
+html[data-bs-theme="dark"] .form-check-input:checked { background-color: var(--itrix-accent); border-color: var(--itrix-accent); }
+.form-check-input:focus { box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.28); }
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple {
+  border-radius: var(--itrix-radius-sm) !important;
+  border: 1px solid var(--bs-border-color) !important;
+  min-height: 2.5rem;
+  background: var(--itrix-card-bg) !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 2.4rem; color: var(--bs-body-color); }
+.select2-container--default .select2-selection--single .select2-selection__arrow { height: 2.4rem; }
+.select2-dropdown { border-radius: var(--itrix-radius-sm); border-color: var(--bs-border-color); box-shadow: var(--itrix-shadow-soft); background: var(--itrix-card-bg); }
+.select2-container--default .select2-results__option--highlighted[aria-selected] { background: var(--itrix-navy); color: #fff; }
+.errorlist, .errornote { color: var(--itrix-error); font-size: 0.8125rem; }
+.errorlist li { list-style: none; }
+.form-group.has-error .form-control, .form-control.is-invalid { border-color: var(--itrix-error) !important; }
+
+/* Buttons — primary = ink on white; the rest are quiet outlines (§8.5) */
+.btn {
+  --bs-btn-border-radius: var(--itrix-radius-sm);
+  --bs-btn-font-weight: 600;
+  --bs-btn-font-size: 0.8125rem;
+  --bs-btn-padding-y: 0.5rem;
+  --bs-btn-padding-x: 0.875rem;
+  --bs-btn-focus-box-shadow: var(--itrix-focus-ring);
+  letter-spacing: var(--itrix-tracking-normal);
+  transition: transform 180ms var(--itrix-ease), box-shadow 180ms var(--itrix-ease), background 180ms var(--itrix-ease);
+}
+.btn-sm { --bs-btn-border-radius: var(--itrix-radius-xs); --bs-btn-font-size: 0.75rem; --bs-btn-padding-y: 0.3rem; --bs-btn-padding-x: 0.625rem; }
+.btn-primary, .btn-info.addlink, .submit-row input[type="submit"].default, input[type="submit"].default, .button.default {
+  --bs-btn-bg: var(--itrix-navy);
+  --bs-btn-border-color: var(--itrix-navy);
+  --bs-btn-color: var(--itrix-signal-white);
+  --bs-btn-hover-bg: #0f172a;
+  --bs-btn-hover-border-color: #0f172a;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: #0f172a;
+  --bs-btn-active-border-color: #0f172a;
+  --bs-btn-disabled-bg: var(--itrix-steel);
+  --bs-btn-disabled-border-color: var(--itrix-steel);
+  background: var(--bs-btn-bg); border-color: var(--bs-btn-border-color); color: var(--bs-btn-color);
+}
+.btn-primary:hover, .submit-row input[type="submit"].default:hover { box-shadow: 0 0 0 4px rgba(214, 230, 255, 0.64); transform: translateY(-1px); }
+html[data-bs-theme="dark"] .btn-primary, html[data-bs-theme="dark"] .submit-row input[type="submit"].default {
+  --bs-btn-bg: var(--itrix-signal-white); --bs-btn-border-color: var(--itrix-signal-white); --bs-btn-color: var(--itrix-navy);
+  --bs-btn-hover-bg: #fff; --bs-btn-hover-border-color: #fff; --bs-btn-hover-color: var(--itrix-navy);
+}
+html[data-bs-theme="dark"] .btn-primary:hover { box-shadow: 0 0 0 4px rgba(143, 168, 234, 0.3); }
+.btn-outline-secondary { --bs-btn-color: var(--bs-body-color); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--itrix-selected-bg); --bs-btn-hover-color: var(--bs-body-color); --bs-btn-hover-border-color: var(--itrix-steel); --bs-btn-active-bg: var(--itrix-selected-bg); --bs-btn-active-color: var(--bs-body-color); }
+.btn-outline-info { --bs-btn-color: var(--bs-body-color); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--itrix-selected-bg); --bs-btn-hover-color: var(--bs-body-color); --bs-btn-hover-border-color: var(--itrix-accent); --bs-btn-active-bg: var(--itrix-selected-bg); --bs-btn-active-color: var(--bs-body-color); }
+.btn-outline-success { --bs-btn-color: var(--bs-success); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--bs-success-bg-subtle); --bs-btn-hover-color: var(--bs-success); --bs-btn-hover-border-color: var(--bs-success); }
+.btn-outline-warning { --bs-btn-color: var(--bs-warning); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--bs-warning-bg-subtle); --bs-btn-hover-color: var(--bs-warning); --bs-btn-hover-border-color: var(--bs-warning); }
+.btn-outline-danger { --bs-btn-color: var(--bs-danger); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--bs-danger-bg-subtle); --bs-btn-hover-color: var(--bs-danger); --bs-btn-hover-border-color: var(--bs-danger); }
+.btn-danger, .deletelink-box .btn, a.deletelink { --bs-btn-bg: var(--itrix-error); --bs-btn-border-color: var(--itrix-error); --bs-btn-color: #fff; --bs-btn-hover-bg: #8f1c13; --bs-btn-hover-border-color: #8f1c13; }
+.btn-success { --bs-btn-bg: var(--itrix-success); --bs-btn-border-color: var(--itrix-success); --bs-btn-color: #fff; }
+
+/* Badges / chips (§8.9) — semantic colour on quiet surfaces, always with text */
+.badge {
+  --bs-badge-font-size: 0.6875rem;
+  --bs-badge-font-weight: 600;
+  --bs-badge-padding-x: 0.5rem;
+  --bs-badge-padding-y: 0.25rem;
+  --bs-badge-border-radius: 999px;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.badge.bg-success  { background: var(--bs-success-bg-subtle) !important; color: var(--bs-success) !important; border: 1px solid rgba(6, 118, 71, 0.25); }
+.badge.bg-danger   { background: var(--bs-danger-bg-subtle) !important;  color: var(--bs-danger) !important;  border: 1px solid rgba(180, 35, 24, 0.25); }
+.badge.bg-warning  { background: var(--bs-warning-bg-subtle) !important; color: var(--bs-warning) !important; border: 1px solid rgba(181, 71, 8, 0.25); }
+.badge.bg-info     { background: var(--itrix-mist) !important;           color: var(--itrix-navy) !important;  border: 1px solid var(--itrix-ice); }
+.badge.bg-primary  { background: var(--itrix-navy) !important;           color: var(--itrix-signal-white) !important; border: 1px solid var(--itrix-navy); }
+.badge.bg-secondary{ background: transparent !important;                 color: var(--bs-secondary-color) !important; border: 1px solid var(--bs-border-color); }
+.badge.bg-dark     { background: var(--itrix-structure-700) !important;  color: #fff !important; border: 1px solid var(--itrix-structure-700); }
+html[data-bs-theme="dark"] .badge.bg-info    { background: var(--itrix-structure-700) !important; color: var(--itrix-accent-soft) !important; border-color: var(--itrix-structure-600); }
+html[data-bs-theme="dark"] .badge.bg-primary { background: var(--itrix-accent) !important; color: var(--itrix-navy) !important; border-color: var(--itrix-accent); }
+html[data-bs-theme="dark"] .badge.bg-success { border-color: rgba(53, 162, 110, 0.35); }
+html[data-bs-theme="dark"] .badge.bg-danger  { border-color: rgba(224, 87, 74, 0.35); }
+html[data-bs-theme="dark"] .badge.bg-warning { border-color: rgba(240, 160, 75, 0.35); }
+
+/* Alerts & callouts */
+.alert { border-radius: var(--itrix-radius-sm); font-size: 0.875rem; }
+.callout { border-radius: var(--itrix-radius-sm); border-left-width: 3px; background: var(--itrix-card-bg); }
+.callout.callout-danger { border-left-color: var(--itrix-error); }
+.callout.callout-info { border-left-color: var(--itrix-accent); }
+.callout.callout-warning { border-left-color: var(--itrix-warning); }
+.callout.callout-success { border-left-color: var(--itrix-success); }
+.dropdown-menu { border-radius: var(--itrix-radius-sm); border-color: var(--bs-border-color); box-shadow: var(--itrix-shadow-soft); font-size: 0.875rem; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--itrix-selected-bg); }
+.modal-content { border-radius: var(--itrix-radius-md); border-color: var(--bs-border-color); }
+.pagination { --bs-pagination-border-radius: var(--itrix-radius-xs); --bs-pagination-color: var(--bs-body-color); --bs-pagination-active-bg: var(--itrix-navy); --bs-pagination-active-border-color: var(--itrix-navy); --bs-pagination-hover-bg: var(--itrix-selected-bg); --bs-pagination-font-size: 0.8125rem; }
+html[data-bs-theme="dark"] .pagination { --bs-pagination-active-bg: var(--itrix-accent); --bs-pagination-active-border-color: var(--itrix-accent); --bs-pagination-active-color: var(--itrix-navy); }
+
+
+/* ----------------------------------------------------------------------------
+   6. Django-admin specifics
+   ------------------------------------------------------------------------- */
+/* Changelist filter panel */
+#changelist-filter, .change-list-filters .card { font-size: 0.8125rem; }
+#changelist-filter h2, .card-header h3 { font-family: var(--itrix-font-primary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: var(--itrix-tracking-label); color: var(--bs-secondary-color); }
+#changelist-filter h3, .filter-title { font-family: var(--itrix-font-primary); font-size: 0.8125rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+#changelist-filter ul { padding-left: 0; list-style: none; }
+#changelist-filter li a { display: block; padding: 0.25rem 0.5rem; border-radius: var(--itrix-radius-xs); color: var(--bs-secondary-color); }
+#changelist-filter li a:hover { background: var(--itrix-selected-bg); color: var(--bs-body-color); }
+#changelist-filter li.selected a { background: var(--itrix-sidebar-active-bg); color: var(--bs-body-color); font-weight: 600; }
+.date-hierarchy, .toplinks { font-size: 0.8125rem; }
+/* Date hierarchy: quiet chips, the current level as a filled chip */
+.date-hierarchy.btn-group { gap: 0.375rem; flex-wrap: wrap; }
+.date-hierarchy.btn-group .btn { border-radius: 999px !important; --bs-btn-padding-y: 0.3rem; --bs-btn-padding-x: 0.75rem; --bs-btn-font-size: 0.75rem; --bs-btn-font-weight: 500; }
+.date-hierarchy.btn-group .btn.btn-primary:not(.active) { background: transparent; border-color: var(--bs-border-color); color: var(--bs-body-color); }
+.date-hierarchy.btn-group .btn.btn-primary:not(.active):hover { background: var(--itrix-selected-bg); border-color: var(--itrix-steel); box-shadow: none; transform: none; }
+.date-hierarchy.btn-group .btn.btn-primary.active { background: var(--itrix-navy); border-color: var(--itrix-navy); color: var(--itrix-signal-white); }
+html[data-bs-theme="dark"] .date-hierarchy.btn-group .btn.btn-primary.active { background: var(--itrix-signal-white); border-color: var(--itrix-signal-white); color: var(--itrix-navy); }
+/* Changelist filter selects (select2) sit in a row */
+#changelist-search .form-group { margin-bottom: 0.5rem; }
+#changelist-search .select2-container--default .select2-selection--single { min-height: 2.5rem; }
+.date-hierarchy a, .toplinks a { color: var(--bs-secondary-color); margin-right: 0.75rem; }
+.date-hierarchy a:hover, .toplinks a:hover { color: var(--bs-body-color); }
+.paginator, .pagination-wrapper { font-size: 0.8125rem; color: var(--bs-secondary-color); }
+.actions .form-select, .actions select { min-width: 14rem; }
+#jazzy-actions .object-tools li a, .object-tools a { border-radius: var(--itrix-radius-sm); }
+.change-list .results table { border-radius: var(--itrix-radius-sm); overflow: hidden; }
+#changelist .actions { padding: 0.5rem 0; }
+.action-counter, .all, .clear { color: var(--bs-secondary-color); }
+tr.selected, .table tbody tr.selected > td { background: var(--itrix-selected-bg) !important; }
+
+/* Change form: fieldset geometry ------------------------------------------
+   Jazzmin lays each line out as .form-group > .row > label.col-sm-3 + .col-sm-9
+   (single field) or label.col-auto + .col-auto.fieldBox pairs (multi-field).
+   We tighten that into a fixed 11rem label column, vertically centre labels on
+   40px controls, and give secondary labels a minimum width so their controls
+   line up from row to row. */
+fieldset.module h2, .fieldset-heading, .card-header .fieldset-title { font-family: var(--itrix-font-display); font-size: 1rem; }
+#content-main .card > .p-5, #content-main .card > .card-body.p-5, .tab-content > .tab-pane > .p-5 { padding: 1.25rem 1.5rem 0.75rem !important; }
+.form-row, .form-group { margin-bottom: 0.75rem; }
+.form-group > .row { align-items: flex-start; --bs-gutter-x: 1rem; }
+.form-group > .row > label { padding-top: 0.5rem; margin-bottom: 0; line-height: 1.5; }
+.form-group > .row > label.col-sm-3 { flex: 0 0 11rem; max-width: 11rem; }
+.form-group > .row > .col-sm-9 { flex: 1 1 0; max-width: none; min-width: 0; }
+.form-group > .row > label.col-auto { min-width: 8rem; }
+.form-group > .row > label.col-auto:not(:first-child) { min-width: 7rem; padding-left: 1.25rem; }
+.form-group > .row > .fieldBox { padding-right: 0; }
+.form-group > .row > .fieldBox .form-control, .form-group > .row > .fieldBox .form-select { min-width: 12rem; }
+.form-group > .row > .fieldBox textarea.form-control, .form-group > .row > .col-sm-9 textarea { min-width: 24rem; width: 100%; max-width: 48rem; }
+.form-group > .row > .col-sm-9 > .form-control:not(textarea), .form-group > .row > .col-sm-9 > .form-select,
+.form-group > .row > .col-sm-9 > .related-widget-wrapper > .form-control { max-width: 40rem; }
+.form-group .form-check-input { margin-top: 0.7rem; }
+.form-group .fieldBox .form-check-input { margin-top: 0.7rem; }
+.readonly, .form-control-plaintext {
+  display: flex; align-items: center; flex-wrap: wrap;
+  min-height: 2.5rem; padding: 0.375rem 0.75rem;
+  background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: var(--itrix-radius-sm);
+  color: var(--bs-body-color); font-size: 0.875rem; line-height: 1.5;
+}
+html[data-bs-theme="dark"] .readonly { background: rgba(22, 28, 38, 0.6); }
+.readonly p { margin: 0; }
+.readonly:has(pre.itrix-json), .readonly:has(ul.itrix-list), .readonly:has(img) { display: block; padding: 0; background: transparent; border: 0; min-height: 0; }
+.readonly a { text-decoration: underline; text-decoration-color: var(--itrix-steel); text-underline-offset: 3px; }
+.readonly img { max-width: 100%; border-radius: var(--itrix-radius-xs); }
+.related-widget-wrapper { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.related-widget-wrapper .related-lookup { display: inline-flex; align-items: center; gap: 0.25rem; }
+.related-widget-wrapper strong { font-weight: 500; }
+.help, .helptext, .form-text { font-size: 0.75rem; }
+.submit-row, #jazzy-actions .d-flex { gap: 0.5rem; }
+#jazzy-actions .card { position: sticky; top: 4.25rem; }
+#jazzy-actions .card .card-body { padding: 1rem; }
+#jazzy-actions .card .btn { width: 100%; }
+/* "Save" is the one primary action on a change form (ink button); the rest stay quiet. */
+#jazzy-actions input[name="_save"].btn, .submit-row input[name="_save"] {
+  background: var(--itrix-navy) !important; border-color: var(--itrix-navy) !important; color: var(--itrix-signal-white) !important;
+  --bs-btn-padding-y: 0.5rem; font-size: 0.8125rem;
+}
+#jazzy-actions input[name="_save"].btn:hover { background: #0f172a !important; border-color: #0f172a !important; box-shadow: 0 0 0 4px rgba(214, 230, 255, 0.64); }
+html[data-bs-theme="dark"] #jazzy-actions input[name="_save"].btn { background: var(--itrix-signal-white) !important; border-color: var(--itrix-signal-white) !important; color: var(--itrix-navy) !important; }
+html[data-bs-theme="dark"] #jazzy-actions input[name="_save"].btn:hover { box-shadow: 0 0 0 4px rgba(143, 168, 234, 0.3); }
+#jazzy-actions .btn-sm { --bs-btn-padding-y: 0.45rem; }
+#jazzy-actions .object-tools { margin-top: 0.75rem; }
+.datetimeshortcuts a { color: var(--bs-secondary-color); }
+.calendarbox, .clockbox { border-radius: var(--itrix-radius-sm); box-shadow: var(--itrix-shadow-soft); }
+
+/* Inlines (the tabs on hub models) */
+.inline-group, .inline-related { border: 0; }
+.inline-related h3, .inline-related .card-header { font-family: var(--itrix-font-primary); font-size: 0.8125rem; font-weight: 600; }
+.tab-pane .inline-related { margin-bottom: 1rem; }
+.tab-pane .inline-related.tabular table.table { margin-bottom: 0.5rem; }
+.tab-pane .inline-related.tabular thead th { font-size: 0.6875rem; }
+.inline-related .form-row .form-control, .inline-related td .form-control { min-height: 2.125rem; font-size: 0.8125rem; }
+.inline-related .readonly { font-size: 0.8125rem; padding: 0; }
+.tab-pane .inline-related.tabular tbody td { padding: 0.4rem 0.75rem; }
+.tab-pane .inline-related.tabular tbody td p, .tab-pane .inline-related.tabular tbody td .readonly p { margin: 0; }
+.add-row a { color: var(--bs-body-color); font-weight: 600; font-size: 0.8125rem; }
+.add-row a::before { content: "+ "; }
+.inline-deletelink { color: var(--itrix-error); }
+.inline-related tr.has_original td { padding-top: 0.625rem; }
+.original p { display: none; }
+.inline-related .original + .form-row, .stacked .form-row { padding-left: 0; }
+.tabular tr td.original p { display: none; }
+td.original { width: 0; padding: 0 !important; }
+.tabular tr td .related-widget-wrapper .select2 { min-width: 12rem; }
+a.inlinechangelink { color: var(--bs-secondary-color); font-size: 0.75rem; }
+a.inlinechangelink:hover { color: var(--bs-body-color); }
+
+/* JSON payload renderer (apps.core.admin.pretty_json) */
+pre.itrix-json {
+  font-family: var(--itrix-font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  background: var(--itrix-json-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--itrix-radius-sm);
+  padding: 0.75rem 0.875rem;
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre;
+  color: var(--bs-body-color);
+  margin: 0;
+}
+ul.itrix-list { margin: 0; padding-left: 1.1rem; }
+ul.itrix-list li { margin: 0.125rem 0; }
+
+/* Dashboard (index) — app cards */
+#content-main .card .table.table-sm td, #content-main .card .table.table-sm th { padding: 0.5rem 0.75rem; }
+#content-main .card .table.table-sm thead { display: none; }
+#content-main .card .table.table-sm td a { font-weight: 500; }
+#content-main .card .btn-group .btn { --bs-btn-padding-y: 0.2rem; --bs-btn-padding-x: 0.55rem; }
+#recent-actions-module h4 { font-size: 0.9375rem; }
+.timeline::before { background: var(--bs-border-color); width: 2px; }
+.timeline > div > .timeline-item { border-radius: var(--itrix-radius-sm); box-shadow: none; border: 1px solid var(--bs-border-color); background: var(--itrix-card-bg); }
+.timeline > div > i { border-radius: 50%; }
+.timeline .time { color: var(--bs-secondary-color); font-size: 0.75rem; }
+.timeline .timeline-header { font-size: 0.8125rem; }
+
+/* Related-object popup / modal */
+.related-modal .modal-content { border-radius: var(--itrix-radius-md); }
+.related-widget-wrapper-link { opacity: 0.7; }
+.related-widget-wrapper-link:hover { opacity: 1; }
+.related-widget-wrapper .related-widget-wrapper-link img { filter: none; }
+html[data-bs-theme="dark"] .related-widget-wrapper .related-widget-wrapper-link img { filter: invert(1) brightness(1.4); }
+
+/* App index / model tables */
+.app-index .card .table td { padding: 0.625rem 0.75rem; }
+
+/* Delete confirmation */
+.delete-confirmation ul, .delete-summary ul { padding-left: 1.2rem; }
+
+/* Toasts / messages */
+.messagelist, .alert.alert-dismissible { border-radius: var(--itrix-radius-sm); }
+.alert-success { --bs-alert-bg: var(--bs-success-bg-subtle); --bs-alert-border-color: rgba(6, 118, 71, 0.25); --bs-alert-color: var(--bs-success); }
+.alert-danger  { --bs-alert-bg: var(--bs-danger-bg-subtle);  --bs-alert-border-color: rgba(180, 35, 24, 0.25); --bs-alert-color: var(--bs-danger); }
+.alert-warning { --bs-alert-bg: var(--bs-warning-bg-subtle); --bs-alert-border-color: rgba(181, 71, 8, 0.25);  --bs-alert-color: var(--bs-warning); }
+.alert-info    { --bs-alert-bg: var(--itrix-mist);           --bs-alert-border-color: var(--itrix-ice);         --bs-alert-color: var(--itrix-navy); }
+html[data-bs-theme="dark"] .alert-info { --bs-alert-bg: var(--itrix-structure-700); --bs-alert-border-color: var(--itrix-structure-600); --bs-alert-color: var(--itrix-signal-white); }
+
+
+/* ----------------------------------------------------------------------------
+   7. Login
+   ------------------------------------------------------------------------- */
+body.login-page {
+  background: var(--bs-body-bg) !important;
+  background-image: radial-gradient(60rem 30rem at 50% -10rem, rgba(214, 230, 255, 0.55), transparent 70%) !important;
+}
+html[data-bs-theme="dark"] body.login-page {
+  background-image: radial-gradient(60rem 30rem at 50% -10rem, rgba(143, 168, 234, 0.12), transparent 70%) !important;
+}
+.login-box { width: 24rem; max-width: calc(100vw - 2rem); }
+.login-logo { margin-bottom: 1.5rem; }
+.login-logo img { height: 2.75rem; width: auto; }   /* wordmark ≥120px wide (§2.4) */
+.login-box .card {
+  border-radius: var(--itrix-radius-lg);
+  box-shadow: var(--itrix-shadow-soft);
+  border: 1px solid var(--bs-border-color);
+}
+.login-card-body, .login-box .card-body { padding: 1.75rem 1.75rem 1.5rem; background: var(--itrix-card-bg); border-radius: var(--itrix-radius-lg); }
+.login-box-msg { font-size: 1.0625rem; margin-bottom: 1.25rem; padding: 0; }
+.login-box .input-group .form-control { min-height: 3rem; border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; border-right: 0 !important; }
+.login-box .input-group-text { background: var(--itrix-card-bg); border: 1px solid var(--bs-border-color); border-left: 0; border-radius: 0 var(--itrix-radius-sm) var(--itrix-radius-sm) 0; color: var(--itrix-steel); min-height: 3rem; }
+.login-box .btn-primary { width: 100%; min-height: 3rem; border-radius: var(--itrix-radius-md); font-size: 0.875rem; }
+.login-box .callout { margin-bottom: 1rem; }
+.login-box a { color: var(--bs-secondary-color); font-size: 0.8125rem; }
+.login-box a:hover { color: var(--bs-body-color); }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

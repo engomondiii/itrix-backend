@@ -288,3 +288,6 @@ itrix-backend-revert-ingestion*
 itrix-backend-fixes-aug12/
 .backend-round2-backup-*
 itrix-backend-round2/
+
+# Django collectstatic output (WhiteNoise manifest storage)
+staticfiles/

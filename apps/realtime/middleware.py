@@ -114,7 +114,7 @@ class WSAuthMiddleware:
             scope["team_user"] = team_user
             return
 
-        # 4) Try a capability token (public plane reach: client_page / portal).
+        # 4) Try a capability token. Individual consumers enforce the accepted token type.
         payload = self._try_capability_token(token)
         if payload is not None:
             scope["plane"] = "public"

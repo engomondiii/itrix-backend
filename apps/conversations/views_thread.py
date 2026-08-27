@@ -412,6 +412,39 @@ class ThreadTurnsView(APIView):
         )
 
 
+class ThreadRetryView(APIView):
+    """POST threads/{id}/retry/ — retry the latest unanswered visitor turn safely."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = [ClientJWTAuthentication]
+
+    def post(self, request, thread_id):
+        thread = _resolve_thread(request, thread_id)
+        if thread is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        visitor = (
+            Message.objects.filter(thread=thread, sender_kind__in=["visitor", "client"])
+            .order_by("-seq", "-created_at")
+            .first()
+        )
+        if visitor is None:
+            return Response({"detail": "There is no turn to retry."}, status=status.HTTP_409_CONFLICT)
+        existing = (
+            Message.objects.filter(thread=thread, sender_kind="agent", seq__gt=visitor.seq)
+            .order_by("seq", "created_at")
+            .first()
+        )
+        if existing is not None:
+            return Response({"assistantTurn": ThreadTurnSerializer(existing).data, "reused": True}, status=status.HTTP_200_OK)
+        assistant = _generate_assistant_turn(thread, visitor.body)
+        if assistant is None:
+            # Either the original request is still producing the turn or the provider is
+            # temporarily unavailable. The client refreshes the transcript; it must not
+            # submit the visitor message again.
+            return Response({"pending": True}, status=status.HTTP_202_ACCEPTED)
+        return Response({"assistantTurn": assistant, "reused": False}, status=status.HTTP_200_OK)
+
+
 class ThreadShellView(APIView):
     """GET threads/{id}/shell/ — just the shell contract, for a cheap re-render."""
 
@@ -524,6 +557,39 @@ class ThreadPaneView(APIView):
 
 
 def _generate_assistant_turn(thread, body: str):
+    """Idempotent transport-independent generation for the latest visitor turn.
+
+    HTTP and retry paths share this lock. A retry while the original generation is
+    still running therefore cannot create a second assistant/business action.
+    """
+    from django.core.cache import cache
+
+    latest = (
+        Message.objects.filter(thread=thread, sender_kind__in=["visitor", "client"])
+        .order_by("-seq", "-created_at")
+        .only("seq")
+        .first()
+    )
+    seq = getattr(latest, "seq", 0) or 0
+    key = f"itrix:turn-generation:{thread.id}:{seq}"
+    if not cache.add(key, "1", timeout=180):
+        return None
+    try:
+        # Recheck after taking the lock: another request may have completed between
+        # the caller's read and this acquisition.
+        existing = (
+            Message.objects.filter(thread=thread, sender_kind="agent", seq__gt=seq)
+            .order_by("seq", "created_at")
+            .first()
+        )
+        if existing is not None:
+            return ThreadTurnSerializer(existing).data
+        return _generate_assistant_turn_impl(thread, body)
+    finally:
+        cache.delete(key)
+
+
+def _generate_assistant_turn_impl(thread, body: str):
     """
     Produce the assistant reply for a turn, governed.
 
@@ -537,6 +603,27 @@ def _generate_assistant_turn(thread, body: str):
 
     lead = getattr(thread, "lead", None)
     session = getattr(lead, "review_session", None) if lead else None
+
+    # v2.2 hard stops run before retrieval/model invocation. The correct response to
+    # confidential input or protected-function probing is deliberately smaller than a
+    # normal answer, and it must not contain the sensitive values from the visitor turn.
+    from apps.conversations.services import confidentiality, protected_probe
+    if getattr(thread, "_confidential_intercept", None):
+        text = confidentiality.safe_reply(locale=getattr(thread, "locale", "en"))
+        message = ingest.ingest_agent_message(
+            thread.conversation, agent_key="concierge", body=text, governance_status="auto_approved",
+            claim_level=0, thread=thread, streaming_status=StreamingStatus.SETTLED,
+            meta={"policy_stop": "confidential_input"},
+        )
+        return ThreadTurnSerializer(message).data
+    if getattr(thread, "_protected_probe", False):
+        text = protected_probe.safe_reply(locale=getattr(thread, "locale", "en"))
+        message = ingest.ingest_agent_message(
+            thread.conversation, agent_key="concierge", body=text, governance_status="auto_approved",
+            claim_level=0, thread=thread, streaming_status=StreamingStatus.SETTLED,
+            meta={"policy_stop": "protected_probe"},
+        )
+        return ThreadTurnSerializer(message).data
 
     ctx = AgentContext(
         lead_id=str(lead.id) if lead else None,
@@ -602,19 +689,23 @@ def _generate_assistant_turn(thread, body: str):
 
     status = StreamingStatus.SETTLED
 
-    # Internal names never reach a visitor: the prompt teaches the public term, and
-    # this is the deterministic guarantee (same shape as the two appends below).
-    from apps.conversations.services import terminology
+    # Internal names never reach a visitor; then the deterministic state/source/contract
+    # policy applies regardless of whether the answer came from AI or fallback.
+    from apps.conversations.services import response_policy, terminology
 
     text = terminology.normalise_outbound(text)
+    text = response_policy.enforce(text, thread=thread)
 
-    # If a client page was just revealed for this turn, append the link so the visitor
-    # can reach it regardless of whether the live socket delivered the reveal event.
-    # (The agent was also told to present it in its own words; the link is the
-    # transport-independent guarantee.)
+    # v2.2 stated-mode-change requirement. A qualifying request does not silently flip
+    # modes: the interface says exactly what changes and asks for explicit consent.
+    mode_offer = getattr(thread, "_mode_change_offer", "") or ""
+    if mode_offer and status == StreamingStatus.SETTLED and mode_offer not in text:
+        text = f"{text.rstrip()}\n\n{mode_offer}" if text.strip() else mode_offer
+
+    # My Review access is never placed in conversational text. A ready review is
+    # surfaced through the one-time browser-bound reveal event and explicit UI action;
+    # the URL itself remains credential-free (`/c`).
     reveal = getattr(thread, "_client_page_reveal", None)
-    if reveal and reveal.get("url") and status == StreamingStatus.SETTLED:
-        text = _append_client_page_link(text, reveal["url"])
 
     # And if the page is waiting on an email address, make sure the reply actually
     # asks for one. The agent was told to ask in its own words; this is the
@@ -662,36 +753,28 @@ def _generate_assistant_turn(thread, body: str):
     return ThreadTurnSerializer(message).data
 
 
-# ── WHAT HAPPENS AFTER THE PAGE ─────────────────────────────────────────────
-# The reveal used to end at the link, so a visitor reached their page and had no idea
-# what it was for or what came next — reported as "what happens next after receiving
-# personalised page". Three short steps, and honest about the fact that the page is a
-# starting point rather than a verdict.
-#
-# Deterministic copy rather than model-generated: this is a description of the itriX
-# engagement path, and a paraphrase that drifted would be a commitment nobody made.
+# ── READY REVIEW HANDOFF ────────────────────────────────────────────────────
+# My Review access is deliberately not carried in assistant prose.  The browser receives
+# a separate realtime readiness/reveal signal, exchanges a short-lived browser-bound code
+# through the Next.js BFF, and opens tokenless /c with an httpOnly session cookie.  This
+# fallback copy therefore contains no URL or credential and is safe even if an older caller
+# still invokes it.
 WHAT_HAPPENS_NEXT = (
-    "What happens from here: the page reflects the pressure areas you described and "
-    "sets out the assessment path that fits them. It is a starting point, not a "
-    "verdict — nothing on it is a measured result yet. When you are ready, you can "
-    "keep asking questions here, share more about the workload, or ask to speak to "
-    "the specialist who reviewed it. Anything workload-specific stays "
-    "non-confidential until an NDA is in place."
+    "Your My Review reflects the current conversation state and is a decision-support "
+    "artifact, not a measured result or contractual commitment. You can review it and "
+    "continue the conversation if anything needs to be corrected or clarified."
 )
 
 
-def _append_client_page_link(text: str, url: str) -> str:
-    """
-    Append the client-page link to a governed reply.
+def _append_client_page_link(text: str, url: str = "") -> str:
+    """Legacy-safe handoff helper: never append a credential-bearing URL.
 
-    A bare internal URL carries no claim, so it does not need to pass the claims
-    discipline again. One short, plain line so it reads as a hand-off.
+    Retained only for transport compatibility while older consumer call sites are removed.
+    The secure UI owns review access; assistant text may announce readiness but must never
+    carry the one-time exchange code or a durable bearer token.
     """
-    text = (text or "").rstrip()
-    if url and url not in text:
-        return text + (
-            "\n\nYour personalised itriX page is ready — open it here:"
-            f"\n\n<{url}>"
-            f"\n\n{WHAT_HAPPENS_NEXT}"
-        )
-    return text
+    body = (text or "").rstrip()
+    notice = "Your My Review is ready. Use **View My Review** to open it securely."
+    if notice in body:
+        return body
+    return f"{body}\n\n{notice}\n\n{WHAT_HAPPENS_NEXT}" if body else f"{notice}\n\n{WHAT_HAPPENS_NEXT}"

@@ -6,7 +6,7 @@ Request shapes match exactly what the web proxies send
 
     create:  { client_id, visitor_type }              -> { id, ... }
     prompt:  { prompt, pressure_areas, environment }  -> { sessionId, immediateResponse }
-    qualify: { answers }                              -> authoritative score/tier/route + lead_id
+    qualify: { answers }                              -> customer-safe generation acknowledgement
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from apps.review.models import ReviewSession
 class ReviewSessionCreateSerializer(serializers.Serializer):
     client_id = serializers.CharField(required=False, allow_blank=True, default="")
     visitor_type = serializers.CharField(required=False, allow_blank=True, default="unknown")
+    locale = serializers.ChoiceField(choices=("en", "ko"), required=False, default="en")
     visitor_session_id = serializers.UUIDField(required=False, allow_null=True)
 
 
@@ -28,7 +29,7 @@ class ReviewSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReviewSession
-        fields = ["id", "session_id", "status", "client_id", "visitor_type", "created_at"]
+        fields = ["id", "session_id", "status", "locale", "created_at"]
         read_only_fields = fields
 
 

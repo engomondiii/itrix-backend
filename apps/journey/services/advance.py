@@ -108,7 +108,7 @@ def advance(
                     to_state=current,
                     event=event,
                     changed=False,
-                    reveal=reveal_for_state(lead, current),
+                    reveal=reveal_for_state(lead, current, thread=thread),
                     transition=None,
                     journey_number=journey_number(current),
                 )
@@ -140,8 +140,8 @@ def advance(
     lead.save(update_fields=update_fields)
 
     # A reveal may be fired by the RESULTING STATE or by the EVENT itself (reveal 4).
-    reveal = reveal_for_event(lead, event, target) or (
-        reveal_for_state(lead, target) if state_moved else None
+    reveal = reveal_for_event(lead, event, target, thread=thread) or (
+        reveal_for_state(lead, target, thread=thread) if state_moved else None
     )
     reveal_surface = EVENT_REVEAL.get(event) or (STATE_REVEAL.get(target, "") if state_moved else "")
 
@@ -285,9 +285,9 @@ def mark_diagnosed(lead, *, meta: dict | None = None) -> AdvanceResult:
     return advance(lead, JourneyEvent.QUALIFY.value, meta=meta)
 
 
-def reveal_client_page(lead, *, meta: dict | None = None) -> AdvanceResult:
-    """DIAGNOSED → CLIENT_PAGE (reveal 1)."""
-    return advance(lead, JourneyEvent.REVEAL_CLIENT_PAGE.value, meta=meta)
+def reveal_client_page(lead, *, meta: dict | None = None, thread=None) -> AdvanceResult:
+    """DIAGNOSED → CLIENT_PAGE (reveal 1), bound to the active conversation thread."""
+    return advance(lead, JourneyEvent.REVEAL_CLIENT_PAGE.value, meta=meta, thread=thread)
 
 
 def accept_invite(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:

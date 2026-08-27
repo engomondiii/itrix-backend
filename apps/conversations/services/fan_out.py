@@ -134,6 +134,9 @@ def broadcast_reveal(group_name: str, reveal: dict) -> None:
             "type": "journey.reveal",
             "state": reveal.get("state"),
             "surface": reveal.get("surface"),
+            # My Review uses a semantically distinct browser-bound one-time exchange
+            # code. Other reveal surfaces keep their legitimate capability-token contract.
+            "access_code": reveal.get("access_code"),
             "capability_token": reveal.get("capability_token"),
             "value_delivered": reveal.get("value_delivered", True),
             "account_invite_available": reveal.get("account_invite_available", False),
@@ -212,33 +215,56 @@ def govern_and_broadcast(message) -> str:
 # v6.0 events
 # ─────────────────────────────────────────────────────────────────────────────
 def broadcast_shell_update(group_name: str, contract: dict) -> None:
-    """
-    Push ``shell.update`` — the event that REPLACES ``rail.update``.
-
-    Carries the sidebar sections, the conversation header and the composer label so an
-    open conversation re-renders its shell WITHOUT a navigation. ``rail.update`` is
-    removed; a client still listening for it simply never hears one.
-    """
+    """Push the current authorized shell contract without retired aliases."""
     if not contract:
         return
+
+    def pick(snake: str, camel: str, default=None):
+        if snake in contract:
+            return contract.get(snake)
+        return contract.get(camel, default)
+
     _group_send(
         group_name,
         {
-            # Channels handler name (dots -> underscores): shell_update
             "type": "shell.update",
             "payload": {
-                "journeyState": contract.get("journey_state"),
-                "stateKey": contract.get("state_key"),
-                "sidebarSections": contract.get("sidebar_sections", []),
-                "conversationHeader": _camel_header(contract.get("conversation_header") or {}),
-                "composerLabel": contract.get("composer_label"),
-                "questionLoopOpen": bool(contract.get("question_loop_open")),
-                "attachmentsEnabled": bool(contract.get("attachments_enabled")),
-                "identityState": contract.get("identity_state"),
-                # disclosure_ceiling is safe to send: it tells the client what tier it
-                # may DISPLAY, not what it may fetch. Every fetch is re-authorized
-                # server-side regardless.
-                "disclosureCeiling": contract.get("disclosure_ceiling"),
+                "threadId": pick("thread_id", "threadId"),
+                "journeyState": pick("journey_state", "journeyState"),
+                "stateKey": pick("state_key", "stateKey"),
+                "shellMode": pick("shell_mode", "shellMode"),
+                "conversationRailSections": pick(
+                    "conversation_rail_sections", "conversationRailSections", []
+                ) or [],
+                "contentPaneSections": pick(
+                    "content_pane_sections", "contentPaneSections", []
+                ) or [],
+                "contentPaneDefaultArtifactId": pick(
+                    "content_pane_default_artifact_id", "contentPaneDefaultArtifactId"
+                ),
+                "conversationHeader": _camel_header(
+                    pick("conversation_header", "conversationHeader", {}) or {}
+                ),
+                "composerLabel": pick("composer_label", "composerLabel"),
+                "questionLoopOpen": bool(pick("question_loop_open", "questionLoopOpen", False)),
+                "attachmentsEnabled": bool(pick("attachments_enabled", "attachmentsEnabled", False)),
+                "identityState": pick("identity_state", "identityState"),
+                "disclosureCeiling": pick("disclosure_ceiling", "disclosureCeiling"),
+                "relationshipState": pick("relationship_state", "relationshipState", "visitor"),
+                "engagementStage": pick("engagement_stage", "engagementStage", "exploration"),
+                "selectedStageLabel": pick("selected_stage_label", "selectedStageLabel", ""),
+                "selectedAction": pick("selected_action", "selectedAction", ""),
+                "modeChangeStatus": pick("mode_change_status", "modeChangeStatus", "none"),
+                "modeChangeTarget": pick("mode_change_target", "modeChangeTarget", ""),
+                "mirrorStatus": pick("mirror_status", "mirrorStatus", "not_required"),
+                "identityNeededAction": pick("identity_needed_action", "identityNeededAction", ""),
+                "ctaDeclined": bool(pick("cta_declined", "ctaDeclined", False)),
+                "evaluationType": pick("evaluation_type", "evaluationType", ""),
+                "contractStage": pick("contract_stage", "contractStage", "no_discussion"),
+                "locale": pick("locale", "locale", "en"),
+                "recommendationAllowed": bool(
+                    pick("recommendation_allowed", "recommendationAllowed", False)
+                ),
             },
         },
     )

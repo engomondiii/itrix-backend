@@ -4,7 +4,6 @@ Realtime consumers.
     ReviewDispatchConsumer  ws/review/{segment}/     resolves thread-vs-session
     ThreadConsumer          (via dispatch)           v6.0 anonymous thread plane
     ReviewConsumer          (via dispatch)           v4.0 review session plane
-    ClientPageConsumer      ws/client-page/{token}/  client page live generation
     PortalConsumer          ws/portal/               client plane
     TeamConsoleConsumer     ws/console/              team plane
 
@@ -18,7 +17,6 @@ __all__ = [
     "ReviewDispatchConsumer",
     "ThreadConsumer",
     "ReviewConsumer",
-    "ClientPageConsumer",
     "PortalConsumer",
     "TeamConsoleConsumer",
 ]

@@ -1,19 +1,10 @@
-"""
-The conversation-surface memory + state-advancement fix.
+"""Conversation memory plus explicit relationship/journey-state orchestration.
 
-These tests prove the four behaviours that were broken:
-
-  1. MEMORY   — a reply's context includes prior turns (build_turn_extra), so the
-                model can see what has already been said.
-  2. STATE    — an anonymous (lead-less) thread advances ARRIVED -> IN_REVIEW on the
-                first turn, which the old on_first_turn-only hook never did.
-  3. LOOP END — once the qualification band is covered, the loop CLOSES
-                (IN_REVIEW -> DIAGNOSED) instead of re-asking forever.
-  4. NEXT     — while the loop is open, a follow-up question is suggested; once it
-                closes, no more are suggested.
-
-They exercise the deterministic layer only (no AI calls), which is exactly the
-layer that decides WHETHER to advance/stop — the model only ever decides wording.
+The numbered qualification ladder is no longer opened by an arbitrary anonymous turn.
+Visitors and Technical Evaluators may remain at ARRIVED indefinitely.  A concrete workload
+evaluation request first creates an explicit mode-change offer; only consent enters the
+Customer/Strategic Customer qualification band.  Once in that band, the existing deterministic
+coverage/stop-rule/question machinery still owns IN_REVIEW -> DIAGNOSED.
 """
 
 from __future__ import annotations
@@ -50,6 +41,15 @@ def _persist_visitor(thread, body: str):
     return ingest.ingest_inbound(
         thread.conversation, sender_kind=SenderKind.VISITOR, body=body, thread=thread
     )
+
+
+def _prime_customer(thread):
+    """Enter the already-consented Customer lane for qualification-loop unit tests."""
+    thread.relationship_state = "customer"
+    thread.mode_change_status = "consented"
+    thread.mirror_status = "pending"
+    thread.save(update_fields=["relationship_state", "mode_change_status", "mirror_status"])
+    thread.refresh_from_db()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,14 +100,30 @@ def test_anonymous_thread_starts_at_arrived():
     assert thread_state.current_state_number(thread) == 1
 
 
-def test_first_turn_advances_anonymous_thread_to_in_review():
+def test_an_ordinary_anonymous_turn_stays_at_arrived():
     thread = thread_svc.create_thread(visitor_session="state-2")
     _persist_visitor(thread, "Hello, we have a compute question.")
 
-    # ingest's post-turn hook runs advance_on_turn; the anonymous thread moves 1 -> 2.
     thread.refresh_from_db()
+    assert thread_state.current_state_key(thread) == "ARRIVED"
+    assert thread.relationship_state == "visitor"
+
+
+def test_concrete_evaluation_request_offers_mode_change_before_customer_state():
+    thread = thread_svc.create_thread(visitor_session="state-2b")
+    _persist_visitor(thread, "Our inference workload is expensive. Please evaluate the bottleneck.")
+
+    thread.refresh_from_db()
+    assert thread_state.current_state_key(thread) == "ARRIVED"
+    assert thread.relationship_state == "visitor"
+    assert thread.mode_change_status == "offered"
+    assert thread.mode_change_target == "customer"
+
+    _persist_visitor(thread, "Yes, proceed.")
+    thread.refresh_from_db()
+    assert thread.relationship_state == "customer"
+    assert thread.mode_change_status == "consented"
     assert thread_state.current_state_key(thread) == "IN_REVIEW"
-    assert thread_state.current_state_number(thread) == 2
 
 
 def test_state_only_moves_forward():
@@ -121,14 +137,56 @@ def test_state_only_moves_forward():
     assert thread_state.current_state_key(thread) == "IN_REVIEW"
 
 
+def test_str03_confirm_allows_recommendation_only_after_confirmation():
+    from apps.conversations.services import engagement_state
+
+    thread = thread_svc.create_thread(visitor_session="mirror-confirm")
+    _prime_customer(thread)
+    assert engagement_state.recommendation_allowed(thread) is False
+
+    _persist_visitor(thread, "This reflects my situation")
+    thread.refresh_from_db()
+
+    assert thread.mirror_status == engagement_state.MIRROR_CONFIRMED
+    assert engagement_state.recommendation_allowed(thread) is True
+    assert any(e.get("event") == "problem_mirror_confirmed" for e in thread.consent_history)
+
+
+def test_str03_refine_keeps_recommendation_gate_closed():
+    from apps.conversations.services import engagement_state
+
+    thread = thread_svc.create_thread(visitor_session="mirror-refine")
+    _prime_customer(thread)
+    _persist_visitor(thread, "Refine this")
+    thread.refresh_from_db()
+
+    assert thread.mirror_status == engagement_state.MIRROR_REFINE
+    assert engagement_state.recommendation_allowed(thread) is False
+    assert any(e.get("event") == "problem_mirror_refine_requested" for e in thread.consent_history)
+
+
+def test_str03_start_again_keeps_recommendation_gate_closed():
+    from apps.conversations.services import engagement_state
+
+    thread = thread_svc.create_thread(visitor_session="mirror-restart")
+    _prime_customer(thread)
+    _persist_visitor(thread, "Start again")
+    thread.refresh_from_db()
+
+    assert thread.mirror_status == engagement_state.MIRROR_RESTART
+    assert engagement_state.recommendation_allowed(thread) is False
+    assert any(e.get("event") == "problem_mirror_restart_requested" for e in thread.consent_history)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. LOOP END — the qualification loop closes when the band is covered
 # ─────────────────────────────────────────────────────────────────────────────
 def test_loop_closes_when_band_is_covered(settings):
     settings.ENABLE_ADAPTIVE_QUESTIONS = True
     thread = thread_svc.create_thread(visitor_session="loop-1")
+    _prime_customer(thread)
 
-    # One turn that covers all three required dimensions at once.
+    # One turn that covers all required dimensions at once.
     _persist_visitor(thread, COVERING_TEXT)
     qualification.advance_on_turn(thread, COVERING_TEXT)
 
@@ -140,6 +198,7 @@ def test_loop_closes_when_band_is_covered(settings):
 def test_loop_stays_open_when_band_not_covered(settings):
     settings.ENABLE_ADAPTIVE_QUESTIONS = True
     thread = thread_svc.create_thread(visitor_session="loop-2")
+    _prime_customer(thread)
 
     # A vague turn that covers nothing required.
     _persist_visitor(thread, "Hi there, just looking around.")
@@ -153,6 +212,7 @@ def test_loop_stays_open_when_band_not_covered(settings):
 def test_visitor_asking_for_a_human_closes_the_loop(settings):
     settings.ENABLE_ADAPTIVE_QUESTIONS = True
     thread = thread_svc.create_thread(visitor_session="loop-3")
+    _prime_customer(thread)
 
     text = "Can I just speak to a real person about this?"
     _persist_visitor(thread, text)
@@ -169,6 +229,7 @@ def test_visitor_asking_for_a_human_closes_the_loop(settings):
 def test_next_prompt_suggested_while_loop_open(settings):
     settings.ENABLE_ADAPTIVE_QUESTIONS = True
     thread = thread_svc.create_thread(visitor_session="next-1")
+    _prime_customer(thread)
 
     _persist_visitor(thread, "We do a lot of training.")
     qualification.advance_on_turn(thread, "We do a lot of training.")
@@ -183,6 +244,7 @@ def test_next_prompt_suggested_while_loop_open(settings):
 def test_no_suggestion_after_loop_closes(settings):
     settings.ENABLE_ADAPTIVE_QUESTIONS = True
     thread = thread_svc.create_thread(visitor_session="next-2")
+    _prime_customer(thread)
 
     _persist_visitor(thread, COVERING_TEXT)
     qualification.advance_on_turn(thread, COVERING_TEXT)
@@ -208,7 +270,8 @@ def test_anonymous_shell_reports_real_state_and_loop(settings):
     assert contract["journey_state"] == 1
     assert contract["question_loop_open"] is True
 
-    # After a covering turn the loop closes and the contract reflects it.
+    # After explicit Customer entry and a covering turn the loop closes.
+    _prime_customer(thread)
     _persist_visitor(thread, COVERING_TEXT)
     qualification.advance_on_turn(thread, COVERING_TEXT)
     thread.refresh_from_db()

@@ -20,6 +20,7 @@ from tests.factories.review_factory import (
 pytestmark = pytest.mark.django_db
 
 SESSIONS_URL = "/api/v1/review/sessions/"
+BROWSER = "qualification-test-browser"
 
 
 # ── Pure-function tests (must mirror the frontend exactly) ───────────────────
@@ -80,29 +81,23 @@ def test_license_router_product_only_is_none():
 
 # ── Endpoint test: qualify returns authoritative result + placeholder lead ───
 def _start_session(api_client):
+    api_client.credentials(HTTP_X_ITRIX_SESSION=BROWSER)
     resp = api_client.post(SESSIONS_URL, {"client_id": "q-1"}, format="json")
     return resp.json()["id"]
 
 
-def test_qualify_endpoint_returns_full_result(api_client):
+def test_qualify_endpoint_returns_customer_safe_readiness_only(api_client):
     sid = _start_session(api_client)
     url = f"{SESSIONS_URL}{sid}/qualify/"
     resp = api_client.post(url, {"answers": HIGH_SCORE_ANSWERS}, format="json")
     assert resp.status_code == 200
     body = resp.json()
-
-    assert body["lead_id"]  # real lead id present (Phase 2)
-    assert body["lead_is_placeholder"] is False
-    assert body["tier"] == 1
-    assert body["product_route"] in {"alpha_compute", "alpha_core", "both", "general"}
-    assert body["score"]["total"] >= 80
-    assert set(body["score"]["breakdown"].keys()) == {
-        "strategic_fit",
-        "technical_fit",
-        "urgency",
-        "budget_authority",
-        "license_potential",
-    }
+    assert set(body) == {"accepted", "generationStatus", "reviewReady"}
+    assert body["accepted"] is True
+    assert body["generationStatus"] == "pending"
+    assert body["reviewReady"] is False
+    for forbidden in ("lead_id", "leadId", "tier", "score", "product_route", "productRoute", "license_pathway"):
+        assert forbidden not in body
 
 
 def test_qualify_marks_session_qualified(api_client):

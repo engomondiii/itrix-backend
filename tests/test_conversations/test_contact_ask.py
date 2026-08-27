@@ -46,6 +46,25 @@ def _say(thread, body: str):
     return message
 
 
+def _prime_actionable_customer(thread, *, diagnosed: bool):
+    """Set the explicit post-consent Customer state this unit is responsible for."""
+    thread.relationship_state = "customer"
+    thread.mirror_status = "confirmed"
+    thread.identity_needed_action = "formal_evaluation"
+    thread.selected_action = "start_controlled_evaluation"
+    thread.save(
+        update_fields=[
+            "relationship_state",
+            "mirror_status",
+            "identity_needed_action",
+            "selected_action",
+        ]
+    )
+    if diagnosed:
+        thread_state._mirror_onto_thread(thread, "DIAGNOSED")
+    thread.refresh_from_db()
+
+
 # ── the gates ────────────────────────────────────────────────────────────────
 
 
@@ -54,6 +73,7 @@ def test_no_ask_before_the_loop_closes():
     """Value first: nothing is asked for until the diagnosis has been delivered."""
     thread = _thread()
     _say(thread, "Our costs are rising.")
+    _prime_actionable_customer(thread, diagnosed=False)
 
     decision = contact_ask.evaluate(thread, "Our costs are rising.")
 
@@ -67,6 +87,7 @@ def test_the_ask_fires_once_the_loop_closes():
     """This is the failing case: DIAGNOSED, no address, and previously no ask."""
     thread = _thread()
     _say(thread, COVERING_TEXT)
+    _prime_actionable_customer(thread, diagnosed=True)
 
     assert thread_state.current_state_key(thread) == "DIAGNOSED"
 
@@ -89,6 +110,7 @@ def test_no_ask_when_the_current_turn_carries_the_address():
     """
     thread = _thread()
     _say(thread, COVERING_TEXT)
+    _prime_actionable_customer(thread, diagnosed=True)
 
     decision = contact_ask.evaluate(thread, "Sure — it is dana@example.com")
 
@@ -102,6 +124,7 @@ def test_the_ask_is_budgeted_and_then_stops():
     """A third ask would be pressure. Two, and then we let it go."""
     thread = _thread()
     _say(thread, COVERING_TEXT)
+    _prime_actionable_customer(thread, diagnosed=True)
 
     for expected in range(contact_ask.DEFAULT_CONTACT_ASK_BUDGET):
         decision = contact_ask.evaluate(thread, "")
@@ -119,13 +142,14 @@ def test_the_second_ask_offers_a_way_out():
     """Declining has to be a real option, or the ask is a demand."""
     thread = _thread()
     _say(thread, COVERING_TEXT)
+    _prime_actionable_customer(thread, diagnosed=True)
 
     first = contact_ask.evaluate(thread, "")
     contact_ask.record_asked(thread, first)
     second = contact_ask.evaluate(thread, "")
 
     assert second["text"] != first["text"]
-    assert "rather not" in second["text"].lower()
+    assert "if not" in second["text"].lower()
 
 
 @pytest.mark.django_db
@@ -189,6 +213,7 @@ def test_the_turn_path_stashes_the_decision_for_the_agent():
     from apps.conversations.services import conversation_context
 
     thread = _thread()
+    _prime_actionable_customer(thread, diagnosed=False)
     _say(thread, COVERING_TEXT)
 
     qualification.advance_on_turn(thread, COVERING_TEXT)
@@ -204,6 +229,7 @@ def test_the_agent_prompt_carries_the_instruction_to_ask():
     from apps.agents.services.context import PLANE_PUBLIC, AgentContext
 
     thread = _thread()
+    _prime_actionable_customer(thread, diagnosed=False)
     _say(thread, COVERING_TEXT)
     qualification.advance_on_turn(thread, COVERING_TEXT)
 
@@ -218,7 +244,7 @@ def test_the_agent_prompt_carries_the_instruction_to_ask():
     )
     prompt = ConciergeAgent()._conversation_user_prompt(ctx, COVERING_TEXT, "INSTRUCTION")
 
-    assert "work email address" in prompt
+    assert "work email" in prompt
     assert "be in touch" in prompt
 
 
@@ -229,10 +255,12 @@ def test_a_revealed_page_is_handed_over_instead_of_asked_about():
     from apps.agents.services.concierge import ConciergeAgent
 
     directive = ConciergeAgent()._reveal_directive(
-        {"client_page_reveal": {"revealed": True, "url": "https://example.test/c/tok"}}
+        {"client_page_reveal": {"revealed": True, "access_code": "opaque-code"}}
     )
 
-    assert "READY NOW" in directive
+    assert "MY REVIEW IS COMPLETE AND READY" in directive
+    assert "View My Review" in directive
+    assert "opaque-code" not in directive
 
 
 # ── end to end ───────────────────────────────────────────────────────────────
@@ -240,69 +268,66 @@ def test_a_revealed_page_is_handed_over_instead_of_asked_about():
 
 @pytest.mark.django_db
 @override_settings(ENABLE_ADAPTIVE_QUESTIONS=True, FRONTEND_WEB_URL="https://web.test")
-def test_the_conversation_can_now_reach_the_personalised_page():
-    """
-    The whole point. Before this stage existed the thread stopped at DIAGNOSED with
-    ``no_email_yet`` forever, because nothing asked. Now: loop closes, we ask, the
-    visitor answers, the page is revealed.
-    """
+def test_the_conversation_can_start_a_review_without_exposing_access(monkeypatch):
+    """A confirmed Customer can start My Review; generation stays pending and credential-free."""
     thread = _thread()
+    _prime_actionable_customer(thread, diagnosed=False)
+    monkeypatch.setattr(
+        "apps.review.services.qualification_processor.kick_off_result_page",
+        lambda lead, finalize_conversation=False: None,
+    )
 
     _say(thread, COVERING_TEXT)
     assert thread_state.current_state_key(thread) == "DIAGNOSED"
     assert reveal_bridge.maybe_reveal_client_page(thread, "")["reason"] == "no_email_yet"
-
-    # The reply for that turn now carries an ask.
     assert contact_ask.evaluate(thread, "")["ask"] is True
 
-    # The visitor answers it. The reveal fires inside that same turn, so the page
-    # exists by the time the reply for it is generated.
     _say(thread, "dana@example.com")
+    thread.refresh_from_db()
 
     assert thread.lead is not None
     assert thread.lead.email == "dana@example.com"
-    assert thread_state.current_state_key(thread) == "CLIENT_PAGE"
-    assert reveal_bridge._client_page_url("tok").startswith("https://web.test/c/")
+    assert thread_state.current_state_key(thread) == "DIAGNOSED"
+    assert getattr(thread, "_client_page_reveal", None) is None
 
 
 @pytest.mark.django_db
 @override_settings(ENABLE_ADAPTIVE_QUESTIONS=True)
-def test_the_ask_does_not_survive_the_turn_that_reveals_the_page():
-    """
-    The WebSocket consumer reuses ONE Thread instance for the whole socket, so a
-    decision left over from an earlier turn would still be there on the turn that
-    reveals the page — and the reply would hand over the personalised page and then
-    ask for the address it had just used.
-    """
+def test_the_ask_does_not_survive_the_turn_that_starts_review(monkeypatch):
+    """The email turn clears the prior ask and starts a durable pending review only once."""
     from apps.conversations.services import conversation_context
 
     thread = _thread()
-    # ``_say`` ingests, and ingest is the single production call site of
-    # ``advance_on_turn`` — one call per visitor turn is the contract, and the
-    # stash-reset semantics (always assigned, per turn) depend on it. A second
-    # manual call here would model a transport that does not exist and would
-    # (correctly) read as a new turn, clearing the reveal it just made.
+    _prime_actionable_customer(thread, diagnosed=False)
+    monkeypatch.setattr(
+        "apps.review.services.qualification_processor.kick_off_result_page",
+        lambda lead, finalize_conversation=False: None,
+    )
     _say(thread, COVERING_TEXT)
-    assert getattr(thread, "_contact_ask", None) is not None  # asked on this turn
+    assert getattr(thread, "_contact_ask", None) is not None
 
-    # Same instance, next turn — and this one carries the address.
     _say(thread, "dana@example.com")
     extra = conversation_context.build_turn_extra(thread, "dana@example.com")
 
     assert getattr(thread, "_contact_ask", None) is None
     assert "contact_ask" not in extra
-    assert extra.get("client_page_reveal", {}).get("revealed") is True
+    assert thread.lead_id is not None
+    assert "client_page_reveal" not in extra
 
 
 @pytest.mark.django_db
 @override_settings(ENABLE_ADAPTIVE_QUESTIONS=True)
-def test_no_ask_once_the_thread_has_a_lead():
-    """A revealed thread already gave us the address; never ask again."""
+def test_no_ask_once_the_thread_has_a_lead(monkeypatch):
+    """A review already started for this thread; never ask for identity again."""
     thread = _thread()
-    _say(thread, COVERING_TEXT)
-    _say(thread, "dana@example.com")
+    _prime_actionable_customer(thread, diagnosed=True)
+    monkeypatch.setattr(
+        "apps.review.services.qualification_processor.kick_off_result_page",
+        lambda lead, finalize_conversation=False: None,
+    )
     reveal_bridge.maybe_reveal_client_page(thread, "dana@example.com")
     thread.refresh_from_db()
+    assert thread.lead_id is not None
 
     decision = contact_ask.evaluate(thread, "")
 

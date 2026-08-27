@@ -51,7 +51,8 @@ def test_missing_lead_skips_without_retry():
     payload = result.result
 
     assert payload["ok"] is False
-    assert "No lead" in payload["error"]
+    # Task results are operational signals, not an exception-text transport.
+    assert payload["error"] == "not_found"
 
 
 def test_generator_failure_is_bounded_and_swallowed(monkeypatch):
@@ -75,6 +76,7 @@ def test_generator_failure_is_bounded_and_swallowed(monkeypatch):
     payload = result.result
 
     assert payload["ok"] is False
-    assert "synthetic build failure" in payload["error"]
+    assert payload["error"] == "generation_failed"
+    assert payload["status"] == "failed"
     # max_retries=2 → at most 3 attempts, and it must have retried at least once.
     assert 2 <= calls["n"] <= 3

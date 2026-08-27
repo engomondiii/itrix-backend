@@ -405,6 +405,15 @@ def for_subject(subject, *, thread=None, identity_state: str | None = None) -> d
     pane_sections = content_pane_sections_for(state, resolved_identity)
     rail_sections = conversation_rail_sections_for(state, resolved_identity)
 
+    engagement = {}
+    if thread is not None:
+        try:
+            from apps.conversations.services.engagement_state import public_state
+
+            engagement = public_state(thread)
+        except Exception:  # noqa: BLE001
+            engagement = {}
+
     contract: dict[str, Any] = {
         "thread_id": str(getattr(thread, "id", "") or "") or None,
         # v7.1: derived here and nowhere else (§2.6). A client that decided its own mode
@@ -426,8 +435,14 @@ def for_subject(subject, *, thread=None, identity_state: str | None = None) -> d
             thread, pane_sections
         ),
         "conversation_header": conversation_header_for(subject, state, resolved_identity),
-        # v7.1 PHASE 3 — ONE NBA FOR BOTH PLANES (§11.1). See next_best_action_for.
-        "next_best_action": next_best_action_for(subject),
+        # STR-05: no strategic route/action may surface before the Problem Mirror
+        # has been confirmed (or deliberately skipped where the journey permits it).
+        "next_best_action": next_best_action_for(subject)
+        if engagement.get("recommendationAllowed", False)
+        else None,
+        # Relationship/consent state is safe orchestration metadata for Surface 1.
+        # It contains no score, hidden persona, or sales qualification detail.
+        **engagement,
     }
     return contract
 
@@ -515,6 +530,13 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
     pane_sections = content_pane_sections_for(state_key, IDENTITY_ANONYMOUS)
     rail_sections = conversation_rail_sections_for(state_key, IDENTITY_ANONYMOUS)
 
+    try:
+        from apps.conversations.services.engagement_state import public_state
+
+        engagement = public_state(thread)
+    except Exception:  # noqa: BLE001
+        engagement = {}
+
     return {
         "thread_id": str(getattr(thread, "id", "") or "") or None,
         # A thread exists, so the mode depends on whether anything has been said in it.
@@ -546,6 +568,7 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
         # No Lead exists yet, so there is no subject to reason about — and nothing the
         # precedence rule could read. None is the honest answer rather than a placeholder.
         "next_best_action": None,
+        **engagement,
     }
 
 

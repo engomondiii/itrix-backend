@@ -4,9 +4,9 @@
 Walks the ``knowledge_docs/`` tree and registers a ``KnowledgeDocument`` for every
 ingestible file (``.docx`` / ``.pdf`` / ``.txt`` / ``.md``), inferring:
 
-* **disclosure_level** using the visitor-knowledge policy: product/research source folders
-  (public / controlled_public / nda_only) are PUBLIC by default; internal_only and
-  customer_contract remain non-public, and
+* **disclosure_level** from the source folder itself. Folder placement is an
+  authorization decision; registration never silently downgrades controlled/NDA material
+  into public, and
 * **namespace** from filename patterns (technology / proofs / alpha-compute / alpha-core /
   licensing / company / general).
 
@@ -40,18 +40,16 @@ SUPERSEDED_FILENAMES = {
     "WP_Alpha Compute Core.docx",
 }
 
-# Folder name -> effective disclosure level.
-# Product/research knowledge is visitor-readable by default.  Operational internals and
-# customer-specific contract material are still outside the public knowledge corpus.
+# Folder name -> exact disclosure level.  The folder is the decision: registration
+# must never reinterpret a more restrictive source folder as public.
 FOLDER_DISCLOSURE = {
     "public": "public",
-    "controlled_public": "public",
-    "nda_only": "public",
-    # ── v6.0 Phase 2: the sixth tier ─────────────────────────────────────────
-    # Scoped PER CUSTOMER and never cross-served. The folder decides the tier; the
-    # per-customer scope is applied separately by the disclosure filter.
+    "controlled_public": "controlled_public",
+    "authorized": "authorized",
+    "nda_only": "nda_only",
     "customer_contract": "customer_contract",
     "internal_only": "internal_only",
+    "prohibited": "prohibited",
 }
 
 # ── THE ATTACHMENT STORE IS NEVER A KNOWLEDGE SOURCE (§8.2) ──────────────────
@@ -126,6 +124,45 @@ def namespace_for(filename: str) -> str:
     return "general"
 
 
+
+def source_authority_for(filename: str) -> tuple[str, bool, str]:
+    """Conservative source-precedence metadata inferred only from explicit version/status cues."""
+    n = filename.lower()
+    if filename in SUPERSEDED_FILENAMES or any(x in n for x in ("legacy", "superseded", "archive")):
+        return "legacy", False, ""
+    if any(x in n for x in ("canonical", "register", "executed")):
+        return "authoritative", True, "Explicit canonical/register source"
+    if any(x in n for x in ("master technical architecture", "complete backend structure", "complete surface", "legal instruments", "content and flow playbook", "_overview_v2.0", "overview v2.0", "unified mathematical", "v2_4", "v2.4")):
+        return "governing", True, "Current approved governing source"
+    return "working", True, ""
+
+
+def technology_family_for(filename: str) -> str:
+    n = filename.lower()
+    if "axiom" in n and not any(x in n for x in ("alpha", "unified")):
+        return "axiom"
+    if ("cre" in n or "conjugation" in n) and not any(x in n for x in ("alpha", "unified")):
+        return "cre"
+    if "fqnm" in n or "quantised" in n or "quantized" in n:
+        return "fqnm"
+    if "alpha compute" in n or "alpha_compute" in n:
+        if "alpha core" not in n and "alpha_core" not in n:
+            return "alpha_compute"
+    if "alpha core" in n or "alpha_core" in n:
+        if "alpha compute" not in n and "alpha_compute" not in n:
+            return "alpha_core"
+    if any(x in n for x in ("boundary-aware", "boundary aware", "unified mathematical")):
+        return "cross_cutting"
+    return "general"
+
+
+def paraphrase_for(disclosure: str) -> str:
+    if disclosure in {"internal_only", "prohibited"}:
+        return "none"
+    if disclosure in {"authorized", "nda_only", "customer_contract"}:
+        return "summary"
+    return "approved"
+
 def title_for(path: Path) -> str:
     stem = path.stem
     # Tidy export-copy noise without accidentally turning a real v2.4 source into
@@ -169,9 +206,13 @@ class Command(BaseCommand):
 
                 ns = namespace_for(f.name)
                 title = title_for(f)
+                authority, is_current, canonical_rule = source_authority_for(f.name)
+                family = technology_family_for(f.name)
+                paraphrase = paraphrase_for(disclosure)
 
                 if dry_run:
-                    self.stdout.write(f"  would register [{disclosure:17}] [{ns:13}] {title}")
+                    suffix = " [NO-EMBED]" if disclosure == "prohibited" else ""
+                    self.stdout.write(f"  would register [{disclosure:17}] [{ns:13}] [{authority:13}] {title}{suffix}")
                     created += 1
                     continue
 
@@ -194,6 +235,11 @@ class Command(BaseCommand):
                         "title": title,
                         "namespace": ns,
                         "disclosure_level": disclosure,
+                        "source_authority": authority,
+                        "is_current": is_current,
+                        "canonical_rule": canonical_rule,
+                        "permitted_paraphrase": paraphrase,
+                        "technology_family": family,
                     },
                 )
                 if made:
@@ -212,6 +258,16 @@ class Command(BaseCommand):
                     if obj.disclosure_level != disclosure:
                         obj.disclosure_level = disclosure
                         updates.append("disclosure_level")
+                    for field, value in (
+                        ("source_authority", authority),
+                        ("is_current", is_current),
+                        ("canonical_rule", canonical_rule),
+                        ("permitted_paraphrase", paraphrase),
+                        ("technology_family", family),
+                    ):
+                        if getattr(obj, field) != value:
+                            setattr(obj, field, value)
+                            updates.append(field)
                     if updates:
                         obj.ingestion_status = "PENDING"
                         updates.append("ingestion_status")

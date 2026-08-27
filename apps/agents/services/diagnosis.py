@@ -69,10 +69,9 @@ class DiagnosisAgent(BaseAgent):
         SECURITY INVARIANT 2 — delegate, never derive locally.
 
         This previously derived the retrieval context from ``context_label``, which is a
-        DISPLAY label rather than an identity plane. An anonymous visitor holding a
-        client_page capability token has ``context_label == "client_page"`` while still
-        being on the PUBLIC plane — so the old rule could hand nda_only chunks to an
-        unidentified visitor.
+        DISPLAY label rather than an identity plane. A public context label must never
+        be treated as proof of identity or authorization; doing so could hand restricted
+        chunks to an unidentified visitor.
 
         ``ctx.retrieval_context`` is derived from the plane and nothing else.
         """

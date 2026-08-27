@@ -5,7 +5,7 @@ DURING generation, a DETERMINISTIC matcher runs over the emerging token stream l
 for prohibited patterns:
 
     benchmark figures · guarantee language · pricing · exclusivity terms ·
-    competitor claims · mechanism disclosure · "lookup-table" phrasing ·
+    competitor claims · mechanism disclosure · governed output-style violations ·
     inferred-identity assertions
 
 On a match the stream HALTS IMMEDIATELY, the partial text is DISCARDED from the client
@@ -124,9 +124,10 @@ def _compiled_patterns() -> list[tuple[str, re.Pattern, str]]:
     for claim in plc.PROHIBITED_CLAIMS:
         patterns.append((claim, re.compile(re.escape(claim), re.IGNORECASE), "prohibited_claim"))
 
-    # 3) Canonical-wording violations. The most important: ALPHA Core is ALWAYS
-    #    "table-free index-ordered algebraic execution" and must NEVER be described as
-    #    "lookup-table execution" (Architecture v2.6 §19.5).
+    # 3) Output-style canonical-wording violations. Product/technology definitions are
+    #    intentionally not hard-coded here: current factual doctrine is enforced by the
+    #    authorized source + governed-prompt layer, so an old wording rule cannot override
+    #    a newer canonical specification.
     for raw, _replacement in plc.CANONICAL_SUBSTITUTIONS:
         patterns.append((raw, re.compile(raw, re.IGNORECASE), "canonical_wording"))
 

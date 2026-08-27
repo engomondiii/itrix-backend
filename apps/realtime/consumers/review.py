@@ -1,10 +1,10 @@
 """
-Review + Client-page WebSocket consumers (PUBLIC / anonymous).
+Review WebSocket consumer (PUBLIC / anonymous).
 
     ws/review/{session}/      ReviewConsumer      — the review-chat channel
-    ws/client-page/{token}/   ClientPageConsumer  — the customized client page channel
 
-Both authorize via a capability token (client_page / portal) or the review session id,
+The review channel resolves a browser-bound review session id or an unrelated portal
+capability where explicitly allowed.
 join the conversation group + the subject group (for journey.reveal pushes), and speak
 the frontend's event contract:
 
@@ -14,16 +14,13 @@ the frontend's event contract:
                       { type: "message.final",        payload: { conversationId, message } }
                       { type: "message.under_review", payload: { conversationId, messageId, governanceStatus } }
                       { type: "journey.reveal",       payload: JourneyRevealPayload }
-                      { type: "clientpage.delta",     payload: { field, delta } }
-                      { type: "clientpage.final",     payload: { page } }
                       { type: "pong",                 payload: {} }
 
-── REAL-TIME GENERATION (v4.0.3) ─────────────────────────────────────────────
+── REAL-TIME GENERATION ───────────────────────────────────────────────────────
 Chat replies stream token-by-token: on ``chat.send`` we persist the inbound turn, emit
 ``message.delta`` for each Claude token, then persist + ``message.final`` the governed
-reply. The client page ALSO streams: on connect, ClientPageConsumer streams the "what we
-heard" narrative live, then emits ``clientpage.final`` with the fully-normalized page —
-so the visitor watches it generate instead of waiting for a background swap or a reload.
+reply. My Review itself is intentionally not streamed over a bearer-token WebSocket; it
+is served only after READY through the tokenless BFF/httpOnly-cookie access flow.
 
 All events are wrapped ``{ "type": ..., "payload": {...} }`` and use camelCase keys to
 match ``src/lib/realtime/socketEvents.ts`` exactly. Everything degrades safely: if the AI
@@ -45,7 +42,7 @@ logger = logging.getLogger("itrix")
 
 
 class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
-    """Shared connect/auth/relay logic for the review + client-page channels."""
+    """Shared connect/auth/relay logic for the review channel."""
 
     # Subclasses set this to the conversation the socket serves.
     conversation = None
@@ -118,18 +115,8 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             await self._stream_chat_reply(body or "")
         elif msg_type in ("chat.typing", "typing"):
             pass  # visitor typing is not fanned out on the public plane
-        elif msg_type == "clientpage.subscribe" or (
-            msg_type == "subscribe" and (payload or {}).get("channel") == "clientpage"
-        ):
-            # Only the page's live-view connection asks for this, so page generation
-            # streams exactly once (not on the chat/journey sockets sharing the URL).
-            await self.on_clientpage_subscribe()
         elif msg_type in ("ping", "presence.ping"):
             await self.send_json({"type": "pong", "payload": {}})
-
-    async def on_clientpage_subscribe(self):
-        """Hook: ClientPageConsumer streams the page here. Default: nothing."""
-        return
 
     # ── chat: stream a governed reply token-by-token ─────────────────────────
     async def _stream_chat_reply(self, body: str):
@@ -294,14 +281,6 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
 
         body_text = terminology.normalise_outbound(body_text)
 
-        # If a client page was revealed while persisting this turn, append the link so
-        # the visitor can reach it even if the live reveal event was missed. The reveal
-        # fact rides on ctx.extra (set by build_turn_extra during _build_ctx).
-        if deliverable:
-            reveal = (getattr(ctx, "extra", None) or {}).get("client_page_reveal") or {}
-            if reveal.get("url"):
-                body_text = _append_client_page_link_ws(body_text, reveal["url"])
-
         # And the mirror image: when the page is waiting on an email address, make
         # sure the reply asks for one. The agent was told to ask in its own words;
         # this guarantees the ask survives a degraded or model-free turn, so a
@@ -385,17 +364,21 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "message.under_review", "payload": event.get("payload", {})})
 
     async def journey_reveal(self, event):
-        # event carries state/surface/capability_token (snake) — reshape to the FE payload.
+        # Client-page/My Review reveals expose ONLY the browser-bound one-time
+        # accessCode. Other surfaces retain their legitimate capabilityToken contract.
+        surface = event.get("surface")
+        reveal_payload = {"surface": surface}
+        if surface == "client_page":
+            reveal_payload["accessCode"] = event.get("access_code")
+        elif event.get("capability_token"):
+            reveal_payload["capabilityToken"] = event.get("capability_token")
         await self.send_json(
             {
                 "type": "journey.reveal",
                 "payload": {
                     "state": event.get("state"),
-                    "authorizedSurface": event.get("surface"),
-                    "reveal": {
-                        "surface": event.get("surface"),
-                        "capabilityToken": event.get("capability_token"),
-                    },
+                    "authorizedSurface": surface,
+                    "reveal": reveal_payload,
                     "valueDelivered": bool(event.get("value_delivered", True)),
                     "accountInviteAvailable": bool(event.get("account_invite_available", False)),
                 },
@@ -450,18 +433,17 @@ class ReviewConsumer(_BaseReviewConsumer):
     context_label = "review"
 
     def _get_conversation(self):
-        from apps.conversations.services.history import (
-            get_or_create_client_page_conversation,
-            get_or_create_review_conversation,
-        )
+        from apps.conversations.services.history import get_or_create_review_conversation
         from apps.leads.models import Lead
 
         self.session_id = self.scope["url_route"]["kwargs"].get("session")
         cap = self.scope.get("cap_payload")
-        if cap is not None and getattr(cap, "typ", None) in ("client_page", "portal"):
+        # My Review client_page bearer capabilities are retired. An unrelated portal
+        # capability may still resolve a lead for this historical review-chat surface.
+        if cap is not None and getattr(cap, "typ", None) == "portal":
             lead = Lead.objects.filter(id=cap.sub).first()
             if lead is not None:
-                return get_or_create_client_page_conversation(lead)
+                return get_or_create_review_conversation(review_session_id=str(lead.review_session_id), lead=lead)
         lead = None
         try:
             _uuid.UUID(str(self.session_id))
@@ -471,107 +453,6 @@ class ReviewConsumer(_BaseReviewConsumer):
         return get_or_create_review_conversation(review_session_id=self.session_id, lead=lead)
 
 
-class ClientPageConsumer(_BaseReviewConsumer):
-    """ws/client-page/{token}/ — the customized client page channel (live generation)."""
-
-    context_label = "client_page"
-
-    def _get_conversation(self):
-        from apps.conversations.services.history import get_or_create_client_page_conversation
-        from apps.journey.services import capability_token as ct
-        from apps.leads.models import Lead
-
-        token = self.scope["url_route"]["kwargs"].get("token")
-        # Prefer the middleware-verified payload; else verify the URL token directly.
-        cap = self.scope.get("cap_payload")
-        lead = None
-        if cap is not None and getattr(cap, "typ", None) in ("client_page", "portal"):
-            lead = Lead.objects.filter(id=cap.sub).first()
-        if lead is None and token:
-            try:
-                payload = ct.verify(token, expected_typ=ct.TOKEN_CLIENT_PAGE)
-                lead = Lead.objects.filter(id=payload.sub).first()
-            except Exception:  # noqa: BLE001
-                lead = None
-        self.lead = lead
-        if lead is None:
-            return None
-        return get_or_create_client_page_conversation(lead)
-
-    async def on_clientpage_subscribe(self):
-        """Stream the client-page generation live, then send the final normalized page."""
-        await self._stream_client_page()
-
-    async def _stream_client_page(self):
-        lead = getattr(self, "lead", None)
-        if lead is None:
-            return
-
-        # 1) Is an AI-enriched result already persisted? If so, just send it (fast path).
-        already = await database_sync_to_async(self._existing_enriched_page)(lead)
-        if already is not None:
-            await self.send_json({"type": "clientpage.final", "payload": {"page": already}})
-            return
-
-        # 2) Stream the "what we heard" narrative live as the headline generates.
-        acc: list[str] = []
-        try:
-            async for token in _aiter(self._stream_problem_mirror, lead):
-                acc.append(token)
-                await self.send_json(
-                    {"type": "clientpage.delta", "payload": {"field": "problemMirror", "delta": token}}
-                )
-        except Exception:  # noqa: BLE001
-            logger.exception("client-page narrative stream failed")
-
-        # 3) Build + persist the full page (AI where enabled, deterministic otherwise) and
-        #    send the normalized final payload so the page snaps to its complete content.
-        page = await database_sync_to_async(self._build_and_normalize_page)(lead)
-        await self.send_json({"type": "clientpage.final", "payload": {"page": page}})
-
-    def _existing_enriched_page(self, lead):
-        from apps.result_page.models import ResultPage
-
-        obj = ResultPage.objects.filter(lead=lead).first()
-        if obj is not None and getattr(obj, "used_ai", False):
-            return self._build_and_normalize_page(lead)
-        return None
-
-    def _stream_problem_mirror(self, lead):
-        """A short streamed narrative to show generation immediately (best-effort)."""
-        from apps.agents.services.context import PLANE_PUBLIC, AgentContext
-        from apps.ai_engine.services.claude_client import AIEngineDisabled, ClaudeClient
-
-        session = getattr(lead, "review_session", None)
-        prompt = getattr(session, "prompt", "") or ""
-        ctx = AgentContext(
-            lead_id=str(lead.id),
-            prompt=prompt,
-            pressures=list(getattr(session, "pressure_areas", []) or []),
-            product_route=lead.product_route,
-            tier=lead.tier,
-            plane=PLANE_PUBLIC,
-            context_label="client_page",
-            extra={"message": prompt},
-        )
-        system = (
-            "You are the itriX assessment concierge writing the opening of a customized "
-            "review page. In 2-4 warm, precise sentences, restate the visitor's compute "
-            "bottleneck in their own terms (the 'problem mirror'). Stay within the claims "
-            "discipline: no numbers, no guarantees, no competitor names. Plain prose only."
-        )
-        user = f"Visitor's described bottleneck:\n{prompt or '(no prompt provided)'}"
-        try:
-            yield from ClaudeClient().stream(system=system, user=user, max_tokens=300)
-        except AIEngineDisabled:
-            return
-
-    def _build_and_normalize_page(self, lead) -> dict:
-        """Build the client page via the generator and normalize to the ClientPage shape."""
-        from apps.result_page.services.result_generator import ResultGenerator
-
-        raw = ResultGenerator().build_client_page(lead, context="public")
-        return _normalize_client_page(raw, lead)
 
 
 # ── async iteration helper: run a blocking generator in a thread, yield to the loop ──
@@ -598,136 +479,3 @@ async def _aiter(gen_func, *args):
         if item is sentinel:
             break
         yield item
-
-
-# ── payload normalization (mirrors the frontend proxy's normalizeClientPage) ─────────
-_PRESSURE_LABEL = {
-    "cost": "Compute cost growth",
-    "speed": "Slow turnaround",
-    "energy": "Power / cooling limits",
-    "stability_accuracy": "Stability or accuracy drift",
-    "memory_data_movement": "Data-movement-bound runtime",
-    "hardware_utilization": "Underused accelerators",
-    "architecture": "Architectural ceiling",
-}
-
-
-def _s(v, fallback: str = "") -> str:
-    return v if isinstance(v, str) else fallback
-
-
-def _normalize_diagnosis(items) -> list[dict]:
-    if not isinstance(items, list):
-        return []
-    rows = []
-    for idx, item in enumerate(items):
-        row = item if isinstance(item, dict) else {}
-        rel = row.get("relevance")
-        relevance = rel if rel in ("high", "medium", "low") else ("high" if idx == 0 else "medium" if idx <= 2 else "low")
-        label = _s(row.get("label"))
-        if not label:
-            pressure = _s(row.get("pressure"))
-            label = _PRESSURE_LABEL.get(pressure) or _s(row.get("observation")) or (pressure or "Compute bottleneck")
-        rows.append({"label": label, "relevance": relevance})
-    return rows
-
-
-def _normalize_kpis(items) -> list[dict]:
-    if not isinstance(items, list):
-        return []
-    out = []
-    for item in items:
-        row = item if isinstance(item, dict) else {}
-        label = _s(row.get("label")) or _s(row.get("name"))
-        metric = _s(row.get("metric")) or _s(row.get("value"))
-        if label:
-            out.append({"label": label, "metric": metric})
-    return out
-
-
-def _normalize_proofs(items) -> list[dict]:
-    if not isinstance(items, list):
-        return []
-    out = []
-    for item in items:
-        row = item if isinstance(item, dict) else {}
-        title = _s(row.get("title")) or _s(row.get("label"))
-        disclosure = "nda_only" if row.get("disclosure") == "nda_only" else "public"
-        reference = _s(row.get("reference")) or None
-        if title:
-            out.append({"title": title, "disclosure": disclosure, "reference": reference})
-    return out
-
-
-def _normalize_slides(items) -> list[dict]:
-    if not isinstance(items, list):
-        return []
-    out = []
-    for item in items:
-        s = item if isinstance(item, dict) else {}
-        disclosure = "controlled_public" if s.get("disclosure") == "controlled_public" else "public"
-        title = _s(s.get("title"))
-        body = _s(s.get("body"))
-        if title or body:
-            out.append(
-                {
-                    "key": _s(s.get("key")) or title or _uuid.uuid4().hex[:8],
-                    "title": title,
-                    "body": body,
-                    "disclosure": disclosure,
-                }
-            )
-    return out
-
-
-def _normalize_client_page(raw: dict, lead) -> dict:
-    raw = raw if isinstance(raw, dict) else {}
-    pitch = raw.get("pitch") if isinstance(raw.get("pitch"), dict) else {}
-
-    slides = _normalize_slides(raw.get("slides") or pitch.get("slides"))
-    problem_mirror = _s(raw.get("problemMirror")) or _s(pitch.get("headline"))
-    diagnosis = _normalize_diagnosis(raw.get("diagnosis"))
-    visitor_pain = _s(raw.get("visitorPain")) or problem_mirror or (diagnosis[0]["label"] if diagnosis else "")
-
-    license_raw = raw.get("licensePathway")
-    license_pathway = license_raw if license_raw in ("non_exclusive", "exclusive", "strategic") else None
-
-    tier_raw = raw.get("tier")
-    try:
-        tier = int(tier_raw)
-        tier = tier if tier in (1, 2, 3, 4) else 4
-    except (TypeError, ValueError):
-        tier = 4
-
-    return {
-        "token": _s(raw.get("token")),
-        "leadId": _s(raw.get("leadId")) or str(getattr(lead, "id", "")),
-        "pitchType": _s(raw.get("pitchType")) or _s(pitch.get("pitchType")) or "curious_public",
-        "visitorPain": visitor_pain,
-        "productRoute": _s(raw.get("productRoute")) or "general",
-        "licensePathway": license_pathway,
-        "tier": tier,
-        "problemMirror": problem_mirror,
-        "diagnosis": diagnosis,
-        "alphaFitSummary": _s(raw.get("alphaFitSummary")),
-        "kpiPreview": _normalize_kpis(raw.get("kpiPreview")),
-        "proofPreview": _normalize_proofs(raw.get("proofPreview")),
-        "recommendedNextStep": _s(raw.get("recommendedNextStep")),
-        "slides": slides,
-        "conversationId": _s(raw.get("conversationId")) or (_s(pitch.get("conversationId")) or None),
-        "usedAi": raw.get("usedAi") is True or raw.get("used_ai") is True,
-    }
-
-
-def _append_client_page_link_ws(text: str, url: str) -> str:
-    """Append the client-page link to a streamed reply (see views_thread._append_client_page_link)."""
-    from apps.conversations.views_thread import WHAT_HAPPENS_NEXT
-
-    text = (text or "").rstrip()
-    if url and url not in text:
-        return text + (
-            "\n\nYour personalised itriX page is ready — open it here:"
-            f"\n\n<{url}>"
-            f"\n\n{WHAT_HAPPENS_NEXT}"
-        )
-    return text

@@ -1,7 +1,7 @@
 """
 Disclosure filter.
 
-Enforces the five-tier disclosure model on retrieved knowledge before it can influence a
+Enforces the six-state disclosure model on retrieved knowledge before it can influence a
 public-facing result. The public result page may only be built from ``public`` (and, when
 an NDA context applies, ``nda_only``) material; ``controlled_public`` is allowed only in
 controlled contexts; ``internal_only`` and ``prohibited`` are never exposed.
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 # Ordering from most to least open.
 DISCLOSURE_ORDER = [
-    "public", "controlled_public", "nda_only", "customer_contract",
+    "public", "controlled_public", "authorized", "nda_only", "customer_contract",
     "internal_only", "prohibited",
 ]
 
@@ -22,6 +22,9 @@ DISCLOSURE_ORDER = [
 CONTEXT_ALLOWED = {
     "public": {"public"},
     "controlled": {"public", "controlled_public"},
+    # Authorized content requires an explicit authorization context; an NDA does not
+    # imply this state and therefore does not gain it automatically.
+    "authorized": {"public", "controlled_public", "authorized"},
     "nda": {"public", "controlled_public", "nda_only"},
     # ── v6.0: the SIXTH TIER ─────────────────────────────────────────────────
     # customer_contract material is SCOPED PER CUSTOMER and NEVER CROSS-SERVED.
@@ -30,7 +33,7 @@ CONTEXT_ALLOWED = {
     # can see the tier must still not see another customer's contract material.
     "customer_contract": {"public", "controlled_public", "nda_only", "customer_contract"},
     "internal": {
-        "public", "controlled_public", "nda_only", "customer_contract", "internal_only",
+        "public", "controlled_public", "authorized", "nda_only", "customer_contract", "internal_only",
     },
 }
 

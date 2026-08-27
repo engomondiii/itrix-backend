@@ -46,16 +46,18 @@ VISITOR_KNOWLEDGE_NAMESPACES: tuple[str, ...] = (
 
 
 def _canonical_priority_for_row(row: KnowledgeChunk) -> int:
+    """Use explicit source authority/currentness first; filenames are legacy fallback only."""
     doc = getattr(row, "document", None)
+    if doc is not None:
+        authority = str(getattr(doc, "source_authority", "") or "")
+        base = {"authoritative": 100, "governing": 85, "working": 50, "legacy": 5}.get(authority, 0)
+        if base:
+            if not bool(getattr(doc, "is_current", True)):
+                base = min(base, 5)
+            return base
     blob = f"{getattr(doc, 'title', '')} {getattr(doc, 'file_path', '')}".lower()
-    if "wp_alpha_compute_core_v2.4" in blob or "wp alpha compute core v2.4" in blob:
-        return 100
-    if "itrix_product_canonical_v2_4" in blob or "itrix product canonical v2 4" in blob:
-        return 100
-    if "itrix_company_overview_public" in blob or "itrix company overview public" in blob:
+    if "canonical" in blob or "v2.4" in blob or "v2_4" in blob:
         return 90
-    if any(token in blob for token in ("axiom_overview", "cre_overview", "fqnm_overview", "unified mathematical")):
-        return 60
     return 10
 
 
@@ -72,6 +74,14 @@ def _row_to_dict(row: KnowledgeChunk, *, score=None, retrieval_backend: str = "d
         "document_title": getattr(getattr(row, "document", None), "title", ""),
         "document_path": getattr(getattr(row, "document", None), "file_path", ""),
         "canonical_priority": _canonical_priority_for_row(row),
+        "source_authority": getattr(getattr(row, "document", None), "source_authority", "working"),
+        "source_current": bool(getattr(getattr(row, "document", None), "is_current", True)),
+        "canonical_rule": getattr(getattr(row, "document", None), "canonical_rule", ""),
+        "approved_audience": list(getattr(getattr(row, "document", None), "approved_audience", None) or []),
+        "allowed_journey_stages": list(getattr(getattr(row, "document", None), "allowed_journey_stages", None) or []),
+        "permitted_paraphrase": getattr(getattr(row, "document", None), "permitted_paraphrase", "approved"),
+        "technology_family": getattr(getattr(row, "document", None), "technology_family", "general"),
+        "claim_ceiling": int(getattr(getattr(row, "document", None), "claim_ceiling", 0) or 0),
         "score": score,
         "retrieval_backend": retrieval_backend,
     }
@@ -89,10 +99,15 @@ def _normalise_namespaces(
 
 
 def _keyword_fallback(
-    query: str, *, namespaces: tuple[str, ...], top_k: int
+    query: str, *, namespaces: tuple[str, ...], top_k: int, context: str = "public"
 ) -> list[dict]:
-    """Offline retrieval across the same corpus used by Pinecone."""
-    qs = KnowledgeChunk.objects.select_related("document").filter(namespace__in=namespaces)
+    """Offline retrieval with the same query-time disclosure budget as Pinecone."""
+    permitted = allowed_levels(context) - {"prohibited"}
+    qs = (
+        KnowledgeChunk.objects.select_related("document")
+        .filter(namespace__in=namespaces, disclosure_level__in=permitted, document__is_current=True)
+        .exclude(document__permitted_paraphrase="none")
+    )
 
     terms = [
         t
@@ -239,7 +254,7 @@ class KnowledgeRetriever:
 
         if not chunks:
             chunks = _keyword_fallback(
-                query, namespaces=selected_namespaces, top_k=top_k
+                query, namespaces=selected_namespaces, top_k=top_k, context=context
             )
 
         # Belt-and-braces post-filter.  Query-time metadata filtering protects the top-k

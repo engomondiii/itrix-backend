@@ -36,14 +36,19 @@ def test_benchmark_figure_split_across_tokens_is_caught():
     assert hit.category == "benchmark"
 
 
-def test_lookup_table_phrasing_is_caught():
+def test_product_doctrine_is_source_governed_while_output_style_rules_still_stream_guarded():
     """
-    ALPHA Core is ALWAYS 'table-free index-ordered algebraic execution' and must NEVER
-    be described as lookup-table execution (§19.5).
+    Product/technology definitions are not hard-coded into the stream matcher.  The
+    authorized current source + governed-prompt layer owns factual doctrine, so a
+    superseded ALPHA Core wording rule cannot override a newer source.  Output-style
+    substitutions remain deterministic and must still halt mid-stream.
     """
-    _state, hit = _feed(["It uses ", "lookup-table ", "execution ", "internally"])
-    assert hit is not None
-    assert hit.category == "canonical_wording"
+    _state, legacy_hit = _feed(["It uses ", "lookup-table ", "execution ", "internally"])
+    assert legacy_hit is None
+
+    _state, style_hit = _feed(["This is ", "ma", "gic", "."])
+    assert style_hit is not None
+    assert style_hit.category == "canonical_wording"
 
 
 def test_pricing_is_caught():

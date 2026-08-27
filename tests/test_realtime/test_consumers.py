@@ -12,6 +12,8 @@ Redis/broker is needed (InMemoryChannelLayer is configured when ENABLE_REALTIME 
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 from channels.testing import WebsocketCommunicator
 
@@ -77,3 +79,34 @@ async def test_portal_consumer_accepts_with_client():
     connected, _ = await communicator.connect()
     assert connected is True
     await communicator.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_review_consumer_client_page_reveal_exposes_access_code_only():
+    consumer = ReviewConsumer()
+    consumer.send_json = AsyncMock()
+    await consumer.journey_reveal({
+        "state": "CLIENT_PAGE",
+        "surface": "client_page",
+        "access_code": "one-time-code",
+        "capability_token": "must-not-leak",
+    })
+    frame = consumer.send_json.await_args.args[0]
+    reveal = frame["payload"]["reveal"]
+    assert reveal == {"surface": "client_page", "accessCode": "one-time-code"}
+    assert "capabilityToken" not in reveal
+
+
+@pytest.mark.asyncio
+async def test_review_consumer_unrelated_reveal_keeps_capability_token_contract():
+    consumer = ReviewConsumer()
+    consumer.send_json = AsyncMock()
+    await consumer.journey_reveal({
+        "state": "INVITED",
+        "surface": "account_invite",
+        "capability_token": "invite-capability",
+    })
+    frame = consumer.send_json.await_args.args[0]
+    reveal = frame["payload"]["reveal"]
+    assert reveal == {"surface": "account_invite", "capabilityToken": "invite-capability"}
+    assert "accessCode" not in reveal

@@ -276,7 +276,8 @@ def test_an_account_supplies_the_contact_details():
     assert contact["company"] == "Customer Ltd"
 
 
-def test_the_contact_ask_is_skipped_for_an_account_holder():
+def test_an_account_holder_is_not_promoted_into_the_contact_ask():
+    """Account presence is storage identity, not Customer relationship or CTA permission."""
     from apps.conversations.services import contact_ask, thread_state
 
     row = ClientFactory(email="ravi@customer.test", organization="Customer Ltd")
@@ -286,6 +287,32 @@ def test_the_contact_ask_is_skipped_for_an_account_holder():
     thread_state._mirror_onto_thread(thread, "DIAGNOSED")
 
     decision = contact_ask.evaluate(thread, body="here is our bottleneck")
+
+    assert decision["ask"] is False
+    assert decision["reason"] == "visitor_lane"
+
+
+def test_a_confirmed_customer_account_is_not_reasked_for_its_existing_email():
+    """Once an identity-dependent action is legitimate, the account email satisfies it."""
+    from apps.conversations.services import contact_ask, thread_state
+
+    row = ClientFactory(email="ravi2@customer.test", organization="Customer Ltd")
+    thread = _thread(client_row=row)
+    thread.lead = None
+    thread.relationship_state = "customer"
+    thread.mirror_status = "confirmed"
+    thread.identity_needed_action = "formal_evaluation"
+    thread.save(
+        update_fields=[
+            "lead",
+            "relationship_state",
+            "mirror_status",
+            "identity_needed_action",
+        ]
+    )
+    thread_state._mirror_onto_thread(thread, "DIAGNOSED")
+
+    decision = contact_ask.evaluate(thread, body="continue with the controlled evaluation")
 
     assert decision["ask"] is False
     assert decision["reason"] == contact_ask.EMAIL_ALREADY_GIVEN

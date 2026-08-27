@@ -1,8 +1,9 @@
-"""Visitor-knowledge publication policy.
+"""Knowledge-source folder disclosure policy.
 
-Product/research knowledge is public by default even when an older repository layout still
-places the source under controlled_public/ or nda_only/. Operational internals and
-customer-specific contract material remain outside the visitor knowledge corpus.
+Folder placement is an authorization decision.  A source stored under controlled,
+authorized, agreement-gated, private-workspace or role-restricted material must retain
+that tier during registration; the ingestion command may never silently publish it merely
+because the document looks product/research-related.
 """
 
 from __future__ import annotations
@@ -25,10 +26,11 @@ def _files_in(folder: str):
     return [p for p in sorted(path.iterdir()) if p.is_file() and p.name != ".gitkeep"]
 
 
-def test_product_and_research_source_folders_are_public_by_default():
+def test_source_folders_keep_their_explicit_disclosure_tier():
     assert FOLDER_DISCLOSURE["public"] == "public"
-    assert FOLDER_DISCLOSURE["controlled_public"] == "public"
-    assert FOLDER_DISCLOSURE["nda_only"] == "public"
+    assert FOLDER_DISCLOSURE["controlled_public"] == "controlled_public"
+    assert FOLDER_DISCLOSURE["authorized"] == "authorized"
+    assert FOLDER_DISCLOSURE["nda_only"] == "nda_only"
 
 
 def test_operational_and_customer_material_are_not_public_by_default():

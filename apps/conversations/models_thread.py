@@ -132,6 +132,26 @@ class Thread(BaseModel):
     current_state = models.CharField(
         max_length=20, blank=True, default="ARRIVED", db_index=True
     )
+    # Relationship/consent state is deliberately independent of the numbered journey.
+    # An account, a famous employer, or technical sophistication never promotes this field.
+    relationship_state = models.CharField(max_length=32, blank=True, default="visitor", db_index=True)
+    engagement_stage = models.CharField(max_length=48, blank=True, default="exploration")
+    selected_stage_label = models.CharField(max_length=80, blank=True, default="")
+    selected_action = models.CharField(max_length=80, blank=True, default="")
+    # v2.2 Visitor -> Customer/Strategic Customer four-check gate. A qualifying
+    # request first creates an offered mode change; it is not a relationship transition
+    # until the interface has stated the change and the person explicitly consents.
+    mode_change_target = models.CharField(max_length=32, blank=True, default="")
+    mode_change_status = models.CharField(max_length=24, blank=True, default="none", db_index=True)
+    mirror_status = models.CharField(max_length=24, blank=True, default="not_required", db_index=True)
+    identity_needed_action = models.CharField(max_length=48, blank=True, default="")
+    cta_declined = models.BooleanField(default=False)
+    evaluation_type = models.CharField(max_length=48, blank=True, default="")
+    contract_stage = models.CharField(max_length=32, blank=True, default="no_discussion")
+    consent_history = models.JSONField(default=list, blank=True)
+    conversation_commitments = models.JSONField(default=dict, blank=True)
+    locale = models.CharField(max_length=12, blank=True, default="en")
+
     # How many adaptive questions have been asked in this thread's qualification band.
     # Denormalised from QuestionSuggestion so the stop-rule budget check does not have
     # to re-count on every turn; QuestionSuggestion remains the auditable record.

@@ -38,31 +38,32 @@ def test_the_conversation_prompt_does_not_carry_the_result_page_task():
     convo = _prompt("What is itriX?")
 
     assert "suitable for a public result page" not in convo
-    assert "ANSWER THE QUESTION THE VISITOR ACTUALLY ASKED" in convo
+    assert "Answer the question the visitor actually asked" in convo
 
 
 def test_the_conversation_prompt_licenses_identity_questions():
     convo = _prompt("What is itriX?")
 
-    assert "what itriX is" in convo
-    assert "not a request to be qualified" in convo
+    assert "general/company/technical-evaluator question" in convo
+    assert "not a request to diagnose the visitor" in convo
 
 
-def test_the_result_page_task_is_unchanged_for_its_own_callers():
-    """Page generation must keep the task it had; only the concierge changed."""
+def test_the_result_page_task_is_decision_support_for_its_own_callers():
+    """Artifact generation keeps its own task, now governed by the full-conversation review contract."""
     page = build_system_prompt(
         product_route="general", license_pathway=None, tier=4, pressures=[], chunks=[]
     )
 
-    assert "suitable for a public result page" in page
+    assert "personalized decision-support review" in page
+    assert "complete supplied conversation state" in page
 
 
 def test_both_prompts_keep_the_claims_discipline_and_the_ceiling():
     convo = _prompt("What is itriX?")
 
-    assert "CLAIMS DISCIPLINE" in convo
-    assert "do not reveal anything above this tier" in convo
-    assert "Never guarantee specific savings" in convo
+    assert "GOVERNING RESPONSE RULES" in convo
+    assert "this is a ceiling, not permission" in convo
+    assert "no guarantees" in convo
 
 
 # ── #11 · named entities ────────────────────────────────────────────────────
@@ -193,15 +194,15 @@ def test_the_budget_still_closes_the_loop_for_a_visitor_who_will_not_answer():
     assert question_budget(2) >= 4
 
 
-def test_the_reveal_explains_what_happens_next():
+def test_the_reveal_handoff_never_embeds_a_review_credential():
     from apps.conversations.views_thread import WHAT_HAPPENS_NEXT, _append_client_page_link
 
     out = _append_client_page_link("Here is your review.", "https://web.test/c/tok.sig")
 
-    assert "<https://web.test/c/tok.sig>" in out, "angle-bracketed so punctuation cannot touch it"
+    assert "https://web.test/c/tok.sig" not in out
+    assert "View My Review" in out
     assert WHAT_HAPPENS_NEXT in out
-    assert "starting point, not a" in out
-    assert "non-confidential until an NDA" in out
+    assert "decision-support artifact" in out
 
 
 # ── generation completeness ─────────────────────────────────────────────────
@@ -237,7 +238,8 @@ def test_brand_core_does_not_hardcode_the_retired_product_split():
 
     assert "representation diagnosis — the adoption wedge" not in _BRAND_CORE
     assert "ALPHA Core (runtime/execution)" not in _BRAND_CORE
-    assert "retrieved KNOWLEDGE CONTEXT is the source of truth" in _BRAND_CORE
+    assert "use only the supplied KNOWLEDGE CONTEXT and verified conversation state" in _BRAND_CORE
+    assert "Prefer current higher-authority sources" in _BRAND_CORE
 
 
 def test_context_labels_current_canonical_sources_for_the_model():

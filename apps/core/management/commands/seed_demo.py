@@ -640,9 +640,9 @@ class Command(BaseCommand):
 
         # 1) Claim-Card library — the approved wording agents are checked against.
         cards = [
-            ("demo_alpha_core_execution", "[Demo] ALPHA Core execution wording",
-             "table-free index-ordered algebraic execution", ClaimLevel.L1,
-             "Hard rule — never say 'lookup-table execution'."),
+            # Product/technology definitions are deliberately not seeded as Claim Cards.
+            # They are resolved through the current authorized source hierarchy so demo
+            # data cannot resurrect superseded canonical wording.
             ("demo_sustainable_ai", "[Demo] Sustainable AI positioning",
              "itriX builds Computational AI Infrastructure for Sustainable AI.", ClaimLevel.L1,
              "Approved public one-liner."),

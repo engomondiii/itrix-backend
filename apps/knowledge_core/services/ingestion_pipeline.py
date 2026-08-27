@@ -18,7 +18,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from apps.knowledge_core.models import IngestionStatus, KnowledgeChunk, KnowledgeDocument
+from apps.knowledge_core.models import DisclosureLevel, IngestionStatus, KnowledgeChunk, KnowledgeDocument
 from apps.knowledge_core.services.chunker import chunk_text
 from apps.knowledge_core.services.document_loader import load_document_text
 from apps.knowledge_core.services.embedder import Embedder
@@ -58,6 +58,24 @@ def ingest_document(document: KnowledgeDocument, *, dry_run: bool = False) -> In
         document.save(update_fields=["ingestion_status", "ingestion_error", "updated_at"])
 
     try:
+        # PROHIBITED is a non-embedding state, not merely a response filter.  Keeping
+        # protected construction material out of the vector index removes an entire
+        # oracle/probing surface and makes a stale remote disclosure filter harmless.
+        if document.disclosure_level == DisclosureLevel.PROHIBITED:
+            if not dry_run:
+                old_vector_ids = list(document.chunks.exclude(vector_id="").values_list("vector_id", flat=True))
+                if old_vector_ids:
+                    PineconeUpserter().delete_ids(namespace=namespace, ids=old_vector_ids)
+                with transaction.atomic():
+                    document.chunks.all().delete()
+                    document.ingestion_status = IngestionStatus.COMPLETE
+                    document.ingestion_error = ""
+                    document.chunk_count = 0
+                    document.last_ingested_at = timezone.now()
+                    document.save(update_fields=["ingestion_status", "ingestion_error", "chunk_count", "last_ingested_at", "updated_at"])
+            logger.info("Skipped embedding PROHIBITED knowledge document '%s'", document.title)
+            return IngestionResult(document=document, ok=True, chunk_count=0)
+
         source = document.source_ref
         if not source:
             raise ValueError("Document has no file_path or uploaded_file.")

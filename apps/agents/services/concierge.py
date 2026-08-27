@@ -169,36 +169,21 @@ class ConciergeAgent(BaseAgent):
 
     @staticmethod
     def _reveal_directive(extra: dict) -> str:
-        """
-        When a personalised page has just been generated for this visitor, tell the
-        model to HAND IT OVER rather than promise a human will follow up.
+        """Tell the model that a complete My Review is ready, without exposing access data.
 
-        This is the fix for the "the Assessment Team will be in touch" ending: the
-        model has no other way to know an instant page exists, so without this it does
-        the generic-concierge thing and promises human follow-up — the opposite of the
-        intended outcome. The link itself is also appended to the reply by the turn
-        path as a transport-independent fallback; this directive makes the model's OWN
-        words match that outcome.
+        Secure access is owned by the browser/BFF exchange flow.  The model must never write
+        a review URL, one-time exchange code, capability token, internal identifier, or promise
+        a later human handoff merely because generation completed.
         """
         reveal = extra.get("client_page_reveal") or {}
         if not reveal.get("revealed"):
             return ""
-        url = reveal.get("url") or ""
         return (
-            "IMPORTANT — A PERSONALISED itriX PAGE HAS JUST BEEN GENERATED FOR THIS "
-            "VISITOR AND IS READY NOW. Your reply MUST hand it over warmly and directly: "
-            "tell them their personalised page is ready and that they can open it now"
-            + (f" at this link: {url}" if url else "")
-            + ". Do NOT say the team will 'be in touch', do NOT say you will 'prepare a "
-            "briefing', do NOT ask to 'close the intake', and do NOT promise any human "
-            "follow-up — the page is the deliverable and it exists already. Keep it to a "
-            "couple of warm sentences. Then STOP.\n\n"
-            "DO NOT WRITE THE LINK YOURSELF, and do not repeat the URL inside a sentence. "
-            "The link is appended for you, on its own line, after whatever you write. A URL "
-            "written mid-sentence ends up flush against the following full stop, and because "
-            "the token itself contains a period, that punctuation breaks the link for anyone "
-            "who selects it by hand. Refer to it as 'your personalised page' in words and let "
-            "the link stand alone below.\n\n"
+            "IMPORTANT — THE VISITOR'S MY REVIEW IS COMPLETE AND READY. Tell them briefly "
+            "that it is ready and that they can use the View My Review action in the interface. "
+            "Do NOT include or invent any URL, token, code or internal identifier. Do NOT say "
+            "the team will 'be in touch' and do not promise a human follow-up. Keep the handoff "
+            "to one or two sentences, then stop.\n\n"
         )
 
     @staticmethod

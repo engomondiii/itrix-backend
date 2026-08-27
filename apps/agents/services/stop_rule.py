@@ -151,7 +151,8 @@ class StopDecision:
 
 
 def evaluate(*, thread=None, coverage=None, journey_state: int = 2,
-             questions_asked: int = 0, last_visitor_text: str = "") -> StopDecision:
+             questions_asked: int = 0, last_visitor_text: str = "",
+             ignore_proceed_signal: bool = False) -> StopDecision:
     """
     Apply the four conditions in order. The EARLIEST one wins.
 
@@ -177,14 +178,19 @@ def evaluate(*, thread=None, coverage=None, journey_state: int = 2,
         if _DECLINE.search(last_visitor_text):
             return StopDecision(False, STOP_VISITOR_DECLINED,
                                 "visitor declined to continue", questions_asked, budget)
-        if _ASKED_TO_PROCEED.search(last_visitor_text):
-            return StopDecision(False, STOP_ASKED_TO_PROCEED,
-                                "visitor accepted the next step", questions_asked, budget)
-        # Bare assent only counts once a reply has been delivered — an acceptance
-        # needs an offer to accept, and on the very first turn there has been none.
-        if questions_asked >= 1 and _is_bare_assent(last_visitor_text):
-            return StopDecision(False, STOP_ASKED_TO_PROCEED,
-                                "visitor assented to the next step", questions_asked, budget)
+        # A bare/proceed assent that is being consumed as the explicit Visitor ->
+        # Customer mode-change confirmation must not simultaneously close the newly
+        # opened qualification band. It is consent to ENTER assessment, not consent to
+        # skip its listening/coverage work. Callers mark that one turn explicitly.
+        if not ignore_proceed_signal:
+            if _ASKED_TO_PROCEED.search(last_visitor_text):
+                return StopDecision(False, STOP_ASKED_TO_PROCEED,
+                                    "visitor accepted the next step", questions_asked, budget)
+            # Bare assent only counts once a reply has been delivered — an acceptance
+            # needs an offer to accept, and on the very first turn there has been none.
+            if questions_asked >= 1 and _is_bare_assent(last_visitor_text):
+                return StopDecision(False, STOP_ASKED_TO_PROCEED,
+                                    "visitor assented to the next step", questions_asked, budget)
 
     # Condition 1: everything required for this state is covered.
     if coverage is not None and coverage.is_complete_for(journey_state):

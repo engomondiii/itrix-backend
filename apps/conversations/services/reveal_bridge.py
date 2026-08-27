@@ -1,44 +1,17 @@
-"""
-The conversation -> client-page bridge (states 3 -> 4).
+"""Conversation -> READY My Review bridge.
 
-── WHAT THIS DOES ───────────────────────────────────────────────────────────
-The conversational surface takes an anonymous visitor through the qualification
-band (ARRIVED -> IN_REVIEW -> DIAGNOSED) but has no way past DIAGNOSED. The custom
-"pitch room" the visitor is meant to receive is State 4 (CLIENT_PAGE), reached by
-the ``reveal_client_page`` transition, which mints the ``/c/<token>`` capability
-token. That transition, and the Lead it needs, only ever existed in the OLD
-structured-form path. This bridge wires the conversation to that EXISTING reveal
-machinery — it does not duplicate it.
+A concrete, consented Customer/Strategic Customer assessment may create a Lead and start
+My Review generation only after the numbered journey has reached DIAGNOSED, the canonical
+STR-03 Problem Mirror is confirmed/deliberately skipped, and an explicitly selected action
+genuinely requires identity.  Account presence, seniority, company, conversation depth, or a
+volunteered email never promote the relationship or trigger a review.
 
-── THE TWO THINGS THAT MADE THE FIRST VERSION FAIL ──────────────────────────
-1. It read contact from the CURRENT TURN ONLY and required a company AND an email
-   in that one message. Real visitors give their details across several turns
-   ("my name is X and my email is Y" ... then later "our company is Z"), so the
-   two pieces never coincided in one message and the reveal never fired.
-
-   FIX: contact is accumulated across EVERY visitor turn on the thread, so details
-   given in different messages combine.
-
-2. It required a company at all. An email alone is enough to anchor a Lead and mint
-   the page; a company enriches the record but is not essential.
-
-   FIX: the trigger is EMAIL-ANCHORED. A valid email is sufficient; the company is
-   captured when present but never blocks the reveal.
-
-── WHAT IT DOES WHEN IT FIRES ───────────────────────────────────────────────
-    1. creates a real Lead from the thread (lead_source=conversation, honest
-       exploratory defaults — no fabricated Q1-Q9 score),
-    2. attaches the captured contact,
-    3. claims the anonymous thread onto that Lead so the conversation continues as
-       the same thread,
-    4. fires the EXISTING ``reveal_client_page`` transition (3 -> 4), minting the
-       client-page token exactly as the form path does,
-    5. broadcasts the reveal to the THREAD's socket group (the anonymous visitor is
-       subscribed there) so the surface can navigate live, and returns the
-       ``/c/<token>`` URL so the reply can present a link.
-
-Idempotent and best-effort: a thread that already has a lead / already revealed is
-a satisfied no-op, and any failure leaves the conversation working.
+Generation is asynchronous and durable: ``maybe_reveal_client_page`` starts a PENDING review
+without minting any browser credential.  ``finalize_ready_review`` runs only after a complete
+schema-valid ResultPage is persisted READY, then mints a short-lived browser-bound one-time
+exchange code.  The code is broadcast in the realtime reveal event and must be exchanged
+through the Next.js BFF for an opaque httpOnly access-session cookie.  No bearer credential or
+internal identifier belongs in a URL or assistant prose.
 """
 
 from __future__ import annotations
@@ -170,38 +143,62 @@ def extract_contact(text: str) -> dict:
 
 def maybe_reveal_client_page(thread, body: str) -> dict:
     """
-    If the conversation is ready, create the Lead and reveal the client page.
+    Close the conversation-to-review loop without navigating to a partial page.
 
-    Returns:
-        {"revealed": bool, "token": str|None, "url": str|None,
-         "company": str, "name": str, "reason": str}
+    Once the qualification band is complete and an identity-dependent action has
+    legitimately produced an email address, create/attach the durable Lead and
+    start My Review generation.  The journey remains at DIAGNOSED while generation
+    is PENDING.  ``finalize_ready_review`` performs the actual 3 -> 4 reveal only
+    after a complete, schema-valid ResultPage has been persisted as READY.
 
-    ``revealed`` is True only when THIS call performed the 3 -> 4 reveal. It is a
-    no-op when the loop has not closed, no email has been given yet, the thread
-    already has a lead, or the feature is unavailable.
-
-    ── THE TRIGGER ──────────────────────────────────────────────────────────
-    Gate 1: the qualification loop has closed (DIAGNOSED, state >= 3).
-    Gate 2: an EMAIL has been given at any point in the conversation. Company and
-            name are captured when present but do not gate the reveal.
+    The function is deliberately idempotent: if a Lead already exists it simply
+    reports the durable generation state and never issues a second reveal.
     """
-    out = {"revealed": False, "token": None, "url": None, "company": "", "name": "", "reason": ""}
+    out = {
+        "revealed": False,
+        "token": None,
+        "url": None,
+        "company": "",
+        "name": "",
+        "reason": "",
+        "generation_status": None,
+    }
     if thread is None:
         out["reason"] = "no_thread"
         return out
 
-    if getattr(thread, "lead_id", None):
-        out["reason"] = "already_has_lead"
-        return out
-
     from apps.conversations.services import thread_state
 
-    # Gate 1: value must have been delivered (loop closed).
+    # Existing Lead means an earlier turn already started the durable review.
+    if getattr(thread, "lead_id", None):
+        try:
+            from apps.result_page.models import ResultPage
+
+            page = ResultPage.objects.filter(lead_id=thread.lead_id).first()
+            out["generation_status"] = getattr(page, "generation_status", None)
+            out["reason"] = "review_ready" if out["generation_status"] == ResultPage.GenerationStatus.READY else "review_preparing"
+        except Exception:  # noqa: BLE001
+            out["reason"] = "already_has_lead"
+        return out
+
+    # Value and the strategic confirmation gate must already have closed.
     if thread_state.current_state_number(thread) < 3:
         out["reason"] = "not_diagnosed"
         return out
 
-    # Gate 2: a valid email anywhere in the conversation (accumulated across turns).
+    relationship = (getattr(thread, "relationship_state", "") or "").lower()
+    if relationship not in {"customer", "strategic_customer"}:
+        out["reason"] = "not_customer"
+        return out
+    if (getattr(thread, "mirror_status", "") or "").lower() not in {"confirmed", "skipped"}:
+        out["reason"] = "mirror_not_confirmed"
+        return out
+
+    # Identity is requested only for an explicitly identity-dependent action.
+    if not (getattr(thread, "identity_needed_action", "") or "").strip():
+        out["reason"] = "identity_not_needed"
+        return out
+
     contact = accumulated_contact(thread, extra_text=body or "")
     out["company"] = contact["company"]
     out["name"] = contact["name"]
@@ -211,34 +208,72 @@ def maybe_reveal_client_page(thread, body: str) -> dict:
 
     try:
         lead = _create_conversation_lead(thread, contact)
-    except Exception:  # noqa: BLE001 - never break the turn on lead creation
+    except Exception:  # noqa: BLE001
         logger.exception("conversation lead creation failed for thread %s", getattr(thread, "id", "?"))
         out["reason"] = "lead_create_failed"
         return out
 
     try:
-        from apps.journey.services.advance import reveal_client_page
+        from apps.review.services.qualification_processor import kick_off_result_page
 
-        result = reveal_client_page(lead, meta={"source": "conversation", "thread_id": str(thread.id)})
-        reveal = getattr(result, "reveal", None) or {}
-        token = reveal.get("capability_token") if isinstance(reveal, dict) else None
+        kick_off_result_page(lead, finalize_conversation=True)
     except Exception:  # noqa: BLE001
-        logger.exception("reveal_client_page failed for lead %s", getattr(lead, "id", "?"))
-        out["reason"] = "reveal_failed"
+        logger.exception("could not start My Review for lead %s", getattr(lead, "id", "?"))
+        out["reason"] = "review_start_failed"
         return out
+
+    out.update({"reason": "review_preparing", "generation_status": "pending"})
+    logger.info("My Review generation started from conversation for thread %s (lead %s)", thread.id, lead.id)
+    return out
+
+
+def finalize_ready_review(lead) -> dict:
+    """Reveal a completed My Review to its originating conversation, once.
+
+    This is called by the asynchronous generation worker *after* ResultPage has
+    passed complete-schema validation and been persisted as READY.  It therefore
+    cannot expose a partial artifact.  The access code is browser/session-bound
+    by ``reveal_client_page(..., thread=thread)`` and is only a one-time exchange
+    code, not the durable review credential itself.
+    """
+    from apps.conversations.models import Thread
+    from apps.conversations.services import thread_state
+    from apps.journey.services.advance import reveal_client_page
+    from apps.result_page.models import ResultPage
+
+    page = ResultPage.objects.filter(lead=lead).first()
+    if page is None or page.generation_status != ResultPage.GenerationStatus.READY:
+        return {"revealed": False, "reason": "not_ready"}
+
+    thread = Thread.objects.filter(lead=lead).order_by("-updated_at").first()
+    if thread is None:
+        return {"revealed": False, "reason": "no_thread"}
+
+    # Already mirrored to State 4: do not mint/rebroadcast a second access grant.
+    if thread_state.current_state_number(thread) >= 4:
+        return {"revealed": False, "reason": "already_revealed"}
+
+    result = reveal_client_page(
+        lead,
+        meta={"source": "conversation_review_ready", "thread_id": str(thread.id)},
+        thread=thread,
+    )
+    reveal = getattr(result, "reveal", None) or {}
+    token = reveal.get("access_code") if isinstance(reveal, dict) else None
 
     try:
         thread_state._mirror_onto_thread(thread, "CLIENT_PAGE")
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("could not mirror CLIENT_PAGE onto thread %s", thread.id, exc_info=True)
 
-    url = _client_page_url(token) if token else None
     _broadcast_reveal_to_thread(thread, reveal if isinstance(reveal, dict) else {}, token)
-
-    out.update({"revealed": True, "token": token, "url": url, "reason": "revealed"})
-    logger.info("client page revealed from conversation for thread %s (lead %s)", thread.id, lead.id)
-    return out
-
+    logger.info("READY My Review revealed to conversation thread %s (lead %s)", thread.id, lead.id)
+    return {
+        "revealed": True,
+        "access_code": token,
+        "url": None,
+        "reason": "revealed",
+    }
 
 def _create_conversation_lead(thread, contact: dict):
     """
@@ -325,7 +360,7 @@ def _broadcast_reveal_to_thread(thread, reveal: dict, token) -> None:
         payload = {
             "state": reveal.get("state", "CLIENT_PAGE"),
             "surface": reveal.get("surface", "client_page"),
-            "capability_token": token,
+            "access_code": token,
             "value_delivered": True,
         }
         broadcast_reveal(thread.group_name, payload)
@@ -340,16 +375,9 @@ def _broadcast_reveal_to_thread(thread, reveal: dict, token) -> None:
         logger.debug("reveal fan-out to thread group failed for thread %s", getattr(thread, "id", "?"))
 
 
-def _client_page_url(token: str) -> str:
-    from django.conf import settings
-
-    base = (
-        getattr(settings, "FRONTEND_WEB_URL", "")
-        or getattr(settings, "FRONTEND_URL", "")
-        or ""
-    ).rstrip("/")
-    path = f"/c/{token}"
-    return f"{base}{path}" if base else path
+def _client_page_url(_token: str) -> str:
+    """Retired: My Review URLs are credential-free."""
+    return "/c"
 
 
 def _first_visitor_turn(thread) -> str:

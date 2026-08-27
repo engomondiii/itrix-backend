@@ -307,16 +307,13 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "thread.updated", "payload": event.get("payload", {})})
 
     async def journey_reveal(self, event):
-        await self.send_json(
-            {
-                "type": "journey.reveal",
-                "payload": {
-                    "state": event.get("state"),
-                    "surface": event.get("surface"),
-                    "capabilityToken": event.get("capability_token"),
-                },
-            }
-        )
+        surface = event.get("surface")
+        payload = {"state": event.get("state"), "surface": surface}
+        if surface == "client_page":
+            payload["accessCode"] = event.get("access_code")
+        elif event.get("capability_token"):
+            payload["capabilityToken"] = event.get("capability_token")
+        await self.send_json({"type": "journey.reveal", "payload": payload})
 
     async def question_suggested(self, event):
         await self.send_json({"type": "question.suggested", "payload": event.get("payload", {})})
@@ -447,20 +444,13 @@ def _settle(thread, streamed_text: str, ctx, streamed_cited_chunk_ids=None) -> d
 
     deliverable = governance_status in ("auto_approved", "approved")
 
-    # Transport parity with views_thread + the older review consumer.  The journey
-    # decision is deterministic and was made BEFORE generation; the transport owns
-    # the final guarantee that the visitor actually receives it.  This makes the
-    # email turn atomic from the visitor's perspective: email in -> page link out,
-    # with no second email prompt and no model-dependent promise of later work.
+    # Transport parity: review access is never embedded in assistant prose.  The
+    # realtime reveal event carries only the short-lived browser-bound exchange code;
+    # the browser/BFF owns secure access and the transcript remains credential-free.
     from apps.conversations.services import terminology
 
     body = terminology.normalise_outbound(body)
     extra = getattr(ctx, "extra", None) or {}
-    reveal = extra.get("client_page_reveal") or {}
-    if deliverable and reveal.get("url"):
-        from apps.conversations.views_thread import _append_client_page_link
-
-        body = _append_client_page_link(body, reveal["url"])
 
     contact_decision = extra.get("contact_ask") or {}
     if deliverable and contact_decision.get("ask"):

@@ -118,9 +118,17 @@ def generate(thread, artifact_type: str, *, payload: dict | None = None,
 
 def _state_for(thread) -> int:
     lead = getattr(thread, "lead", None)
-    if lead is None:
+    if lead is not None:
+        return journey_number(getattr(lead, "journey_state", None)) or 1
+    # Anonymous Customer threads legitimately occupy ARRIVED/IN_REVIEW/DIAGNOSED before
+    # a Lead exists. Artifact authorization must follow that durable thread state or the
+    # canonical DIAGNOSED reflection can never be delivered before identity capture.
+    try:
+        from apps.conversations.services.thread_state import current_state_number
+
+        return current_state_number(thread)
+    except Exception:  # noqa: BLE001
         return 1
-    return journey_number(getattr(lead, "journey_state", None)) or 1
 
 
 def _govern(payload: dict, artifact_type: str) -> tuple[dict, str]:
@@ -219,48 +227,217 @@ def build_payload(thread, artifact_type: str) -> dict:
     return builders.get(artifact_type, lambda _t: {})(thread)
 
 
-def _visitor_words(thread, limit: int = 5) -> list[str]:
+def _visitor_words(thread, limit: int = 40) -> list[str]:
     from apps.conversations.models import Message
 
-    return [
-        (m.body or "").strip()
-        for m in Message.objects.filter(
-            thread=thread, sender_kind__in=["visitor", "client"]
-        ).order_by("seq", "created_at")[:limit]
-        if (m.body or "").strip()
-    ]
+    qs = Message.objects.filter(
+        thread=thread, sender_kind__in=["visitor", "client"]
+    ).order_by("seq", "created_at")
+    rows = list(qs)
+    if limit:
+        rows = rows[-limit:]
+    return [(m.body or "").strip() for m in rows if (m.body or "").strip()]
+
+
+def _sentences(lines: list[str]) -> list[str]:
+    import re
+
+    out: list[str] = []
+    for line in lines:
+        for part in re.split(r"(?<=[.!?])\s+|\n+", line):
+            clean = " ".join(part.split()).strip()
+            if clean and len(clean) >= 4:
+                out.append(clean)
+    return out
+
+
+def _pick(sentences: list[str], pattern: str) -> str:
+    import re
+
+    rx = re.compile(pattern, re.I)
+    for sentence in reversed(sentences):
+        if rx.search(sentence):
+            return sentence
+    return ""
+
+
+def _public_safe_user_facts(lines: list[str]) -> list[str]:
+    """Recent user facts, excluding control/identity turns and likely sensitive detail."""
+    import re
+    from apps.conversations.services import confidentiality
+
+    controls = re.compile(
+        r"^\s*(?:yes|no|proceed|this reflects my situation|refine this|start again|skip|confirmed|not now)\s*[.!]?$",
+        re.I,
+    )
+    email = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
+    out: list[str] = []
+    for line in lines:
+        if controls.match(line) or email.search(line):
+            continue
+        if confidentiality.detect(line).sensitive:
+            continue
+        clean = " ".join(line.split())
+        if clean and clean not in out:
+            out.append(clean)
+    return out[-4:]
+
+
+def _mirror_quality(thread, payload: dict, *, explicit_decision: bool, facts: list[str]) -> dict:
+    """STR-03 v2.2 8x0-2 gate. Internal only; never included in artifact payload."""
+    sensitive = bool(getattr(thread, "_confidential_intercept", None))
+    scores = {
+        "faithfulness": 2 if facts else 0,
+        "decision_accuracy": 2 if explicit_decision else (1 if payload.get("affectedDecision") else 0),
+        "uncertainty_discipline": 2 if str(payload.get("boundedHypothesis", "")).lower().startswith("hypothesis") and payload.get("unknowns") else 0,
+        "authority_realism": 2,
+        "correction_path": 2 if len(payload.get("controls") or []) == 3 else 0,
+        "disclosure_safety": 0 if sensitive else 2,
+        "route_restraint": 2 if not payload.get("recommendedRoute") else 0,
+        "continuity_value": 2 if len(facts) >= 2 or explicit_decision else 1,
+    }
+    total = sum(scores.values())
+    essentials = ("faithfulness", "uncertainty_discipline", "disclosure_safety", "correction_path")
+    passed = total >= 12 and all(scores[k] > 0 for k in essentials)
+    return {"total": total, "scores": scores, "passed": passed}
+
+
+def _record_mirror_quality(thread, quality: dict) -> None:
+    try:
+        state = dict(getattr(thread, "conversation_commitments", None) or {})
+        state["mirror_quality"] = {
+            "total": int(quality.get("total") or 0),
+            "passed": bool(quality.get("passed")),
+            "scores": quality.get("scores") or {},
+        }
+        thread.conversation_commitments = state
+        thread.save(update_fields=["conversation_commitments", "updated_at"])
+    except Exception:  # noqa: BLE001
+        logger.debug("mirror quality could not be recorded for thread %s", getattr(thread, "id", "?"))
 
 
 def _reflection(thread) -> dict:
-    """
-    "What we think is actually happening" (Playbook State 3).
+    """Canonical STR-03 Strategic Problem Mirror, v2.2.
 
-    Qualitative only. The reflection's job is to prove we LISTENED — quantifying anything
-    here would be claiming a result before any evidence exists.
+    The payload contains exactly the six visitor-facing parts. Quality scoring is stored
+    internally on the thread and deliberately omitted from the payload (SAT-11).
     """
-    said = _visitor_words(thread)
-    return {
-        "title": "What we think is actually happening",
-        "intro": (
-            "Here is how we would describe your bottleneck, the layer we think it may "
-            "really sit in, and the ALPHA route that would be worth examining first."
-        ),
-        "acknowledgement": said[0] if said else "",
-        "recognized_pressures": _pressures_from(said),
-        "likely_hidden_boundary": "",
-        "initial_alpha_route": "ALPHA Compute assessment of one representative workload",
-        "action_label": "Open the full reflection",
+    import re
+    from apps.conversations.services import engagement_state
+
+    lines = _visitor_words(thread, limit=40)
+    facts = _public_safe_user_facts(lines)
+    sentences = _sentences(facts)
+
+    decision_sentence = _pick(
+        sentences,
+        r"\b(decid|decision|choose|whether|roadmap|adopt|adoption|deploy|deployment|architecture|capacity|commit|replace|substitut|scale|rollout)\b",
+    )
+    consequence_sentence = _pick(
+        sentences,
+        r"\b(cost|latency|slow|battery|thermal|power|energy|capacity|reliab|throughput|utili[sz]|risk|deadline|budget|memory|bandwidth)\b",
+    )
+
+    pressures = _pressures_from(facts)
+    fact_text = " ".join(facts[-3:]) if facts else ""
+    if decision_sentence:
+        affected = decision_sentence
+    else:
+        affected = (
+            "Not yet confirmed — the next thing to clarify is which workload, architecture, "
+            "capacity, deployment or adoption decision this assessment is meant to inform."
+        )
+    consequence = consequence_sentence or (
+        "Not yet confirmed — the consequence should be stated in the operational, economic, "
+        "capacity, energy, reliability or strategic terms you actually use to judge this decision."
+    )
+
+    if any(p in pressures for p in ("Data-movement-bound runtime", "Underused accelerators")):
+        hypothesis = (
+            "Hypothesis — part of the burden may sit at representation, memory-movement or execution "
+            "boundaries before additional capacity is assumed to be the answer. This is a possibility, not a finding."
+        )
+    elif any(p in pressures for p in ("Power or cooling limits", "Latency pressure", "Compute cost growth")):
+        hypothesis = (
+            "Hypothesis — part of the observed pressure may be reducible by examining how the selected workload "
+            "is represented before execution, rather than assuming hardware shortage is the root cause. This is not a diagnosis."
+        )
+    else:
+        hypothesis = (
+            "Hypothesis — one structural representation or execution boundary may be worth examining before "
+            "treating the current implementation or hardware as the only lever. This is a possibility, not a finding."
+        )
+
+    joined = " ".join(sentences).lower()
+    unknowns: list[str] = []
+    if not re.search(r"\b(baseline|current (?:latency|cost|power|throughput)|p95|p99|benchmark)\b", joined):
+        unknowns.append("The baseline and the evidence standard against which a change would be judged.")
+    if not re.search(r"\b(workload|pipeline|model|solver|operator|inference|training|simulation|agentic)\b", joined):
+        unknowns.append("Which representative workload or workload family should anchor the assessment.")
+    if not re.search(r"\b(cpu|gpu|npu|tpu|fpga|cloud|cluster|device|android|runtime|platform|environment|silicon)\b", joined):
+        unknowns.append("The target execution environment and relevant software/hardware boundary.")
+    if not re.search(r"\b(i decide|we decide|owner|sponsor|board|vp|evp|cto|architect|team decides|decision authority)\b", joined):
+        unknowns.append("Who owns or sponsors the decision; no authority is assumed from title or company.")
+    unknowns.append("What evidence can be shared safely at the current disclosure level.")
+    unknowns = unknowns[:5]
+
+    payload = {
+        "kind": "strategic_problem_mirror",
+        "title": "Strategic Problem Mirror",
+        "statedFacts": fact_text,
+        "affectedDecision": affected,
+        "consequence": consequence,
+        "boundedHypothesis": hypothesis,
+        "unknowns": unknowns,
+        "confirmOrCorrect": "Please confirm or correct this reading before any strategic route is recommended.",
+        "controls": [
+            {"action": "confirm", "label": "This reflects my situation"},
+            {"action": "refine", "label": "Refine this"},
+            {"action": "restart", "label": "Start again"},
+        ],
     }
+    quality = _mirror_quality(
+        thread, payload, explicit_decision=bool(decision_sentence), facts=facts
+    )
+    _record_mirror_quality(thread, quality)
+
+    if not quality["passed"]:
+        # A below-gate draft is not displayed as a mirror. v2.2 requires a neutral
+        # fallback or human review and treats fallback frequency as a quality signal.
+        if getattr(thread, "mirror_status", "") != engagement_state.MIRROR_FALLBACK:
+            thread.mirror_status = engagement_state.MIRROR_FALLBACK
+            thread.save(update_fields=["mirror_status", "updated_at"])
+        return {
+            "kind": "mirror_fallback",
+            "title": "One decision detail before we continue",
+            "intro": (
+                "I do not have enough confirmed, non-confidential information to show a reliable "
+                "Strategic Problem Mirror yet. Choose or state the decision you want this conversation to inform."
+            ),
+            "decisionChoices": ["Capacity", "Architecture", "Roadmap", "Deployment", "Adoption", "Something else"],
+            "controls": [
+                {"action": "refine", "label": "Refine this"},
+                {"action": "restart", "label": "Start again"},
+            ],
+        }
+
+    if getattr(thread, "mirror_status", "") in (
+        engagement_state.MIRROR_REFINE,
+        engagement_state.MIRROR_RESTART,
+        engagement_state.MIRROR_NOT_REQUIRED,
+    ):
+        thread.mirror_status = engagement_state.MIRROR_PENDING
+        thread.save(update_fields=["mirror_status", "updated_at"])
+    return payload
 
 
 def _pressures_from(said: list[str]) -> list[str]:
-    from apps.agents.services.coverage import analyse_text
-
     joined = " ".join(said)
     labels = {
         "cost": "Compute cost growth", "expensive": "Compute cost growth",
         "slow": "Slow turnaround", "latency": "Latency pressure",
         "energy": "Power or cooling limits", "power": "Power or cooling limits",
+        "battery": "Power or cooling limits", "thermal": "Power or cooling limits",
         "memory": "Data-movement-bound runtime", "bandwidth": "Data-movement-bound runtime",
         "unstable": "Stability or accuracy drift", "drift": "Stability or accuracy drift",
         "utilization": "Underused accelerators", "utilisation": "Underused accelerators",

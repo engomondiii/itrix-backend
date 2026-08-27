@@ -62,6 +62,17 @@ def _visitor_turn(thread, body: str = "Our solver is slow.", seq: int = 1):
     )
 
 
+def _confirmed_customer_thread(lead, *, session="sess-shell-confirmed"):
+    """Create the active thread needed to satisfy the STR-03 recommendation gate."""
+    from apps.conversations.services import engagement_state, threads as thread_svc
+
+    thread = thread_svc.create_thread(visitor_session=session, lead=lead)
+    thread.relationship_state = engagement_state.REL_CUSTOMER
+    thread.mirror_status = engagement_state.MIRROR_CONFIRMED
+    thread.save(update_fields=["relationship_state", "mirror_status", "updated_at"])
+    return thread
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Preserved from v6.0 — none of this changed
 # ─────────────────────────────────────────────────────────────────────────────
@@ -131,7 +142,8 @@ def test_the_portal_and_the_cockpit_reach_the_same_decision():
     from apps.governance.services import nba_precedence
 
     lead = LeadFactory(journey_state="ASSESSMENT", email="x@example.com")
-    portal = shell.for_subject(lead)["next_best_action"]
+    thread = _confirmed_customer_thread(lead)
+    portal = shell.for_subject(lead, thread=thread)["next_best_action"]
     cockpit = nba_precedence.for_lead(lead, nba_candidates(lead)).to_client_payload()
     assert portal == cockpit
 

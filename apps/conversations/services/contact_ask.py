@@ -86,15 +86,13 @@ ASK = "ask"
 # wrong thing first. The reveal contract is unchanged: the email alone is
 # sufficient, the name or organisation only enriches the page and the record.
 _ASK_BANK: tuple[str, ...] = (
-    "One last thing — what is your work email address, and what name or "
-    "organisation should the page be addressed to? The email is the essential "
-    "part; it is what we need to put your personalised itriX page together.",
-    "If you would like that personalised page, your work email address is the one "
-    "thing still missing — and if you tell us the name or organisation it should "
-    "be addressed to, we will use that too. If you would rather not share an "
-    "address, that is completely fine — we can keep going as we are.",
+    "To carry out the action you selected, I need a work email for the private handoff. "
+    "I’ll use it only for that action; it does not increase your disclosure access or "
+    "change the stage you chose. You can decline and continue here anonymously.",
+    "If you still want to continue with that identity-dependent action, a work email is "
+    "the remaining handoff detail. If not, we can leave the action there and continue "
+    "the public conversation without an email.",
 )
-
 # Whether a reply already contains an ask of its own. Deliberately broad: a reply
 # that mentions an address at all is treated as having asked, because appending a
 # second ask underneath the model's own is worse than occasionally not appending.
@@ -154,8 +152,20 @@ def evaluate(thread, body: str = "") -> dict:
         out["reason"] = ALREADY_HAS_LEAD
         return out
 
-    from apps.conversations.services import reveal_bridge, thread_state
+    from apps.conversations.services import engagement_state, reveal_bridge, thread_state
 
+    # Contact is never a depth/lead-capture CTA. It is permitted only after the user
+    # explicitly selected an action whose execution genuinely requires identity, and
+    # only after the Customer Problem Mirror has been confirmed.
+    if not engagement_state.is_customer(thread):
+        out["reason"] = "visitor_lane"
+        return out
+    if not engagement_state.identity_action_selected(thread):
+        out["reason"] = "no_identity_dependent_action"
+        return out
+    if not engagement_state.recommendation_allowed(thread):
+        out["reason"] = "problem_mirror_unconfirmed"
+        return out
     if thread_state.current_state_number(thread) < 3:
         out["reason"] = NOT_DIAGNOSED
         return out

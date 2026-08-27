@@ -48,7 +48,46 @@ def handle_review_chat_turn(*, review_session_id: str, lead=None, body: str) -> 
     inbound = ingest.ingest_inbound(conv, sender_kind="visitor", body=body)
     fan_out.broadcast_message(inbound)
 
-    # 2) route to the Concierge (governed). Deterministic fallback when agents are off.
+    # 2) deterministic safety stops run BEFORE retrieval/model invocation.  Review chat is
+    # another public entry point, so it must not bypass the same confidential-input / oracle
+    # protections used by the main thread route.
+    from apps.conversations.services import confidentiality, protected_probe, response_policy, terminology
+
+    thread = getattr(conv, "thread", None)
+    if thread is None and lead is not None:
+        from apps.conversations.models_thread import Thread
+
+        thread = Thread.objects.filter(lead=lead).order_by("-updated_at").first()
+    locale = getattr(thread, "locale", "") or getattr(getattr(lead, "review_session", None), "locale", "en") or "en"
+
+    intercept = confidentiality.detect(body)
+    if intercept.sensitive:
+        reply_text = confidentiality.safe_reply(locale=locale)
+        reply_msg = ingest.ingest_agent_message(
+            conv, agent_key="concierge", body=reply_text, governance_status="auto_approved",
+            claim_level=0, meta={"policy_stop": "confidential_input"}, thread=thread,
+        )
+        fan_out.broadcast_message(reply_msg)
+        return ReviewChatResult(
+            conversation_id=str(conv.id), reply=reply_text, suggest_nda=False,
+            governance_status="auto_approved", under_review=False, cited_chunk_ids=[],
+        )
+
+    if protected_probe.is_probe(body):
+        if thread is not None:
+            protected_probe.record(thread)
+        reply_text = protected_probe.safe_reply(locale=locale)
+        reply_msg = ingest.ingest_agent_message(
+            conv, agent_key="concierge", body=reply_text, governance_status="auto_approved",
+            claim_level=0, meta={"policy_stop": "protected_probe"}, thread=thread,
+        )
+        fan_out.broadcast_message(reply_msg)
+        return ReviewChatResult(
+            conversation_id=str(conv.id), reply=reply_text, suggest_nda=False,
+            governance_status="auto_approved", under_review=False, cited_chunk_ids=[],
+        )
+
+    # 3) route to the Concierge (governed). Deterministic fallback when agents are off.
     from apps.agents.services.context import AgentContext, PLANE_PUBLIC
     from apps.agents.services.runtime import run_concierge
 
@@ -67,9 +106,10 @@ def handle_review_chat_turn(*, review_session_id: str, lead=None, body: str) -> 
     )
     out = run_concierge(ctx)
     payload = out.payload or {}
-    reply_text = payload.get("reply", "")
+    reply_text = terminology.normalise_outbound(payload.get("reply", ""))
+    reply_text = response_policy.enforce(reply_text, thread=thread)
 
-    # 3) persist the agent reply with its governance status + fan out (governed).
+    # 4) persist the agent reply with its governance status + fan out (governed).
     reply_msg = ingest.ingest_agent_message(
         conv,
         agent_key="concierge",

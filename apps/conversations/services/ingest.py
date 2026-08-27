@@ -124,6 +124,38 @@ def _after_inbound_turn(thread, message, body: str) -> None:
     except Exception:  # noqa: BLE001
         logger.exception("thread post-turn bookkeeping failed")
 
+    # v2.2 confidentiality interception happens BEFORE qualification and BEFORE
+    # any model receives the current turn. The visitor's own turn remains their record,
+    # but downstream processing gets a deterministic stop signal instead of the secret.
+    try:
+        from apps.conversations.services import confidentiality
+
+        intercept = confidentiality.detect(body)
+        setattr(thread, "_confidential_intercept", intercept if intercept.sensitive else None)
+        if intercept.sensitive:
+            setattr(thread, "_client_page_reveal", None)
+            setattr(thread, "_contact_ask", None)
+            return
+    except Exception:  # noqa: BLE001
+        logger.exception("confidentiality interception failed for thread %s", getattr(thread, "id", "?"))
+        setattr(thread, "_confidential_intercept", None)
+
+    # Protected-function probing is also a deterministic routing decision. Do not let
+    # the model become an oracle after a refusal.
+    try:
+        from apps.conversations.services import protected_probe
+
+        probing = protected_probe.is_probe(body)
+        setattr(thread, "_protected_probe", probing)
+        if probing:
+            protected_probe.record(thread)
+            setattr(thread, "_client_page_reveal", None)
+            setattr(thread, "_contact_ask", None)
+            return
+    except Exception:  # noqa: BLE001
+        logger.exception("protected-probe detection failed for thread %s", getattr(thread, "id", "?"))
+        setattr(thread, "_protected_probe", False)
+
     # ── v6.0 Phase 2: support-intent routing ─────────────────────────────────
     # A SUPPORT QUESTION IS NEVER ANSWERED WITH A COMMERCIAL ANSWER. Routing happens
     # here, before any agent sees the turn, so the decision is deterministic rather than

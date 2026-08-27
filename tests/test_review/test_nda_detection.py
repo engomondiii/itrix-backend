@@ -58,6 +58,7 @@ def test_immediate_response_no_reminder_for_clean_prompt():
 
 # ── End-to-end: prompt endpoint sets the flag + returns reminder ─────────────
 def test_prompt_endpoint_flags_nda(api_client):
+    api_client.credentials(HTTP_X_ITRIX_SESSION="nda-test-browser")
     sid = api_client.post(SESSIONS_URL, {}, format="json").json()["id"]
     url = f"{SESSIONS_URL}{sid}/prompt/"
     resp = api_client.post(

@@ -152,6 +152,14 @@ class Thread(BaseModel):
     conversation_commitments = models.JSONField(default=dict, blank=True)
     locale = models.CharField(max_length=12, blank=True, default="en")
 
+    # Durable first-request idempotency. Only SHA-256 digests are stored: the raw
+    # client identifier is a recovery capability and must not land in logs or rows.
+    # Nullable+unique lets ordinary/non-idempotent historical threads coexist.
+    creation_idempotency_hash = models.CharField(
+        max_length=64, null=True, blank=True, unique=True
+    )
+    creation_payload_hash = models.CharField(max_length=64, blank=True, default="")
+
     # How many adaptive questions have been asked in this thread's qualification band.
     # Denormalised from QuestionSuggestion so the stop-rule budget check does not have
     # to re-count on every turn; QuestionSuggestion remains the auditable record.

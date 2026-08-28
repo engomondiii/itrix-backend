@@ -1,48 +1,56 @@
+"""Disclosure authorization filter.
+
+Truth, model-readability, account state and NDA state are separate concerns.  For every
+non-team caller the baseline ceiling is public/controlled-public.  Content in the
+``authorized``, agreement-gated (``nda_only``), or private customer-contract tiers is
+visible only when the *specific document* has an active ContentAuthorization for the
+current subject.  An NDA is a prerequisite for agreement-gated content; it is never an
+authorization by itself.
 """
-Disclosure filter.
-
-Enforces the six-state disclosure model on retrieved knowledge before it can influence a
-public-facing result. The public result page may only be built from ``public`` (and, when
-an NDA context applies, ``nda_only``) material; ``controlled_public`` is allowed only in
-controlled contexts; ``internal_only`` and ``prohibited`` are never exposed.
-
-This runs on retrieved chunks (by their ``disclosure_level`` metadata) and on the proof
-list, so nothing above the caller's allowed tier reaches the visitor.
-"""
-
 from __future__ import annotations
 
-# Ordering from most to least open.
 DISCLOSURE_ORDER = [
     "public", "controlled_public", "authorized", "nda_only", "customer_contract",
     "internal_only", "prohibited",
 ]
 
-# What each context is permitted to see.
+# Baseline levels.  Deliberately, ``nda`` and ``customer_contract`` do not automatically
+# add a restricted tier. Explicit authorization below is the second, mandatory gate.
 CONTEXT_ALLOWED = {
     "public": {"public"},
     "controlled": {"public", "controlled_public"},
-    # Authorized content requires an explicit authorization context; an NDA does not
-    # imply this state and therefore does not gain it automatically.
-    "authorized": {"public", "controlled_public", "authorized"},
-    "nda": {"public", "controlled_public", "nda_only"},
-    # ── v6.0: the SIXTH TIER ─────────────────────────────────────────────────
-    # customer_contract material is SCOPED PER CUSTOMER and NEVER CROSS-SERVED.
-    # Reaching this tier is not enough on its own — ``customer_scope`` must also
-    # match, and ``filter_chunks`` enforces that separately below. A customer who
-    # can see the tier must still not see another customer's contract material.
-    "customer_contract": {"public", "controlled_public", "nda_only", "customer_contract"},
+    "authorized": {"public", "controlled_public"},
+    "nda": {"public", "controlled_public"},
+    "customer_contract": {"public", "controlled_public"},
     "internal": {
         "public", "controlled_public", "authorized", "nda_only", "customer_contract", "internal_only",
     },
 }
-
-# Never exposed outside internal tooling, regardless of context.
 NEVER_PUBLIC = {"internal_only", "prohibited"}
+RESTRICTED = {"authorized", "nda_only", "customer_contract"}
 
 
 def allowed_levels(context: str) -> set[str]:
     return CONTEXT_ALLOWED.get(context, {"public"})
+
+
+def authorized_levels(*, nda_signed: bool = False, contract_executed: bool = False) -> set[str]:
+    levels = {"authorized"}
+    if nda_signed or contract_executed:
+        levels.add("nda_only")
+    if contract_executed:
+        levels.add("customer_contract")
+    return levels
+
+
+def query_candidate_levels(
+    context: str, *, has_explicit_authorization: bool = False,
+    nda_signed: bool = False, contract_executed: bool = False,
+) -> set[str]:
+    levels = set(allowed_levels(context))
+    if context != "internal" and has_explicit_authorization:
+        levels |= authorized_levels(nda_signed=nda_signed, contract_executed=contract_executed)
+    return levels - {"prohibited"}
 
 
 def is_allowed(level: str, *, context: str = "public") -> bool:
@@ -53,47 +61,54 @@ def is_allowed(level: str, *, context: str = "public") -> bool:
 
 
 def filter_chunks(
-    chunks: list[dict], *, context: str = "public", customer_scope: str = ""
+    chunks: list[dict], *, context: str = "public", customer_scope: str = "",
+    authorized_document_ids: set[str] | None = None,
+    nda_signed: bool = False, contract_executed: bool = False,
 ) -> list[dict]:
-    """
-    Keep only chunks whose ``disclosure_level`` is allowed in ``context``.
-
-    ``customer_scope`` adds the SECOND gate for the sixth tier. A customer_contract chunk
-    is served only when its own scope matches the caller's — an empty caller scope can
-    never match a scoped chunk, so the default is closed.
-    """
-    permitted = allowed_levels(context)
+    """Fail-closed response authorization for retrieved chunks."""
+    baseline = allowed_levels(context)
+    explicit = {str(x) for x in (authorized_document_ids or set())}
+    explicit_levels = authorized_levels(
+        nda_signed=nda_signed, contract_executed=contract_executed
+    ) if explicit else set()
     kept: list[dict] = []
     for chunk in chunks:
         metadata = chunk.get("metadata", {}) or {}
-        level = (
-            chunk.get("disclosure_level") or metadata.get("disclosure_level") or "public"
-        ).lower()
+        level = (chunk.get("disclosure_level") or metadata.get("disclosure_level") or "public").lower()
+        doc_id = str(chunk.get("document_id") or metadata.get("document_id") or "")
+        if level == "prohibited":
+            continue
         if level in NEVER_PUBLIC and context != "internal":
             continue
-        if level not in permitted:
+        if context != "internal" and level in RESTRICTED:
+            if doc_id not in explicit or level not in explicit_levels:
+                continue
+        elif level not in baseline:
             continue
 
-        # THE SECOND GATE. customer_contract material is scoped per customer and NEVER
-        # cross-served. The team plane is exempt because internal review must be able to
-        # see the material it is reviewing.
         if level == "customer_contract" and context != "internal":
             chunk_scope = str(chunk.get("customer_scope") or metadata.get("customer_scope") or "")
-            if not chunk_scope or chunk_scope != str(customer_scope or ""):
+            caller_scope = str(customer_scope or "")
+            # Customer-contract material has two independent gates: explicit document
+            # authorization above and exact customer scope here.  Missing scope on either
+            # side is closed, not treated as a wildcard.
+            if not caller_scope or not chunk_scope or chunk_scope != caller_scope:
                 continue
-
+            if not contract_executed:
+                continue
         kept.append(chunk)
     return kept
 
 
-def filter_proofs(proofs: list[dict], *, context: str = "public") -> list[dict]:
-    """Filter proof-preview items by their ``disclosure`` field for the given context."""
-    permitted = allowed_levels(context)
-    out: list[dict] = []
-    for proof in proofs:
-        level = (proof.get("disclosure") or "public").lower()
-        if level in NEVER_PUBLIC and context != "internal":
-            continue
-        if level in permitted:
-            out.append(proof)
-    return out
+def filter_proofs(
+    proofs: list[dict], *, context: str = "public", authorized: bool = False,
+    nda_signed: bool = False, contract_executed: bool = False,
+) -> list[dict]:
+    baseline = allowed_levels(context)
+    extra = authorized_levels(nda_signed=nda_signed, contract_executed=contract_executed) if authorized else set()
+    permitted = baseline | extra
+    return [
+        p for p in proofs
+        if (p.get("disclosure") or "public").lower() in permitted
+        and ((p.get("disclosure") or "public").lower() != "prohibited")
+    ]

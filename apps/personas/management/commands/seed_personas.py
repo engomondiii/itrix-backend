@@ -34,6 +34,10 @@ _PERSONA_FIELDS = (
     "primary_persona",
     "functional_family",
     "pitch_archetype",
+    "strategic_lane",
+    "strategic_lane_code",
+    "reference_person",
+    "reference_role",
     "buying_role",
     "decision_lens",
     "department_mandate",
@@ -156,6 +160,7 @@ class Command(BaseCommand):
         seen_personas: set[str] = set()
         seen_rooms: set[str] = set()
         valid_families = {choice[0] for choice in Persona._meta.get_field("functional_family").choices}
+        valid_lanes = {choice[0] for choice in Persona._meta.get_field("strategic_lane").choices}
 
         for index, record in enumerate(records):
             if not isinstance(record, dict):
@@ -172,6 +177,12 @@ class Command(BaseCommand):
             family = record.get("functional_family")
             if family not in valid_families:
                 problems.append(f"{persona_id}: unknown functional_family {family!r}")
+
+            lane = record.get("strategic_lane")
+            if lane not in valid_lanes:
+                problems.append(f"{persona_id}: unknown strategic_lane {lane!r}")
+            if not str(record.get("strategic_lane_code") or "").startswith("SA-"):
+                problems.append(f"{persona_id}: missing/invalid strategic_lane_code")
 
             room_id = record.get("pitch_room_id")
             if room_id:

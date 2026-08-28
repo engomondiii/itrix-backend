@@ -5,8 +5,9 @@ Client-plane permissions.
 ``ClientJWTAuthentication`` (i.e. ``request.user`` is a ``Client``). Team users and
 anonymous requests are rejected — the client plane is separate from the team plane.
 
-``HasSignedNDA`` additionally requires the client's NDA to be in place, gating the
-data-room / NDA-only surfaces (used by the Phase 2 portal endpoints).
+``HasSignedNDA`` is a narrow agreement-prerequisite helper. It must never be used as a
+content-authorization gate: restricted Knowledge material also requires an explicit
+``ContentAuthorization`` for the current subject and document.
 """
 
 from __future__ import annotations
@@ -42,20 +43,12 @@ from apps.customer_success.permissions import (  # noqa: E402,F401
 
 
 def ceiling_for_client(client) -> str:
-    """
-    The disclosure ceiling a client may reach.
+    """Return the client plane's baseline ceiling.
 
-    Extended in v6.0 with the sixth tier. The ordering is strict and each step must be
-    EARNED — a contract implies an NDA, but an NDA never implies a contract:
-
-        no NDA        -> controlled_public
-        NDA signed    -> nda_only
-        contracted    -> customer_contract
+    Account state, email verification, identity verification, NDA and contract state are
+    not blanket disclosure grants. Restricted documents are permitted only through the
+    explicit ContentAuthorization gate in Knowledge Core.
     """
     if client is None or not getattr(client, "is_active", False):
         return "public"
-    if (getattr(client, "contract_state", "") or "") in CONTRACTED_STATES:
-        return "customer_contract"
-    if getattr(client, "nda_signed", False):
-        return "nda_only"
     return "controlled_public"

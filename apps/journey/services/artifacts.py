@@ -34,9 +34,12 @@ from django.db import transaction
 from apps.journey.constants import (
     ARTIFACT_BOUNDARY_WASTE_MAP,
     ARTIFACT_DOCUMENT,
+    ARTIFACT_EXECUTIVE_BRIEF,
     ARTIFACT_INTEGRATION_READINESS,
+    ARTIFACT_PRODUCT_BRIEF,
     ARTIFACT_PITCH_ROOM,
     ARTIFACT_POC_EVIDENCE,
+    ARTIFACT_TECHNICAL_BRIEF,
     ARTIFACT_REFLECTION,
     ARTIFACT_REVIEW_SUMMARY,
     ARTIFACT_SUCCESS_OVERVIEW,
@@ -84,6 +87,19 @@ def generate(thread, artifact_type: str, *, payload: dict | None = None,
         raise ArtifactNotAuthorized(
             f"State {state} does not authorize a {artifact_type} artifact."
         )
+
+    champion_types = {ARTIFACT_EXECUTIVE_BRIEF, ARTIFACT_TECHNICAL_BRIEF, ARTIFACT_PRODUCT_BRIEF}
+    if not force and artifact_type in champion_types:
+        # Internal-champion material is a Customer/Strategic Customer deliverable, not a
+        # Visitor personalization device.  The same backend mirror gate that controls
+        # strategic recommendations controls these artifacts, so a renderer cannot bypass
+        # confirmation by asking for a brief directly.
+        from apps.conversations.services import engagement_state
+
+        if not engagement_state.recommendation_allowed(thread):
+            raise ArtifactNotAuthorized(
+                f"{artifact_type} requires Customer/Strategic Customer state and a confirmed or skipped mirror."
+            )
 
     body = payload if payload is not None else build_payload(thread, artifact_type)
     governed_body, status = _govern(body, artifact_type)
@@ -222,6 +238,9 @@ def build_payload(thread, artifact_type: str) -> dict:
         ARTIFACT_POC_EVIDENCE: _poc_evidence,
         ARTIFACT_INTEGRATION_READINESS: _integration_readiness,
         ARTIFACT_SUCCESS_OVERVIEW: _success_overview,
+        ARTIFACT_EXECUTIVE_BRIEF: _executive_brief,
+        ARTIFACT_TECHNICAL_BRIEF: _technical_brief,
+        ARTIFACT_PRODUCT_BRIEF: _product_brief,
         ARTIFACT_DOCUMENT: lambda _t: {"title": "Document", "items": []},
     }
     return builders.get(artifact_type, lambda _t: {})(thread)
@@ -275,7 +294,12 @@ def _public_safe_user_facts(lines: list[str]) -> list[str]:
     for line in lines:
         if controls.match(line) or email.search(line):
             continue
-        if confidentiality.detect(line).sensitive:
+        try:
+            sensitive = confidentiality.detect(line).sensitive
+        except Exception:  # noqa: BLE001 - artifact source filtering must fail closed
+            logger.exception("artifact confidentiality evaluation failed; withholding user text")
+            continue
+        if sensitive:
             continue
         clean = " ".join(line.split())
         if clean and clean not in out:
@@ -487,6 +511,120 @@ def _review_summary(thread) -> dict:
         "recommended_pathway": "",
     }
 
+
+
+def _champion_context(thread) -> dict:
+    """Build a bounded, confidentiality-safe decision-support context.
+
+    These artifacts are structured records, never a dump of model JSON.  User-provided
+    wording is filtered by the same artifact safety boundary as the Strategic Problem
+    Mirror; detector failure therefore prevents sensitive text from entering a brief.
+    """
+    lines = _public_safe_user_facts(_visitor_words(thread, limit=40))
+    sentences = _sentences(lines)
+    decision = _pick(
+        sentences,
+        r"\b(decid|decision|choose|whether|roadmap|adopt|deploy|architecture|capacity|commit|replace|scale|rollout)\b",
+    )
+    pressure = _pick(
+        sentences,
+        r"\b(cost|latency|battery|thermal|power|energy|capacity|reliab|throughput|utili[sz]|risk|budget|memory|bandwidth)\b",
+    )
+    workload = _pick(
+        sentences,
+        r"\b(workload|pipeline|model|solver|operator|inference|training|simulation|agent|runtime|platform)\b",
+    )
+    baseline = _pick(
+        sentences,
+        r"\b(baseline|current|p95|p99|benchmark|latency|throughput|power|energy|cost|capacity)\b",
+    )
+    locale = str(getattr(thread, "locale", "") or "en").lower()
+    return {
+        "locale": "ko" if locale.startswith("ko") else "en",
+        "facts": lines[-4:],
+        "decision": decision,
+        "pressure": pressure,
+        "workload": workload,
+        "baseline": baseline,
+        "pressures": _pressures_from(lines),
+    }
+
+
+def _executive_brief(thread) -> dict:
+    c = _champion_context(thread)
+    if c["locale"] == "ko":
+        return {
+            "kind": "executive_brief",
+            "title": "경영진 브리프",
+            "summary": c["facts"],
+            "decision": c["decision"] or "의사결정 범위는 아직 확인이 필요합니다.",
+            "customerImpact": c["pressure"] or "조직·제품 영향은 아직 검증되지 않았습니다.",
+            "evidenceNeeded": ["현재 기준선", "대표 워크로드", "합의된 성공/실패 판단 기준"],
+            "risks": ["아직 검증되지 않은 성능 또는 경제적 효과를 가정하지 않습니다.", "다음 단계의 동의는 별도로 확인합니다."],
+            "recommendation": "확인된 문제 정의를 기준으로 필요한 증거와 다음 의사결정을 정리합니다.",
+        }
+    return {
+        "kind": "executive_brief",
+        "title": "Executive Brief",
+        "summary": c["facts"],
+        "decision": c["decision"] or "The decision scope still needs to be confirmed.",
+        "customerImpact": c["pressure"] or "The organizational or product impact has not yet been validated.",
+        "evidenceNeeded": ["Current baseline", "Representative workload", "Agreed pass/partial/negative criteria"],
+        "risks": ["No unvalidated performance or economic outcome is assumed.", "Consent to any later stage is separate."],
+        "recommendation": "Use the confirmed problem definition to agree the evidence needed for the next decision.",
+    }
+
+
+def _technical_brief(thread) -> dict:
+    c = _champion_context(thread)
+    if c["locale"] == "ko":
+        return {
+            "kind": "technical_brief",
+            "title": "기술 브리프",
+            "workload": c["workload"] or "대표 워크로드는 아직 확인이 필요합니다.",
+            "baseline": c["baseline"] or "기준선은 아직 합의되지 않았습니다.",
+            "observedPressures": c["pressures"],
+            "boundedHypothesis": "가설 — 추가 컴퓨트 자원을 전제하기 전에 표현·데이터 이동·실행 경계를 검토할 가치가 있을 수 있습니다. 이는 진단이 아닙니다.",
+            "kpis": ["워크로드별 지연시간/처리량", "전력·열·메모리 경계", "기존 기준선 대비 검증 가능한 결과"],
+            "proofPlan": ["기준선 고정", "대표 입력과 환경 고정", "성공·부분·부정 결과 기준 사전 합의", "동일 조건에서 결과 검토"],
+            "unknowns": ["적용 가능한 itriX 방법군은 기술 검토 전 확정하지 않습니다.", "ALPHA Core는 ALPHA Compute 가설이 검증되고 추가 실행 계층의 가치가 증거로 뒷받침될 때만 검토합니다."],
+        }
+    return {
+        "kind": "technical_brief",
+        "title": "Technical Brief",
+        "workload": c["workload"] or "A representative workload still needs to be confirmed.",
+        "baseline": c["baseline"] or "The baseline has not yet been agreed.",
+        "observedPressures": c["pressures"],
+        "boundedHypothesis": "Hypothesis — representation, data-movement or execution boundaries may be worth examining before assuming more compute is the answer. This is not a diagnosis.",
+        "kpis": ["Workload-specific latency/throughput", "Power, thermal and memory boundaries", "Verifiable result against the frozen baseline"],
+        "proofPlan": ["Freeze the baseline", "Freeze representative inputs and environment", "Pre-agree pass/partial/negative criteria", "Review results under like-for-like conditions"],
+        "unknowns": ["No itriX method family is assigned before technical applicability is established.", "ALPHA Core is considered only after an ALPHA Compute hypothesis is validated and evidence supports value at a deeper execution layer."],
+    }
+
+
+def _product_brief(thread) -> dict:
+    c = _champion_context(thread)
+    if c["locale"] == "ko":
+        return {
+            "kind": "product_brief",
+            "title": "제품 브리프",
+            "productContext": c["facts"],
+            "userImpact": c["pressure"] or "최종 사용자 영향은 아직 측정되지 않았습니다.",
+            "tradeoffs": ["기능 확장과 지연시간/전력/열/비용 예산의 균형", "평균값뿐 아니라 지속 성능과 꼬리 지연시간 검토"],
+            "evidenceNeeded": ["제품 경험 기준 KPI", "대표 사용 시나리오", "지속 동작 조건과 실패 기준"],
+            "deploymentImplications": "검증 결과가 나오기 전에는 하드웨어 교체, ALPHA Core 또는 상용 전환을 전제하지 않습니다.",
+            "nextDecision": c["decision"] or "어떤 제품·플랫폼 결정을 이 검토가 지원해야 하는지 확인합니다.",
+        }
+    return {
+        "kind": "product_brief",
+        "title": "Product Brief",
+        "productContext": c["facts"],
+        "userImpact": c["pressure"] or "End-user impact has not yet been measured.",
+        "tradeoffs": ["Capability growth versus latency, energy, thermal and cost budgets", "Sustained performance and tail latency, not averages alone"],
+        "evidenceNeeded": ["Product-experience KPI", "Representative usage scenario", "Sustained operating conditions and failure criteria"],
+        "deploymentImplications": "Do not assume hardware replacement, ALPHA Core or commercial transfer before evidence supports it.",
+        "nextDecision": c["decision"] or "Confirm which product or platform decision this review should support.",
+    }
 
 def _boundary_waste_map(thread) -> dict:
     """

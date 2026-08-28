@@ -118,9 +118,12 @@ class UnknownSidebarSection(Exception):
 # The ceiling each identity plane may reach. The PLANE always wins over the state
 # (Architecture v2.6 §12.1) — a state can only ever narrow, never widen.
 _PLANE_CEILING = {
+    # Identity/account/contract labels do not themselves authorize content. The shell
+    # advertises only the baseline; individual restricted resources are separately
+    # authorized server-side.
     IDENTITY_ANONYMOUS: "controlled_public",
-    IDENTITY_IDENTIFIED: "nda_only",
-    IDENTITY_AUTHENTICATED_CUSTOMER: "customer_contract",
+    IDENTITY_IDENTIFIED: "controlled_public",
+    IDENTITY_AUTHENTICATED_CUSTOMER: "controlled_public",
 }
 
 # What "current work" a state represents, for the conversation header.
@@ -142,12 +145,12 @@ def resolve_identity_state(subject) -> str:
     """
     Derive ``identity_state`` from what the subject actually is.
 
-    anonymous              — no client account, no verified email
-    identified             — a Client account exists (or the lead volunteered an email)
-    authenticated_customer — the client holds an executed contract
+    anonymous              — no client account / durable identified record
+    identified             — a Client account exists (or a lead supplied contact details)
+    authenticated_customer — the client has an executed contract record
 
-    NOTE this is derived, never asserted by the caller. A visitor cannot claim to be
-    identified; they become identified by creating an account.
+    These are relationship/session labels, not disclosure levels. Claimed identity,
+    verified identity, NDA, contract state and per-content authorization remain distinct.
     """
     client = getattr(subject, "client", None)
     if client is None:
@@ -328,13 +331,12 @@ def disclosure_ceiling_for(state: str, identity_state: str, *, nda_signed: bool 
     """
     The effective ceiling: the MORE RESTRICTIVE of the plane's ceiling and the state's.
 
-    The plane can never be raised by the state, by a prompt, or by an attachment
-    (Architecture v2.6 §19.7 rule 6). ``nda_signed`` can only ever narrow the gap
-    between an identified client's cap and nda_only — never exceed the plane.
+    The plane can never be raised by state, account, identity claim, verification, NDA,
+    prompt or attachment. ``nda_signed`` is accepted for wire/backward compatibility but
+    is not an authorization input; restricted resources are document-authorized.
     """
+    del nda_signed
     plane_cap = _PLANE_CEILING.get(identity_state, "public")
-    if identity_state == IDENTITY_IDENTIFIED and not nda_signed:
-        plane_cap = "controlled_public"
     return min_ceiling(plane_cap, ceiling_for_state(state))
 
 

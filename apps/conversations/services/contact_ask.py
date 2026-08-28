@@ -251,31 +251,20 @@ def record_asked(thread, decision: dict, *, message=None) -> None:
 
 
 def directive(decision: dict) -> str:
-    """
-    The instruction handed to the concierge so it asks in its OWN words.
+    """Model instruction for the already-approved identity-dependent action.
 
-    Parallel to ``concierge._reveal_directive``. Everything it forbids is a real
-    ending the model produced in production when it had no instruction at all:
-    promising a human follow-up, offering to prepare a briefing, or implying the
-    address buys more disclosure than the conversation has earned.
+    Identity is collected for the selected action only.  It never creates entitlement,
+    raises disclosure, or implies that My Review is already complete/available.
     """
     if not (decision or {}).get("ask"):
         return ""
     return (
-        "IMPORTANT — THIS VISITOR'S REVIEW IS COMPLETE, AND A PERSONALISED itriX "
-        "PAGE CAN BE GENERATED FOR THEM IN THIS CONVERSATION AS SOON AS THEY GIVE "
-        "AN EMAIL ADDRESS. Answer their current turn normally, then END your reply "
-        "by asking, in ONE short natural sentence, for their WORK EMAIL ADDRESS "
-        "and the name or organisation the page should be addressed to — and say "
-        "plainly that the email is the essential part, because it is what we need "
-        "to put their personalised page together. THE EMAIL IS REQUIRED; the name "
-        "or organisation is welcome but optional, and can never replace the email. "
-        "If they have already given a name or organisation but no address, thank "
-        "them for it and ask for the work email address specifically. Do NOT say "
-        "the team will 'be in touch', do NOT promise that a human will follow up, "
-        "and do NOT offer to 'prepare' or 'send over' a briefing — the page is "
-        "generated here, the moment they give the address. Do NOT suggest that "
-        "giving it shows them anything more than they can already see; it does "
-        "not. Ask for nothing beyond those two details — no phone number, no job "
-        "title. Then STOP.\n\n"
+        "IDENTITY-DEPENDENT ACTION: the visitor explicitly selected an action that "
+        "requires a private handoff. Answer the current turn normally, then ask in one "
+        "short natural sentence for a WORK EMAIL ADDRESS needed to carry out that "
+        "selected action. Say that they can decline and continue anonymously. Do not "
+        "say the email unlocks content, raises disclosure, proves identity or completes "
+        "a review. Do not claim a personalised page is already ready. Do not promise "
+        "human follow-up unless the selected action is human follow-up. Ask for no phone "
+        "number or unnecessary profile detail.\n\n"
     )

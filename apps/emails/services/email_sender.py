@@ -160,11 +160,7 @@ def send_email(
     # to be the authenticated mailbox, and a per-call override is exactly how a caller
     # would produce a message the provider then rejects.
     if from_email and from_email != _sender_address():
-        logger.info(
-            "[email-sender-override-ignored] requested=%s using=%s",
-            from_email,
-            _sender_address(),
-        )
+        logger.info("email.sender_override_ignored")
 
     common = {
         "kind": kind,
@@ -189,18 +185,18 @@ def send_email(
     except Exception:  # noqa: BLE001 - the gate must never take out the mail path
         allowed, reason = True, ""
     if not allowed:
-        logger.info("[email-blocked-unconfirmed] %s -> %s | %s", kind, to_email, subject)
+        logger.info("email.blocked_unconfirmed kind=%s", kind)
         return _log(**common, status=EmailLog.Status.FAILED, error=reason)
 
     log = _log(**common, status=EmailLog.Status.STUBBED)
 
     # A future-dated send is queued, never delivered inline.
     if scheduled_at is not None:
-        logger.info("[email-scheduled] %s -> %s | %s @ %s", kind, to_email, subject, scheduled_at)
+        logger.info("email.scheduled kind=%s at=%s", kind, scheduled_at)
         return log
 
     if not getattr(settings, "ENABLE_EMAIL_DELIVERY", False):
-        logger.info("[email-stubbed] %s -> %s | %s", kind, to_email, subject)
+        logger.info("email.stubbed kind=%s", kind)
         return log
 
     if not to_email:
@@ -221,7 +217,7 @@ def send_email(
             "EMAIL_HOST_USER + EMAIL_HOST_PASSWORD for SMTP, or RESEND_API_KEY."
         )
         log.save(update_fields=["status", "error", "updated_at"])
-        logger.error("[email-no-provider] %s -> %s | %s", kind, to_email, subject)
+        logger.error("email.no_provider kind=%s", kind)
         return log
 
     try:
@@ -232,7 +228,7 @@ def send_email(
         log.status = EmailLog.Status.SENT
         log.provider_message_id = message_id or ""
         log.save(update_fields=["status", "provider_message_id", "updated_at"])
-        logger.info("Email sent (%s) %s -> %s", provider, kind, to_email)
+        logger.info("email.sent provider=%s kind=%s", provider, kind)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Email send failed (%s)", provider)
         log.status = EmailLog.Status.FAILED

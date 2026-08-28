@@ -77,6 +77,11 @@ def create_client_for_lead(
         full_name=full_name or getattr(lead, "visitor_name", "") or "",
         organization=organization or getattr(lead, "company", "") or "",
         role=role or getattr(lead, "role", "") or "",
+        claimed_identity={
+            "full_name": full_name or getattr(lead, "visitor_name", "") or "",
+            "organization": organization or getattr(lead, "company", "") or "",
+            "role": role or getattr(lead, "role", "") or "",
+        },
     )
 
     credential = ClientCredential(client=client)

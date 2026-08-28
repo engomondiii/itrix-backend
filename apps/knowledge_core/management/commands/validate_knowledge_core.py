@@ -17,9 +17,11 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Count
+from django.utils import timezone
 
 from apps.knowledge_core.models import IngestionStatus, KnowledgeChunk, KnowledgeDocument
 from apps.knowledge_core.services.namespace_router import CANONICAL_NAMESPACES
+from apps.knowledge_core.management.commands.register_knowledge_docs import FOLDER_DISCLOSURE
 
 
 class Command(BaseCommand):
@@ -67,8 +69,8 @@ class Command(BaseCommand):
 
         # ── Complete-but-empty ───────────────────────────────────────────────
         empty_complete = KnowledgeDocument.objects.filter(
-            ingestion_status=IngestionStatus.COMPLETE, chunk_count=0
-        )
+            is_current=True, ingestion_status=IngestionStatus.COMPLETE, chunk_count=0
+        ).exclude(disclosure_level="prohibited")
         if empty_complete.exists():
             problems += empty_complete.count()
             self.stdout.write(
@@ -110,15 +112,40 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("  ! Current ALPHA Compute/Core v2.4 source is not COMPLETE + public."))
             problems += 1
 
-        # Product/research source folders are visitor-readable by policy. Operational
-        # internal_only and customer_contract are intentionally exempt.
-        non_public_product_sources = KnowledgeDocument.objects.filter(
-            file_path__regex=r"^knowledge_docs/(public|controlled_public|nda_only)/",
-        ).exclude(disclosure_level="public")
-        if non_public_product_sources.exists():
-            problems += non_public_product_sources.count()
+        # Folder placement is itself an authorization decision. Validate exact policy
+        # parity instead of incorrectly requiring controlled/agreement-gated sources to
+        # become public. That would turn a health check into a disclosure downgrade.
+        self.stdout.write(self.style.MIGRATE_HEADING("Disclosure folder parity"))
+        drift = []
+        for doc in KnowledgeDocument.objects.all():
+            parts = str(doc.file_path or "").replace("\\", "/").split("/")
+            expected = None
+            if "knowledge_docs" in parts:
+                i = parts.index("knowledge_docs")
+                if i + 1 < len(parts):
+                    expected = FOLDER_DISCLOSURE.get(parts[i + 1])
+            if expected and doc.disclosure_level != expected:
+                drift.append((doc, expected))
+        if drift:
+            problems += len(drift)
+            for doc, expected in drift:
+                self.stdout.write(self.style.ERROR(
+                    f"  ! {doc.file_path}: row={doc.disclosure_level} folder={expected}"
+                ))
+        else:
+            self.stdout.write(self.style.SUCCESS("  all registered source tiers match their folders"))
+
+        # Currentness metadata must not quietly age past an owner-supplied review date.
+        today = timezone.now().date()
+        overdue = KnowledgeDocument.objects.filter(is_current=True, review_after__lt=today)
+        if overdue.exists():
+            problems += overdue.count()
+            self.stdout.write(self.style.ERROR(f"  ! {overdue.count()} current source(s) are past review_after."))
+        stale_with_chunks = KnowledgeDocument.objects.filter(is_current=False, chunks__isnull=False).distinct()
+        if stale_with_chunks.exists():
+            problems += stale_with_chunks.count()
             self.stdout.write(self.style.ERROR(
-                f"  ! {non_public_product_sources.count()} product/research source(s) are not public."
+                f"  ! {stale_with_chunks.count()} non-current source(s) still have retrievable chunks."
             ))
 
         # ── Live Pinecone parity ──────────────────────────────────────────────

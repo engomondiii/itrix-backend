@@ -390,39 +390,71 @@ class PortalConversationMessagesView(APIView):
 
 
 class PortalDocumentsView(APIView):
-    """GET portal/documents/ — CLIENT. NDA-aware data room."""
+    """GET portal/documents/ — CLIENT. Authorization-aware data room.
+
+    An NDA is displayed as protection state, never as the permission itself. Restricted
+    documents unlock only when this client has an active explicit ContentAuthorization
+    and any required agreement prerequisite is also satisfied.
+    """
 
     authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request):
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from apps.knowledge_core.models import ContentAuthorization, KnowledgeDocument
+
         client = request.user
-        nda = client.nda_signed
-        # Public materials are always available; NDA-only materials unlock post-signature.
-        # Grouped into the folder shape the Documents screen renders (see the
-        # serializer's SHAPE FIX note): open folders always show, data-room folders
-        # carry the locked flag until the NDA is signed.
-        open_folders = [
-            {
-                "folder": "Overview",
-                "documents": [
-                    {"title": "itriX overview", "disclosure": "public", "href": "", "locked": False},
-                    {"title": "ALPHA approach summary", "disclosure": "controlled_public", "href": "", "locked": False},
-                ],
+        now = timezone.now()
+        authorized_ids = set(
+            ContentAuthorization.objects.filter(
+                subject_kind=ContentAuthorization.SubjectKind.CLIENT,
+                subject_id=str(client.id),
+                active=True,
+            )
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+            .values_list("document_id", flat=True)
+        )
+
+        docs = list(
+            KnowledgeDocument.objects.filter(is_current=True)
+            .exclude(disclosure_level__in=["internal_only", "prohibited", "customer_contract"])
+            .order_by("namespace", "title")
+        )
+        open_docs = []
+        restricted_docs = []
+        for doc in docs:
+            level = doc.disclosure_level
+            row = {
+                "title": doc.title,
+                "disclosure": level,
+                "href": "",
+                "locked": False,
             }
-        ]
-        data_room_folders = [
-            {
-                "folder": "Technical materials",
-                "documents": [
-                    {"title": "Technical deep-dive", "disclosure": "nda_only", "href": "", "locked": not nda},
-                    {"title": "Evaluation methodology", "disclosure": "nda_only", "href": "", "locked": not nda},
-                ],
-            }
-        ]
+            if level in {"public", "controlled_public"}:
+                open_docs.append(row)
+                continue
+            explicitly_authorized = doc.id in authorized_ids
+            agreement_ok = level != "nda_only" or bool(client.nda_signed)
+            row["locked"] = not (explicitly_authorized and agreement_ok)
+            restricted_docs.append(row)
+
+        open_folders = [{"folder": "Available materials", "documents": open_docs}]
+        data_room_folders = [{"folder": "Authorized materials", "documents": restricted_docs}]
+        # This is the only client-plane data-room unlock bit. It is derived from
+        # explicit per-document authorization (plus any agreement prerequisite),
+        # never from account, email-verification, journey or NDA state alone.
+        data_room_authorized = any(not row["locked"] for row in restricted_docs)
         return Response(
             PortalDataRoomSerializer(
-                {"ndaSigned": nda, "openFolders": open_folders, "dataRoomFolders": data_room_folders}
+                {
+                    "ndaSigned": bool(client.nda_signed),
+                    "dataRoomAuthorized": data_room_authorized,
+                    "openFolders": open_folders,
+                    "dataRoomFolders": data_room_folders,
+                }
             ).data
         )
 
@@ -573,8 +605,9 @@ class PortalNdaRequestView(APIView):
     INBOX_BODY = (
         "Thank you — we have your request for an NDA. The itriX team will prepare it "
         "and send it to the address on your account for signature. You will see it "
-        "here in your inbox as well, so you can keep an eye on either. Once it is "
-        "signed and countersigned, your confidential data room opens automatically."
+        "here in your inbox as well, so you can keep an eye on either. Signing the NDA "
+        "protects later confidential exchange; access to restricted material is granted "
+        "separately when that specific material is authorized."
     )
 
     def post(self, request):
@@ -694,11 +727,9 @@ class PortalTeamInviteView(APIView):
         delivery_enabled = bool(getattr(settings, "ENABLE_EMAIL_DELIVERY", False))
         if delivery_enabled and mail.status != EmailLog.Status.SENT:
             logger.error(
-                "portal.team_invite delivery failed client=%s email=%s log=%s error=%s",
+                "portal.team_invite delivery failed client=%s mail_log=%s",
                 client.id,
-                email,
                 mail.id,
-                mail.error,
             )
             return Response(
                 {"detail": "We could not send that invitation. Please try again."},

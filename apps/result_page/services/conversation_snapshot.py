@@ -41,9 +41,9 @@ def _safe_turn(text: str) -> bool:
     try:
         from apps.conversations.services.confidentiality import detect
 
-        return not bool(detect(text).matched)
-    except Exception:  # pragma: no cover - additive safety module should be present
-        return True
+        return not bool(detect(text).sensitive)
+    except Exception:  # fail closed: artifact inputs must never become permissive on detector failure
+        return False
 
 
 @dataclass

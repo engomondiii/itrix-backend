@@ -2,8 +2,7 @@
 Client identity models (Backend v4 §3.1, the client plane).
 
 A ``Client`` is an account-holding subject created when a Lead accepts a workspace
-invite (reveal ③). It is the anchor of the client-JWT plane (audience=client), whose
-disclosure ceiling is NDA-gated (≤ NDA_ONLY). The Client is linked 1:1 back to its Lead
+invite (reveal ③). It is the anchor of the client-JWT plane (audience=client), whose baseline disclosure ceiling remains controlled-public. NDA/agreement state can be a prerequisite for a separately authorized disclosure, but never raises access by itself. The Client is linked 1:1 back to its Lead
 so the journey state mirrors across.
 
 ``ClientCredential`` stores the client's password hash (separate from the team User
@@ -57,8 +56,14 @@ class Client(BaseModel):
     full_name = models.CharField(max_length=200, blank=True, default="")
     organization = models.CharField(max_length=200, blank=True, default="")
     role = models.CharField(max_length=120, blank=True, default="")
+    # Self-asserted identity/profile claims. They remain claims until an operator or
+    # approved external verification workflow records verification timestamps below.
+    # Neither a claim nor verification expands disclosure without ContentAuthorization.
+    claimed_identity = models.JSONField(default=dict, blank=True)
+    identity_verified_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    organization_verified_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    # NDA state gates the client's disclosure ceiling and the data room (reveal ④).
+    # NDA state records agreement protection only. It never creates content authorization.
     nda_signed = models.BooleanField(default=False)
     nda_signed_at = models.DateTimeField(null=True, blank=True)
     # When the customer asked for an NDA from the Documents screen (2026-08-10).
@@ -93,8 +98,8 @@ class Client(BaseModel):
 
     # ── v6.0 Phase 2: the customer lifecycle ─────────────────────────────────
     # A Client becomes a CUSTOMER when a contract is executed. The distinction matters
-    # because it gates the sixth disclosure tier (customer_contract) — a client with a
-    # signed NDA is not yet a customer.
+    # because it can satisfy an agreement prerequisite for customer-contract material.
+    # It is never sufficient disclosure authorization: a specific ContentAuthorization is still required.
     contract_state = models.CharField(
         max_length=24,
         blank=True,

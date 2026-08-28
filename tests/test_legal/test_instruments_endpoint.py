@@ -82,6 +82,7 @@ def test_a_version_mismatch_is_logged_loudly_but_the_server_versions_are_stored(
     from apps.legal.services import assent as assent_svc
     from apps.legal.views import PortalAssentView
 
+    settings.LEGAL_PUBLISHED = True
     settings.LEGAL_TERMS_VERSION = "1.1"
     # ``itrix`` deliberately owns its console handler with ``propagate=False``.  Patch
     # the logger method directly so this test verifies the actual contract (an ERROR is
@@ -102,6 +103,7 @@ def test_a_matching_version_logs_nothing(settings):
 
     from apps.legal.views import PortalAssentView
 
+    settings.LEGAL_PUBLISHED = True
     settings.LEGAL_TERMS_VERSION = "1.1"
     with patch("apps.legal.views.logger.error") as logged:
         PortalAssentView._warn_on_version_mismatch([{"slug": "terms", "version": "1.1"}])

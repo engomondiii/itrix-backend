@@ -61,6 +61,8 @@ def create_thread(
     context: str = ThreadContext.ANONYMOUS_REVIEW,
     title: str = "",
     state_at_creation: str = "ARRIVED",
+    creation_idempotency_hash: str | None = None,
+    creation_payload_hash: str = "",
 ) -> Thread:
     """
     Create a thread and its backing Conversation.
@@ -84,6 +86,8 @@ def create_thread(
         title=(title or "").strip()[:200],
         title_source=ThreadTitleSource.GENERATED,
         state_at_creation=state_at_creation,
+        creation_idempotency_hash=creation_idempotency_hash or None,
+        creation_payload_hash=(creation_payload_hash or "")[:64],
         last_activity_at=timezone.now(),
         retention_expires_at=retention_expires_at,
     )

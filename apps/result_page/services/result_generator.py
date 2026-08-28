@@ -287,6 +287,7 @@ class ResultGenerator:
                 product_route=lead.product_route,
                 tier=lead.tier,
                 context=context,
+                workload_text=snapshot.corpus,
             ),
             "recommendedNextStep": _next_step(snapshot),
         }

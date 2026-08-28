@@ -227,6 +227,8 @@ def build_for_thread(thread) -> CoverageMap:
     ).order_by("seq", "created_at")
 
     for message in messages:
+        if not _safe_context_text(message.body or ""):
+            continue
         for dimension, status in analyse_text(message.body or "").items():
             merged = _merge(coverage.dimensions.get(dimension, UNKNOWN), status)
             if merged != coverage.dimensions.get(dimension):
@@ -242,6 +244,15 @@ def build_for_thread(thread) -> CoverageMap:
     return coverage
 
 
+def _safe_context_text(text: str) -> bool:
+    try:
+        from apps.conversations.services.confidentiality import detect
+
+        return not bool(detect(text or "").sensitive)
+    except Exception:  # fail closed: coverage drives downstream diagnosis/questions
+        return False
+
+
 def _attachment_texts(thread) -> list[str]:
     try:
         from apps.attachments.models import Attachment, AttachmentStatus
@@ -252,7 +263,9 @@ def _attachment_texts(thread) -> list[str]:
         return [
             (row.extraction.text or "")[:20_000]
             for row in rows
-            if getattr(row, "extraction", None) and row.extraction.has_text
+            if getattr(row, "extraction", None)
+            and row.extraction.has_text
+            and _safe_context_text(row.extraction.text or "")
         ]
     except Exception:  # noqa: BLE001
         return []

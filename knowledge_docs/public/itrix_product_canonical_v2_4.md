@@ -62,6 +62,6 @@ No method family is universally applicable. Mathematical eligibility comes befor
 
 Mathematical equivalence does not by itself prove runtime, memory, power or economic benefit. Runtime, memory, energy and commercial claims require workload-specific measurement against a frozen baseline, including transformation and reconstruction overhead.
 
-## Commercial progression
+## Evaluation and deployment progression
 
-A customer can move through assessment, PoC and production software deployment in ALPHA Compute. Assessment and PoC are paid stages where fees are separately agreed. For validated production value, the standard internal value-sharing rule is that the customer retains 67% of Verified Net Advantage and itriX receives 33%, subject to the agreed baseline and contract. ALPHA Core is considered only when deeper hardware implementation is expected to add incremental verified value beyond the software-only ALPHA Compute baseline.
+ALPHA Compute can support assessment, controlled evaluation or proof work, and production software deployment when each step is explicitly selected and evidence supports it. A controlled evaluation is not automatically a PoC, and success at one stage does not create consent to a later stage. Commercial terms are agreed separately in the applicable commercial process and are not part of public technical guidance. ALPHA Core is considered only when deeper hardware implementation is expected to add incremental verified value beyond the software-only ALPHA Compute baseline.

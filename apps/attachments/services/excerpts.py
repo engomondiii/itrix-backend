@@ -25,6 +25,22 @@ logger = logging.getLogger("itrix")
 DEFAULT_EXCERPT_CHARS = 1500
 DEFAULT_MAX_EXCERPTS = 6
 
+
+def _safe_extracted_text(text: str) -> bool:
+    """Return whether extracted attachment text may enter model/artifact context.
+
+    Attachment-derived content crosses the same confidentiality boundary as typed input.
+    Detector failures are fail-closed because omission is safer than silently feeding
+    potentially restricted material to retrieval/model or downstream artifacts.
+    """
+    try:
+        from apps.conversations.services.confidentiality import detect
+
+        return not bool(detect(text or "").sensitive)
+    except Exception:  # noqa: BLE001 - fail closed by design
+        logger.exception("attachment confidentiality evaluation failed; withholding extracted text")
+        return False
+
 _STOPWORDS = {
     "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be", "been",
     "to", "of", "in", "on", "for", "with", "as", "at", "by", "it", "this", "that",
@@ -123,6 +139,8 @@ def build(attachment, query: str = "") -> list:
         return []
 
     AttachmentExcerpt.objects.filter(attachment=attachment).delete()
+    if not _safe_extracted_text(extraction.text):
+        return []
     rows = []
     for ordinal, text in enumerate(select(extraction.text, query)):
         rows.append(
@@ -169,6 +187,10 @@ def for_context(thread, query: str = "", *, max_attachments: int = 10) -> list[d
                 "metadata_only": True,
                 "text": "",
             })
+            continue
+        if not _safe_extracted_text(extraction.text):
+            # Do not leak filename, excerpt, summary, or a detector-confirming detail to the model.
+            # The UI may still show the visitor their own upload through normal attachment metadata.
             continue
         chosen = select(extraction.text, query)
         out.append({

@@ -138,20 +138,27 @@ def _after_inbound_turn(thread, message, body: str) -> None:
             return
     except Exception:  # noqa: BLE001
         logger.exception("confidentiality interception failed for thread %s", getattr(thread, "id", "?"))
-        setattr(thread, "_confidential_intercept", None)
+        # Fail closed: a detector outage must not turn into permission to send the body
+        # into qualification, retrieval or model execution.
+        intercept = confidentiality.Intercept(True, "detector_error")
+        setattr(thread, "_confidential_intercept", intercept)
+        setattr(thread, "_client_page_reveal", None)
+        setattr(thread, "_contact_ask", None)
+        return
 
     # Protected-function probing is also a deterministic routing decision. Do not let
     # the model become an oracle after a refusal.
     try:
         from apps.conversations.services import protected_probe
 
-        probing = protected_probe.is_probe(body)
+        probing = protected_probe.is_history_probe(thread, body)
         setattr(thread, "_protected_probe", probing)
         if probing:
-            protected_probe.record(thread)
+            protected_probe.record(thread, body)
             setattr(thread, "_client_page_reveal", None)
             setattr(thread, "_contact_ask", None)
             return
+        protected_probe.observe_safe(thread, body)
     except Exception:  # noqa: BLE001
         logger.exception("protected-probe detection failed for thread %s", getattr(thread, "id", "?"))
         setattr(thread, "_protected_probe", False)

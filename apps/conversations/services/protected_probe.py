@@ -1,6 +1,12 @@
-"""Protection against direct and oracle-style extraction of eligibility logic."""
+"""Protection against direct, derivative and adaptive extraction of protected logic.
+
+Only hashes and coarse risk categories are persisted. Raw probe bodies are not copied into
+risk telemetry, so the control does not create a second store of potentially sensitive or
+protected material.
+"""
 from __future__ import annotations
 
+import hashlib
 import re
 
 _DIRECT = re.compile(
@@ -24,27 +30,102 @@ _EXPLICITLY_EXCLUDES_PROTECTED = re.compile(
     r"thresholds?|performance claims?|confidential (?:math(?:ematics)?|details?|logic))\b",
     re.I | re.S,
 )
+_CATEGORY_PATTERNS = {
+    "binary": re.compile(r"\b(binary|yes/no|eligible|ineligible|label|classify)\b", re.I),
+    "ranking": re.compile(r"\b(rank|ranking|score|sort|top\s+\d+)\b", re.I),
+    "threshold": re.compile(r"\b(threshold|cutoff|decision boundary|minimum score)\b", re.I),
+    "batch": re.compile(r"\b(batch|list|examples?|hypothetical|ten|twenty|100)\b", re.I),
+    "logic": re.compile(r"\b(rule|logic|criteria|algorithm|eligibility|selection)\b", re.I),
+}
+
+
+def _normal(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def fingerprint(text: str) -> str:
+    return hashlib.sha256(_normal(text).encode()).hexdigest()
+
+
+def categories(text: str) -> set[str]:
+    return {name for name, pattern in _CATEGORY_PATTERNS.items() if pattern.search(text or "")}
 
 
 def is_probe(text: str) -> bool:
     raw = text or ""
-    # A request explicitly limited to the approved public-safe boundary, while
-    # expressly excluding eligibility/implementation detail, is the useful
-    # alternative the oracle-probing policy itself promises. Do not refuse it.
     if _PUBLIC_SAFE_BOUNDARY.search(raw) and _EXPLICITLY_EXCLUDES_PROTECTED.search(raw):
         return False
     return bool(_DIRECT.search(raw) or _DERIVATIVE.search(raw))
 
 
-def record(thread) -> int:
+def is_history_probe(thread, text: str) -> bool:
+    """Detect a sequence that can reconstruct the protected decision boundary.
+
+    A single benign taxonomy question remains allowed. Repeated category combinations,
+    repeated near-oracle requests, or a direct/derivative request are blocked.
+    """
+    if is_probe(text):
+        return True
+    if _PUBLIC_SAFE_BOUNDARY.search(text or "") and _EXPLICITLY_EXCLUDES_PROTECTED.search(text or ""):
+        return False
+
+    state = dict(getattr(thread, "conversation_commitments", None) or {})
+    risk = dict(state.get("protected_probe") or {})
+    previous_categories = set(risk.get("categories") or [])
+    current = categories(text)
+    if not current:
+        return False
+    hashes = list(risk.get("query_hashes") or [])
+    fp = fingerprint(text)
+
+    # Repeating a classification/ranking/threshold family after earlier probe activity is
+    # adaptive extraction even if each sentence was softened enough to avoid _DERIVATIVE.
+    oracle_categories = {"binary", "ranking", "threshold", "batch", "logic"}
+    history_count = int(risk.get("count") or 0)
+    if history_count >= 2 and current & oracle_categories:
+        return True
+    if fp in hashes and current & oracle_categories and history_count >= 1:
+        return True
+    if len((previous_categories | current) & oracle_categories) >= 3 and history_count >= 1:
+        return True
+    return False
+
+
+def record(thread, text: str = "") -> int:
     state = dict(getattr(thread, "conversation_commitments", None) or {})
     risk = dict(state.get("protected_probe") or {})
     count = int(risk.get("count") or 0) + 1
     risk["count"] = count
+    if text:
+        hashes = list(risk.get("query_hashes") or [])
+        fp = fingerprint(text)
+        if fp not in hashes:
+            hashes.append(fp)
+        risk["query_hashes"] = hashes[-24:]
+        risk["categories"] = sorted(set(risk.get("categories") or []) | categories(text))
     state["protected_probe"] = risk
     thread.conversation_commitments = state
     thread.save(update_fields=["conversation_commitments", "updated_at"])
     return count
+
+
+def observe_safe(thread, text: str) -> None:
+    """Record only coarse probe-adjacent history for future adaptive detection."""
+    current = categories(text)
+    if not current:
+        return
+    state = dict(getattr(thread, "conversation_commitments", None) or {})
+    risk = dict(state.get("protected_probe") or {})
+    hashes = list(risk.get("query_hashes") or [])
+    fp = fingerprint(text)
+    if fp not in hashes:
+        hashes.append(fp)
+    risk["query_hashes"] = hashes[-24:]
+    risk["categories"] = sorted(set(risk.get("categories") or []) | current)
+    risk["observed"] = int(risk.get("observed") or 0) + 1
+    state["protected_probe"] = risk
+    thread.conversation_commitments = state
+    thread.save(update_fields=["conversation_commitments", "updated_at"])
 
 
 def safe_reply(*, locale: str = "en") -> str:

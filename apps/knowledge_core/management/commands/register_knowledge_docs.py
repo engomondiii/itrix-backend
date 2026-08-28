@@ -132,6 +132,8 @@ def source_authority_for(filename: str) -> tuple[str, bool, str]:
         return "legacy", False, ""
     if any(x in n for x in ("canonical", "register", "executed")):
         return "authoritative", True, "Explicit canonical/register source"
+    if "itrix_company_overview_public" in n:
+        return "governing", True, "Current public company/technology synthesis"
     if any(x in n for x in ("master technical architecture", "complete backend structure", "complete surface", "legal instruments", "content and flow playbook", "_overview_v2.0", "overview v2.0", "unified mathematical", "v2_4", "v2.4")):
         return "governing", True, "Current approved governing source"
     return "working", True, ""
@@ -188,6 +190,7 @@ class Command(BaseCommand):
         assert_not_attachment_store(base)
 
         created = existing = skipped = 0
+        active_paths: set[str] = set()
         for folder, disclosure in FOLDER_DISCLOSURE.items():
             d = base / folder
             if not d.exists():
@@ -210,6 +213,15 @@ class Command(BaseCommand):
                 family = technology_family_for(f.name)
                 paraphrase = paraphrase_for(disclosure)
 
+                # POSIX FORM, ALWAYS. The active-path set is also the reconciliation
+                # source: anything previously registered under knowledge_docs/ that is no
+                # longer present/eligible is marked non-current after this walk.
+                try:
+                    canonical_path = f.resolve().relative_to(Path(settings.BASE_DIR).resolve()).as_posix()
+                except ValueError:
+                    canonical_path = f.as_posix()
+                active_paths.add(canonical_path)
+
                 if dry_run:
                     suffix = " [NO-EMBED]" if disclosure == "prohibited" else ""
                     self.stdout.write(f"  would register [{disclosure:17}] [{ns:13}] [{authority:13}] {title}{suffix}")
@@ -225,10 +237,6 @@ class Command(BaseCommand):
                 #
                 # `as_posix()` is the same string on every platform, so the idempotence
                 # this command's docstring already claimed is now actually true.
-                try:
-                    canonical_path = f.resolve().relative_to(Path(settings.BASE_DIR).resolve()).as_posix()
-                except ValueError:
-                    canonical_path = f.as_posix()
                 obj, made = KnowledgeDocument.objects.get_or_create(
                     file_path=canonical_path,
                     defaults={
@@ -276,6 +284,32 @@ class Command(BaseCommand):
                     else:
                         existing += 1
                         self.stdout.write(f"  = exists: {title}")
+
+        if not dry_run:
+            # A move, deletion or newly-superseded source must not leave its old row
+            # current. Mark it non-current and remove local chunks immediately; a later
+            # namespace re-ingest clears any old remote vectors before rebuilding only
+            # current documents.
+            stale = KnowledgeDocument.objects.filter(file_path__startswith="knowledge_docs/").exclude(
+                file_path__in=sorted(active_paths)
+            )
+            stale_count = stale.count()
+            for obj in stale:
+                obj.chunks.all().delete()
+                updates = []
+                for field, value in (
+                    ("is_current", False),
+                    ("permitted_paraphrase", "none"),
+                    ("chunk_count", 0),
+                    ("ingestion_status", "COMPLETE"),
+                ):
+                    if getattr(obj, field) != value:
+                        setattr(obj, field, value)
+                        updates.append(field)
+                if updates:
+                    obj.save(update_fields=updates + ["updated_at"])
+            if stale_count:
+                self.stdout.write(self.style.WARNING(f"  ~ marked {stale_count} inactive source row(s) non-current"))
 
         verb = "Would register" if dry_run else "Registered"
         self.stdout.write(

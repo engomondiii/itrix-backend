@@ -123,6 +123,8 @@ class PortalDataRoomSerializer(serializers.Serializer):
     """
 
     ndaSigned = serializers.BooleanField()
+    # Explicit server authorization, deliberately distinct from NDA state.
+    dataRoomAuthorized = serializers.BooleanField()
     openFolders = PortalDocumentFolderSerializer(many=True)
     dataRoomFolders = PortalDocumentFolderSerializer(many=True)
 

@@ -17,7 +17,7 @@ something that happened IN THE THREAD:
 
     first turn posted on an empty thread   -> 1 → 2   (``on_first_turn``)
     stop rule fires for qualification band -> 2 → 3   (``on_loop_closed``)
-    NDA signed                             -> reveal 4, ceiling raised
+    NDA signed                             -> reveal protected-exchange status; authorization unchanged
     first payment recorded                 -> reveal 5, overlay activated, 6 → 7
     contract executed                      -> reveal 6, 9 → 10
 
@@ -188,7 +188,7 @@ def _phase2_hooks(lead, *, event: str, to_state: str, thread=None) -> None:
     v6.0 Phase 2 side effects (Backend v6.0 §Phase 2).
 
         FIRST_PAYMENT      -> overlay.activate()      (R16 — success at first payment)
-        CONTRACT_EXECUTED  -> ceiling -> customer_contract
+        CONTRACT_EXECUTED  -> record executed contract state (authorization remains separate)
         LOOP_CLOSED        -> artifacts.generate()    (§5.5 — the stop-rule handoff)
 
     Every hook is best-effort. A transition that has already been written must never be
@@ -198,7 +198,7 @@ def _phase2_hooks(lead, *, event: str, to_state: str, thread=None) -> None:
         _activate_success_overlay(lead)
 
     if event == JourneyEvent.CONTRACT_EXECUTED.value:
-        _mark_contracted(lead)
+        _mark_contracted(lead, thread=thread)
 
     if event == JourneyEvent.LOOP_CLOSED.value and thread is not None:
         _generate_qualification_artifacts(thread)
@@ -217,8 +217,8 @@ def _activate_success_overlay(lead) -> None:
         logger.exception("success overlay activation failed for lead %s", getattr(lead, "id", "?"))
 
 
-def _mark_contracted(lead) -> None:
-    """Reveal 6 — the ceiling rises to customer_contract."""
+def _mark_contracted(lead, *, thread=None) -> None:
+    """Record an executed agreement without turning it into blanket disclosure permission."""
     try:
         from apps.clients.models import Client
 
@@ -226,6 +226,11 @@ def _mark_contracted(lead) -> None:
         if client is not None and (client.contract_state or "") not in {"executed", "active"}:
             client.contract_state = "executed"
             client.save(update_fields=["contract_state", "updated_at"])
+        # Thread contract state is a separate durable conversational fact. Synchronize it
+        # only from this executed-record event; ordinary licensing discussion cannot set it.
+        if thread is not None and getattr(thread, "contract_stage", "") != "executed":
+            thread.contract_stage = "executed"
+            thread.save(update_fields=["contract_stage", "updated_at"])
     except Exception:  # noqa: BLE001
         logger.exception("contract state update failed for lead %s", getattr(lead, "id", "?"))
 
@@ -319,7 +324,7 @@ def on_loop_closed(lead, *, thread=None, meta: dict | None = None) -> AdvanceRes
 
 
 def on_nda_signed(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
-    """NDA signed — reveal 4, ceiling raised. The state does not move."""
+    """NDA signed — record/reveal agreement protection. Content authorization is unchanged."""
     return advance(lead, JourneyEvent.NDA_SIGNED.value, actor=actor, meta=meta)
 
 
@@ -338,6 +343,6 @@ def on_integration_start(lead, *, actor=None, meta: dict | None = None) -> Advan
     return advance(lead, JourneyEvent.INTEGRATION_START.value, actor=actor, meta=meta)
 
 
-def on_contract_executed(lead, *, actor=None, meta: dict | None = None) -> AdvanceResult:
-    """Contract executed — reveal 6, ceiling → customer_contract: 9 → 10."""
-    return advance(lead, JourneyEvent.CONTRACT_EXECUTED.value, actor=actor, meta=meta)
+def on_contract_executed(lead, *, actor=None, meta: dict | None = None, thread=None) -> AdvanceResult:
+    """Contract executed — synchronize durable contract state; authorization remains separate."""
+    return advance(lead, JourneyEvent.CONTRACT_EXECUTED.value, actor=actor, meta=meta, thread=thread)

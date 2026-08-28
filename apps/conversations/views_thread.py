@@ -21,6 +21,8 @@ your session, not because the id was hard to guess.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import secrets
 
@@ -163,6 +165,66 @@ def _resolve_thread(request, thread_id):
     return thread_svc.get_for_session(thread_id, visitor_session_from(request))
 
 
+def _creation_idempotency(request, data) -> tuple[str | None, str]:
+    """Return (stored key digest, canonical payload digest) for a first-turn request.
+
+    The raw key never enters a row or a log. The payload digest binds a key to exactly
+    one request so a buggy caller cannot reuse a recovery identifier for different text.
+    """
+    raw = (request.META.get("HTTP_IDEMPOTENCY_KEY", "") or "").strip()
+    if not raw:
+        return None, ""
+    if len(raw) > 128:
+        raise ValueError("Idempotency-Key is too long.")
+    key_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    canonical = json.dumps(
+        {
+            "body": data.get("body", "") or "",
+            "example_key": data.get("example_key", "") or "",
+            "attachment_ids": list(data.get("attachment_ids") or []),
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return key_hash, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _replay_created_thread(request, *, key_hash: str, payload_hash: str, client, session_id: str):
+    """Resolve an already-created first request without repeating any business effect.
+
+    If the original anonymous response was lost before its Set-Cookie reached the browser,
+    the caller may have no session yet. Possession of the high-entropy idempotency key is
+    accepted only for that no-session recovery case; an existing *different* session may
+    not cross into the thread.
+    """
+    from apps.conversations.models import Thread
+
+    thread = Thread.objects.select_related("conversation", "lead", "client").filter(
+        creation_idempotency_hash=key_hash
+    ).first()
+    if thread is None:
+        return None, False
+    if thread.creation_payload_hash != payload_hash:
+        return Response(
+            {"detail": "That idempotency key was already used for a different request."},
+            status=status.HTTP_409_CONFLICT,
+        ), False
+
+    if client is not None:
+        if thread.client_id != client.id:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND), False
+        return thread, False
+
+    if thread.client_id is not None:
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND), False
+    if session_id and thread.visitor_session != session_id:
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND), False
+
+    # True means the caller lost the original response (and therefore its cookie).
+    return thread, not bool(session_id)
+
+
 class ThreadListCreateView(APIView):
     """POST threads/ · GET threads/ — PUBLIC, scoped to the visitor session."""
 
@@ -199,6 +261,26 @@ class ThreadListCreateView(APIView):
         client = _client_from(request)
         session_id = visitor_session_from(request)
         issued_session = False
+
+        try:
+            idempotency_hash, payload_hash = _creation_idempotency(request, data)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if idempotency_hash:
+            replay, recover_session = _replay_created_thread(
+                request, key_hash=idempotency_hash, payload_hash=payload_hash,
+                client=client, session_id=session_id,
+            )
+            if isinstance(replay, Response):
+                return replay
+            if replay is not None:
+                response = Response(ThreadDetailSerializer(replay).data, status=status.HTTP_200_OK)
+                response["Idempotency-Replayed"] = "true"
+                if recover_session and replay.visitor_session:
+                    _set_session_cookie(response, replay.visitor_session)
+                return response
+
         if client is None and not session_id:
             session_id = new_visitor_session()
             issued_session = True
@@ -212,6 +294,8 @@ class ThreadListCreateView(APIView):
             client=client,
             lead=getattr(client, "lead", None) if client is not None else None,
             title=thread_svc.derive_title(body) if body else "",
+            creation_idempotency_hash=idempotency_hash,
+            creation_payload_hash=payload_hash,
         )
 
         # ── THE HAND-OFF THIS SERIALIZER WAS ALWAYS FOR (2026-08-13) ──────────

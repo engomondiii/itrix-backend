@@ -61,6 +61,7 @@ class DiagnosisAgent(BaseAgent):
             namespace=self._namespace(ctx),
             top_k=top_k,
             context=self._retrieval_context(ctx),
+            **ctx.knowledge_access_kwargs,
         )
 
     @staticmethod

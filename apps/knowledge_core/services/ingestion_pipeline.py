@@ -180,5 +180,5 @@ def reingest_namespace(namespace: str, *, dry_run: bool = False) -> list[Ingesti
     namespace = normalize_namespace(namespace)
     if not dry_run:
         PineconeUpserter().delete_namespace(namespace)
-    docs = KnowledgeDocument.objects.filter(namespace=namespace)
+    docs = KnowledgeDocument.objects.filter(namespace=namespace, is_current=True)
     return [ingest_document(doc, dry_run=dry_run) for doc in docs]

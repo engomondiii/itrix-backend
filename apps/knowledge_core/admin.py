@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from django.contrib import admin, messages
 
-from apps.knowledge_core.models import ClaimRecord, KnowledgeChunk, KnowledgeDocument
+from apps.knowledge_core.models import (
+    ClaimRecord, ContentAuthorization, HardFact, KnowledgeChunk, KnowledgeConflict, KnowledgeDocument,
+)
 from apps.knowledge_core.services.ingestion_pipeline import ingest_document
 
 
@@ -47,3 +49,24 @@ class ClaimRecordAdmin(admin.ModelAdmin):
     list_display = ("id", "disclosure_level", "is_prohibited", "public_reference", "created_at")
     list_filter = ("disclosure_level", "is_prohibited")
     search_fields = ("text", "public_reference")
+
+
+@admin.register(HardFact)
+class HardFactAdmin(admin.ModelAdmin):
+    list_display = ("key", "category", "jurisdiction", "publication_status", "prosecution_status", "verified_grant_number", "is_current", "last_verified_at")
+    list_filter = ("category", "source_authority", "is_current", "disclosure_level")
+    search_fields = ("key", "public_statement", "internal_reference", "official_application_number", "verified_grant_number")
+
+
+@admin.register(ContentAuthorization)
+class ContentAuthorizationAdmin(admin.ModelAdmin):
+    list_display = ("document", "subject_kind", "subject_id", "active", "expires_at", "authorized_by")
+    list_filter = ("subject_kind", "active", "document__disclosure_level")
+    search_fields = ("subject_id", "document__title", "reason", "scope")
+
+
+@admin.register(KnowledgeConflict)
+class KnowledgeConflictAdmin(admin.ModelAdmin):
+    list_display = ("topic", "authority", "resolved", "created_at")
+    list_filter = ("authority", "resolved")
+    search_fields = ("topic", "query_fingerprint", "detail")

@@ -226,6 +226,7 @@ class ConciergeAgent(BaseAgent):
             namespaces=VISITOR_KNOWLEDGE_NAMESPACES,
             top_k=8,
             context=retrieval_context,
+            **ctx.knowledge_access_kwargs,
         )
         try:
             # CONVERSATIONAL, not result-page. The shared builder's default TASK tells
@@ -328,6 +329,7 @@ class ConciergeAgent(BaseAgent):
                 namespaces=VISITOR_KNOWLEDGE_NAMESPACES,
                 top_k=8,
                 context=retrieval_context,
+                **ctx.knowledge_access_kwargs,
             )
             self._last_chunk_ids = [
                 c.get("chunk_id") or c.get("id")

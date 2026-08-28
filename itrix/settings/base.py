@@ -453,6 +453,10 @@ LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.1")
 LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "")
 LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.1")
 LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "")
+# Counsel-review draft displayed while LEGAL_PUBLISHED is false. This is deliberately
+# separate from the effective LEGAL_*_VERSION values: Legal Instruments v1.2 says the
+# effective versions are bumped only after publication/counsel sign-off.
+LEGAL_DRAFT_VERSION = env("LEGAL_DRAFT_VERSION", "1.2")
 
 # Whether counsel has signed the instruments off.
 #

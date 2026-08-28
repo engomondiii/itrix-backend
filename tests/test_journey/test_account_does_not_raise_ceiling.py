@@ -45,9 +45,8 @@ def test_a_silent_registered_account_is_capped_at_public():
     assert disclosure_ceiling_for("ARRIVED", IDENTITY_IDENTIFIED, nda_signed=False) == "public"
 
 
-def test_an_nda_is_what_moves_the_ceiling_not_an_account():
-    """The thing that actually raises reach is a contractual position, and it has to be
-    signed — which itself requires a confirmed address (R66)."""
+def test_an_nda_does_not_become_blanket_content_authorization():
+    """An NDA protects authorized disclosure; it does not itself raise the general ceiling."""
     without = disclosure_ceiling_for("NDA_REVIEW", IDENTITY_IDENTIFIED, nda_signed=False)
     with_nda = disclosure_ceiling_for("NDA_REVIEW", IDENTITY_IDENTIFIED, nda_signed=True)
-    assert without != with_nda
+    assert without == with_nda == "controlled_public"

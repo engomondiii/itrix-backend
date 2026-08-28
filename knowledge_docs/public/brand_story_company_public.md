@@ -1,19 +1,16 @@
-# iTrix Brand Story — Public
+# itriX Brand Story — Public
 
 ## Purpose
-iTrix exists to relieve the real bottlenecks in hard computation. The company's purpose is
+itriX exists to relieve the real bottlenecks in hard computation. The company's purpose is
 durable capability, not a one-off demonstration — and that purpose runs through how it
-talks to prospects, how it evaluates fit, and how it licenses.
+talks to visitors, how it evaluates fit when asked, and how it supports governed commercial transfer when that stage is explicitly reached.
 
 ## Problem
-The teams iTrix serves are constrained by cost, energy, speed, or data movement in their
-computational work. They rarely need a brochure; they need an honest read on whether a
-different approach would relieve the specific pressure they face.
+When a customer asks itriX to examine a computational problem, pressures may include cost, energy, speed, memory movement or other execution constraints. The useful first task is an honest reflection of the problem and the evidence needed to test a hypothesis, not a product pitch.
 
 ## Solution
-iTrix offers a value-first path: it delivers a qualitative diagnosis and a customized view
+itriX offers a value-first path: it delivers a qualitative diagnosis and a customized view
 before it ever asks for a commitment. The relationship deepens only as value is earned.
 
 ## Commercialization
-The company's commercial model is evaluation-first. A scoped assessment establishes fit,
-and only then does the conversation move toward licensing or a longer engagement.
+Commercial progression is not automatic. A controlled evaluation, PoC, licensing discussion or other later step occurs only when explicitly selected and appropriately governed; success in one stage does not create consent to the next.

@@ -275,27 +275,50 @@ def finalize_ready_review(lead) -> dict:
         "reason": "revealed",
     }
 
-def _create_conversation_lead(thread, contact: dict):
-    """
-    Create a real Lead from an anonymous thread and claim the thread onto it.
+def _safe_visitor_turns(thread) -> list[str]:
+    """Conversation source for downstream lead/review artifacts; confidential turns fail closed."""
+    from apps.conversations.models import Message
+    from apps.conversations.services.confidentiality import detect
 
-    Honest exploratory defaults (general route, tier 4) rather than a fabricated
-    Q1-Q9 score. Marked ``lead_source=conversation`` — exactly the case the model
-    describes ("somebody described a problem and Layer 1 qualified them").
-    """
+    rows = Message.objects.filter(
+        thread=thread, sender_kind__in=["visitor", "client"]
+    ).order_by("seq", "created_at")
+    out: list[str] = []
+    for row in rows:
+        text = " ".join((row.body or "").split()).strip()
+        if not text:
+            continue
+        try:
+            if detect(text).sensitive:
+                continue
+        except Exception:
+            continue
+        out.append(text)
+    return out
+
+
+def _create_conversation_lead(thread, contact: dict):
+    """Create the internal subject from the full safe state, never just the first turn."""
     from django.db import transaction
 
     from apps.leads.models import Lead, LeadActivity, LeadSource
     from apps.review.models import ReviewSession
 
-    first_turn = _first_visitor_turn(thread)
+    turns = _safe_visitor_turns(thread)
+    corpus = "\n".join(turns)[:8000]
+    latest_context = " ".join(turns[-4:])[:1200] if turns else ""
+    action = getattr(thread, "selected_action", "") or ""
+    evaluation = getattr(thread, "evaluation_type", "") or ""
+    mirror_status = getattr(thread, "mirror_status", "") or ""
 
     with transaction.atomic():
         session = ReviewSession.objects.create(
             client_id="",
             visitor_type="conversation",
             status=ReviewSession.Status.QUALIFIED,
-            prompt=first_turn[:2000],
+            # Compatibility field now carries a bounded safe conversation synopsis;
+            # Result generation still reads the durable Thread as authoritative.
+            prompt=corpus[:2000],
         )
 
         lead = Lead.objects.create(
@@ -308,19 +331,25 @@ def _create_conversation_lead(thread, contact: dict):
             tier=4,
             score=0,
             journey_state="DIAGNOSED",
-            compute_bottleneck=first_turn[:500],
-            recommended_next_step="Client page revealed from conversation.",
+            compute_bottleneck=latest_context[:500],
+            recommended_next_step=(
+                f"Carry out explicitly selected action: {action}." if action
+                else "No identity-dependent next action is selected."
+            ),
         )
 
         LeadActivity.objects.create(
             lead=lead,
             type=LeadActivity.ActivityType.SUBMISSION,
-            label="Lead created from conversation — contact captured, client page revealed.",
+            label="Lead created from governed conversation — My Review generation pending.",
             meta={
                 "source": "conversation",
                 "thread_id": str(thread.id),
-                "company": contact.get("company", ""),
-                "name": contact.get("name", ""),
+                "relationship_state": getattr(thread, "relationship_state", "visitor"),
+                "mirror_status": mirror_status,
+                "selected_action": action,
+                "evaluation_type": evaluation,
+                "safe_turn_count": len(turns),
             },
         )
 
@@ -381,11 +410,5 @@ def _client_page_url(_token: str) -> str:
 
 
 def _first_visitor_turn(thread) -> str:
-    from apps.conversations.models import Message
-
-    m = (
-        Message.objects.filter(thread=thread, sender_kind__in=["visitor", "client"])
-        .order_by("seq", "created_at")
-        .first()
-    )
-    return (m.body or "") if m else ""
+    turns = _safe_visitor_turns(thread)
+    return turns[0] if turns else ""

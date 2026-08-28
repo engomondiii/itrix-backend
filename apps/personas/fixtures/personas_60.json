@@ -73,7 +73,11 @@
     "body": "Suggested next step: Map one Apple Intelligence inference path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-002",
@@ -149,7 +153,11 @@
     "body": "Suggested next step: Review one non-confidential device-to-PCC request class. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-003",
@@ -225,7 +233,11 @@
     "body": "Suggested next step: Select one operator family for an architecture-fit review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-004",
@@ -301,7 +313,11 @@
     "body": "Suggested next step: Trace one Core ML or Metal model pipeline. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-005",
@@ -377,7 +393,11 @@
     "body": "Suggested next step: Select one spatial perception or sensor-fusion path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-006",
@@ -453,7 +473,11 @@
     "body": "Suggested next step: Choose one stable Gemini or science-model kernel. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-007",
@@ -529,7 +553,11 @@
     "body": "Suggested next step: Review one tenant workload on a bounded Hypercomputer configuration. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-008",
@@ -605,7 +633,11 @@
     "body": "Suggested next step: Select one TPU operator graph for a fit assessment. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-009",
@@ -681,7 +713,11 @@
     "body": "Suggested next step: Map one high-volume serving path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-010",
@@ -757,7 +793,11 @@
     "body": "Suggested next step: Choose one simulation or prediction component. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-011",
@@ -833,7 +873,11 @@
     "body": "Suggested next step: Map one repeatable Copilot agent workflow. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-012",
@@ -909,7 +953,11 @@
     "body": "Suggested next step: Review one heterogeneous Azure workload class. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-013",
@@ -985,7 +1033,11 @@
     "body": "Suggested next step: Select one Maia-targeted inference kernel. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-014",
@@ -1061,7 +1113,11 @@
     "body": "Suggested next step: Map one portable ONNX or DirectML graph. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-015",
@@ -1137,7 +1193,11 @@
     "body": "Suggested next step: Select one industry solution for a strategic fit brief. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "Charles Lamanna",
+  "reference_role": "EVP, Copilot, Agents and Platform"
  },
  {
   "persona_id": "P-016",
@@ -1213,7 +1273,11 @@
     "body": "Suggested next step: Map one stable Bedrock or Alexa inference path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-017",
@@ -1289,7 +1353,11 @@
     "body": "Suggested next step: Review one customer-representative Trainium workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-018",
@@ -1365,7 +1433,11 @@
     "body": "Suggested next step: Select one Neuron model graph for architecture review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-019",
@@ -1441,7 +1513,11 @@
     "body": "Suggested next step: Map one bounded ranking or optimization stage. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-020",
@@ -1517,7 +1593,11 @@
     "body": "Suggested next step: Choose one device or robotics perception path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-021",
@@ -1593,7 +1673,11 @@
     "body": "Suggested next step: Choose one stable Llama kernel or serving path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-022",
@@ -1669,7 +1753,11 @@
     "body": "Suggested next step: Review one repeatable training or serving workload class. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-023",
@@ -1745,7 +1833,11 @@
     "body": "Suggested next step: Select one MTIA production model for architecture fit. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-024",
@@ -1821,7 +1913,11 @@
     "body": "Suggested next step: Map one ranking stage with clear offline metrics. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-025",
@@ -1897,7 +1993,11 @@
     "body": "Suggested next step: Choose one multimodal wearable workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-026",
@@ -1973,7 +2073,11 @@
     "body": "Suggested next step: Select one research kernel with a measurable structural bottleneck. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-027",
@@ -2050,7 +2154,11 @@
     "body": "Suggested next step: Review one repeatable DGX Cloud workload class. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-028",
@@ -2126,7 +2234,11 @@
     "body": "Suggested next step: Select one Blackwell operator family. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-029",
@@ -2202,7 +2314,11 @@
     "body": "Suggested next step: Map one CUDA workload before kernel selection. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-030",
@@ -2278,7 +2394,11 @@
     "body": "Suggested next step: Choose one Omniverse or Isaac scenario. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-031",
@@ -2354,7 +2474,11 @@
     "body": "Suggested next step: Select one bounded perception or planning path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-032",
@@ -2430,7 +2554,11 @@
     "body": "Suggested next step: Review one stable training stage. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-033",
@@ -2506,7 +2634,11 @@
     "body": "Suggested next step: Select one inference graph segment. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-034",
@@ -2582,7 +2714,11 @@
     "body": "Suggested next step: Choose one autonomy or Optimus simulation component. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-035",
@@ -2659,7 +2795,11 @@
     "body": "Suggested next step: Select one manufacturing or energy optimization loop. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-036",
@@ -2735,7 +2875,11 @@
     "body": "Suggested next step: Map one Galaxy AI on-device path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-037",
@@ -2812,7 +2956,11 @@
     "body": "Suggested next step: Select one digital-twin or fab-analytics workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-038",
@@ -2888,7 +3036,11 @@
     "body": "Suggested next step: Select one NPU operator family. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-039",
@@ -2965,7 +3117,11 @@
     "body": "Suggested next step: Map one TCAD or EDA solver segment. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-040",
@@ -3041,7 +3197,11 @@
     "body": "Suggested next step: Select one accelerator-memory workload for a joint boundary review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-041",
@@ -3117,7 +3277,11 @@
     "body": "Suggested next step: Map one AI workload to its memory boundary pattern. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-042",
@@ -3194,7 +3358,11 @@
     "body": "Suggested next step: Review one data-center workload with a memory bottleneck. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-043",
@@ -3271,7 +3439,11 @@
     "body": "Suggested next step: Select one HBM-bound workload trace. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-044",
@@ -3347,7 +3519,11 @@
     "body": "Suggested next step: Map one process-simulation or smart-fab workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-045",
@@ -3423,7 +3599,11 @@
     "body": "Suggested next step: Choose one partner workload for a controlled system review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-046",
@@ -3499,7 +3679,11 @@
     "body": "Suggested next step: Select one Gaudi model or kernel. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-047",
@@ -3576,7 +3760,11 @@
     "body": "Suggested next step: Map one cloud-to-edge AI workflow. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-048",
@@ -3652,7 +3840,11 @@
     "body": "Suggested next step: Select one customer workload for a co-design review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-049",
@@ -3728,7 +3920,11 @@
     "body": "Suggested next step: Map one oneAPI numerical workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-050",
@@ -3805,7 +4001,11 @@
     "body": "Suggested next step: Select one repeatable AI-PC workflow. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-051",
@@ -3881,7 +4081,11 @@
     "body": "Suggested next step: Select one Instinct workload for boundary review. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-052",
@@ -3958,7 +4162,11 @@
     "body": "Suggested next step: Review one heterogeneous data-center workflow. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-053",
@@ -4034,7 +4242,11 @@
     "body": "Suggested next step: Select one multi-engine workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-054",
@@ -4111,7 +4323,11 @@
     "body": "Suggested next step: Map one ROCm graph before code generation. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-055",
@@ -4188,7 +4404,11 @@
     "body": "Suggested next step: Select one Ryzen AI or embedded workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-056",
@@ -4264,7 +4484,11 @@
     "body": "Suggested next step: Select one mathematically structured workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "executive_compute_economics",
+  "strategic_lane_code": "SA-EC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-057",
@@ -4341,7 +4565,11 @@
     "body": "Suggested next step: Map one hybrid AI application path. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "infrastructure_capacity_strategy",
+  "strategic_lane_code": "SA-IC-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-058",
@@ -4418,7 +4646,11 @@
     "body": "Suggested next step: Select one Z or Power workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "architecture_platform_fit",
+  "strategic_lane_code": "SA-AF-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-059",
@@ -4495,7 +4727,11 @@
     "body": "Suggested next step: Map one quantum-classical or HPC workflow. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "technical_validation_delivery_risk",
+  "strategic_lane_code": "SA-TV-01",
+  "reference_person": "",
+  "reference_role": ""
  },
  {
   "persona_id": "P-060",
@@ -4572,6 +4808,10 @@
     "body": "Suggested next step: Select one strategic watsonx customer workload. Treat the first session as an eligibility review before selecting a technology route."
    }
   ],
-  "review_status": "Draft — ready for account validation"
+  "review_status": "Draft — ready for account validation",
+  "strategic_lane": "strategic_partnership_commercial_transfer",
+  "strategic_lane_code": "SA-SP-01",
+  "reference_person": "",
+  "reference_role": ""
  }
 ]

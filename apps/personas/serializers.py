@@ -36,6 +36,8 @@ class PersonaSummarySerializer(serializers.ModelSerializer):
     personaId = serializers.CharField(source="persona_id", read_only=True)
     functionalFamily = serializers.CharField(source="functional_family", read_only=True)
     pitchArchetype = serializers.CharField(source="pitch_archetype", read_only=True)
+    strategicLane = serializers.CharField(source="strategic_lane", read_only=True)
+    strategicLaneCode = serializers.CharField(source="strategic_lane_code", read_only=True)
     validationStatus = serializers.CharField(source="validation_status", read_only=True)
     pitchRoomId = serializers.SerializerMethodField()
 
@@ -49,6 +51,8 @@ class PersonaSummarySerializer(serializers.ModelSerializer):
             "primary_persona",
             "functionalFamily",
             "pitchArchetype",
+            "strategicLane",
+            "strategicLaneCode",
             "priority",
             "validationStatus",
             "pitchRoomId",
@@ -82,6 +86,8 @@ class PersonaDetailSerializer(PersonaSummarySerializer):
     expansionRule = serializers.CharField(source="expansion_rule", read_only=True)
     disclosureCeiling = serializers.CharField(source="disclosure_ceiling", read_only=True)
     departmentConfidence = serializers.CharField(source="department_confidence", read_only=True)
+    referencePerson = serializers.CharField(source="reference_person", read_only=True)
+    referenceRole = serializers.CharField(source="reference_role", read_only=True)
     pitchRoom = PitchRoomSerializer(source="pitch_room", read_only=True)
 
     class Meta(PersonaSummarySerializer.Meta):
@@ -109,6 +115,8 @@ class PersonaDetailSerializer(PersonaSummarySerializer):
             "product_route",
             "disclosureCeiling",
             "departmentConfidence",
+            "referencePerson",
+            "referenceRole",
             "pitchRoom",
         ]
         read_only_fields = fields

@@ -38,8 +38,11 @@ def test_requesting_an_nda_stamps_the_client_and_returns_the_confirmation():
 
     row.refresh_from_db()
     assert row.nda_requested_at is not None
-    # A request is NOT a signature: the data room must stay shut.
+    # A request is NOT a signature or content authorization.
     assert row.nda_signed is False
+    message = res.json()["message"].lower()
+    assert "restricted material" in message
+    assert "authorized" in message
 
 
 def test_the_request_lands_in_the_workspace_inbox():
@@ -67,11 +70,12 @@ def test_asking_twice_keeps_the_first_timestamp_and_does_not_repeat_the_note():
     assert len(notes) == 1
 
 
-def test_a_signed_client_is_told_it_is_already_in_place():
+def test_a_signed_client_is_told_the_agreement_is_already_in_place_without_promising_access():
     row = ClientFactory(nda_signed=True)
     res = _authed(row).post(URL, {}, format="json")
     assert res.status_code == 200
     assert "already" in res.json()["detail"].lower()
+    assert "data room" not in res.json()["detail"].lower()
 
 
 def test_the_endpoint_requires_a_client():

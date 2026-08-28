@@ -189,11 +189,14 @@ def test_nothing_is_appended_when_no_ask_is_due():
     assert contact_ask.append_ask("A reply.", {"ask": False}) == "A reply."
 
 
-def test_the_directive_forbids_the_ending_that_caused_this_bug():
+def test_the_directive_forbids_generic_follow_up_and_names_the_selected_action_handoff():
     directive = contact_ask.directive({"ask": True, "text": "..."})
+    lower = directive.lower()
 
-    assert "be in touch" in directive
-    assert "email address" in directive
+    assert "work email address" in lower
+    assert "identity-dependent action" in lower
+    assert "do not promise human follow-up" in lower
+    assert "be in touch" not in lower
 
 
 def test_no_directive_when_no_ask_is_due():
@@ -244,8 +247,10 @@ def test_the_agent_prompt_carries_the_instruction_to_ask():
     )
     prompt = ConciergeAgent()._conversation_user_prompt(ctx, COVERING_TEXT, "INSTRUCTION")
 
-    assert "work email" in prompt
-    assert "be in touch" in prompt
+    lower = prompt.lower()
+    assert "work email address" in lower
+    assert "identity-dependent action" in lower
+    assert "be in touch" not in lower
 
 
 @pytest.mark.django_db

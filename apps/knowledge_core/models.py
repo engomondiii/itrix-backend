@@ -17,6 +17,7 @@ Core governance: Public / Controlled public / Authorized / Agreement-gated / Pri
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 from apps.core.models import BaseModel
@@ -192,3 +193,89 @@ class ClaimRecord(BaseModel):
 
     def __str__(self) -> str:
         return f"Claim({self.disclosure_level}): {self.text[:50]}"
+
+
+class HardFact(BaseModel):
+    """Structured owner-verifiable fact; prose retrieval must not upgrade its status."""
+
+    class Category(models.TextChoices):
+        PATENT = "patent", "Patent / IP"
+        CORPORATE = "corporate", "Corporate"
+        COMMERCIAL = "commercial", "Commercial"
+        BENCHMARK = "benchmark", "Benchmark"
+        CUSTOMER = "customer", "Customer"
+        TRANSACTION = "transaction", "Transaction"
+
+    key = models.SlugField(max_length=160, unique=True)
+    category = models.CharField(max_length=24, choices=Category.choices, db_index=True)
+    public_statement = models.TextField(blank=True, default="")
+    jurisdiction = models.CharField(max_length=80, blank=True, default="")
+    internal_reference = models.CharField(max_length=120, blank=True, default="")
+    official_application_number = models.CharField(max_length=120, blank=True, default="")
+    filing_date = models.DateField(null=True, blank=True)
+    publication_status = models.CharField(max_length=120, blank=True, default="")
+    prosecution_status = models.CharField(max_length=120, blank=True, default="")
+    verified_grant_number = models.CharField(max_length=120, blank=True, default="")
+    ownership_assignment = models.CharField(max_length=255, blank=True, default="")
+    source_document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.SET_NULL, null=True, blank=True, related_name="hard_facts"
+    )
+    source_reference = models.CharField(max_length=512, blank=True, default="")
+    source_authority = models.CharField(
+        max_length=20, choices=SourceAuthority.choices, default=SourceAuthority.AUTHORITATIVE, db_index=True
+    )
+    is_current = models.BooleanField(default=True, db_index=True)
+    disclosure_level = models.CharField(
+        max_length=24, choices=DisclosureLevel.choices, default=DisclosureLevel.INTERNAL_ONLY
+    )
+    approved_audience = models.JSONField(default=list, blank=True)
+    claim_ceiling = models.PositiveSmallIntegerField(default=1)
+    last_verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["category", "key"]
+
+
+class ContentAuthorization(BaseModel):
+    """Explicit per-content authorization, deliberately independent of NDA/account state."""
+
+    class SubjectKind(models.TextChoices):
+        CLIENT = "client", "Client"
+        LEAD = "lead", "Lead"
+        THREAD = "thread", "Thread"
+
+    document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.CASCADE, related_name="content_authorizations"
+    )
+    subject_kind = models.CharField(max_length=16, choices=SubjectKind.choices, db_index=True)
+    subject_id = models.CharField(max_length=64, db_index=True)
+    scope = models.CharField(max_length=255, blank=True, default="")
+    reason = models.CharField(max_length=512, blank=True, default="")
+    authorized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="knowledge_authorizations"
+    )
+    active = models.BooleanField(default=True, db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "subject_kind", "subject_id"],
+                name="uniq_knowledge_document_subject_authorization",
+            )
+        ]
+
+
+class KnowledgeConflict(BaseModel):
+    """Auditable unresolved conflict among equally authoritative applicable sources."""
+
+    query_fingerprint = models.CharField(max_length=64, db_index=True)
+    topic = models.CharField(max_length=160, blank=True, default="")
+    authority = models.CharField(max_length=20, choices=SourceAuthority.choices)
+    document_ids = models.JSONField(default=list, blank=True)
+    detail = models.CharField(max_length=1024, blank=True, default="")
+    resolved = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]

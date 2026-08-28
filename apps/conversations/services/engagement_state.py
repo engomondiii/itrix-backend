@@ -365,11 +365,13 @@ def update_from_turn(thread, body: str) -> Decision:
         _append_consent(thread, "action_selected", detail=selected_action)
         dirty.append("consent_history")
 
-    # Contract state is conservative. Discussion of terms is not a draft/executed contract.
-    if re.search(r"\b(term|licen[cs]|commercial|ownership|sublicen[cs]|exclusiv|royalt|agreement)\b", text, re.I):
-        if getattr(thread, "contract_stage", CONTRACT_NONE) == CONTRACT_NONE:
-            thread.contract_stage = CONTRACT_FRAMEWORK
-            dirty.append("contract_stage")
+    # Contract state is evidence-driven. Merely asking what licensing, ownership or a
+    # term means is not a contract-state event. An explicit request to *start a licensing
+    # discussion* can enter framework discussion; draft/term-sheet/executed states are
+    # synchronized only from durable legal/commercial records elsewhere.
+    if selected_action == "start_licensing" and getattr(thread, "contract_stage", CONTRACT_NONE) == CONTRACT_NONE:
+        thread.contract_stage = CONTRACT_FRAMEWORK
+        dirty.append("contract_stage")
 
     if dirty:
         _save(thread, dirty)

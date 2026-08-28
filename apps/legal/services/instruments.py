@@ -41,12 +41,10 @@ _SETTINGS_KEYS: dict[str, tuple[str, str]] = {
 
 def published() -> bool:
     """
-    Whether the instruments have been signed off by counsel.
+    Whether the configured legal instruments are currently published.
 
-    Defaults FALSE. Until it is true the routes still answer — a visitor must always be able
-    to read what governs their use — but the payload says `published: false`, and
-    `itrix-web` renders the draft banner and a `noindex`. An unreviewed Terms of Service
-    presented as authoritative is worse than a delayed one.
+    Publication controls the legal status/version presented by the platform. It is independent
+    of journey state, NDA state and content authorization.
     """
     return bool(getattr(settings, "LEGAL_PUBLISHED", False))
 
@@ -68,8 +66,9 @@ def effective_of(slug: str) -> str:
 def display_version_of(slug: str) -> str:
     """Version the public route is displaying right now.
 
-    While counsel review is pending this is the v1.2 draft and is *not* an effective
-    version. Once published, the deployment-controlled effective version binds.
+    When publication is disabled, ``LEGAL_DRAFT_VERSION`` remains available as a safe
+    compatibility display version. When published, the deployment-controlled effective version
+    and effective date bind.
     """
     if not published():
         return str(getattr(settings, "LEGAL_DRAFT_VERSION", "1.2") or "1.2")

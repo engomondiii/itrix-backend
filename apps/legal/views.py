@@ -46,10 +46,10 @@ class LegalInstrumentsView(APIView):
     """
     GET legal/instruments/ — PUBLIC.
 
-    ``published`` is in the payload so `itrix-web` can render the draft banner without a
-    second flag of its own. Until counsel signs off, the instruments are still SERVED — a
-    visitor must always be able to read what governs their use — but they are not presented
-    as authoritative.
+    ``published`` is in the payload so `itrix-web` can distinguish the current governing
+    instrument from an intentionally unpublished version without a second source of truth.
+    When publication is disabled, the instruments may still be served for controlled review
+    but are not presented as the current governing version.
     """
 
     permission_classes = [AllowAny]

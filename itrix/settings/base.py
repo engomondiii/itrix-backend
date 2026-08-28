@@ -445,26 +445,21 @@ ATTACHMENT_RETENTION_DAYS = int(env("ATTACHMENT_RETENTION_DAYS", "365"))
 # `GET legal/instruments/` and the frontend disagree, `useLegalAssent` warns in development,
 # and `audit_assent` reports it — because the mismatch means every assent being recorded is
 # attached to a version the visitor did not read.
-LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", "1.1")
-LEGAL_TERMS_EFFECTIVE = env("LEGAL_TERMS_EFFECTIVE", "")
-LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", "1.1")
-LEGAL_PRIVACY_EFFECTIVE = env("LEGAL_PRIVACY_EFFECTIVE", "")
-LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.1")
-LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "")
-LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.1")
-LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "")
-# Counsel-review draft displayed while LEGAL_PUBLISHED is false. This is deliberately
-# separate from the effective LEGAL_*_VERSION values: Legal Instruments v1.2 says the
-# effective versions are bumped only after publication/counsel sign-off.
+LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", "1.2")
+LEGAL_TERMS_EFFECTIVE = env("LEGAL_TERMS_EFFECTIVE", "2026-08-28")
+LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", "1.2")
+LEGAL_PRIVACY_EFFECTIVE = env("LEGAL_PRIVACY_EFFECTIVE", "2026-08-28")
+LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.2")
+LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "2026-08-28")
+LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.2")
+LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "2026-08-28")
+# Compatibility display version used only if an operator deliberately disables publication.
 LEGAL_DRAFT_VERSION = env("LEGAL_DRAFT_VERSION", "1.2")
 
-# Whether counsel has signed the instruments off.
-#
-# DEFAULTS FALSE, and the routes still answer with it false — a visitor must always be able to
-# read what governs their use. What changes is that the payload says `published: false`, and
-# itrix-web renders a draft banner and a noindex. An unreviewed Terms of Service presented as
-# authoritative is worse than a delayed one.
-LEGAL_PUBLISHED = env("LEGAL_PUBLISHED", "False").lower() == "true"
+# v1.2 is the published MVP instrument from 2026-08-28. Deployments may still set this false
+# as an emergency publication kill-switch, but the release default is the effective v1.2 set.
+# Publication is an assent/version fact only; it never changes disclosure authorization.
+LEGAL_PUBLISHED = env("LEGAL_PUBLISHED", "True").lower() == "true"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # v6.0 Phase 3

@@ -117,7 +117,10 @@ class Command(BaseCommand):
         # become public. That would turn a health check into a disclosure downgrade.
         self.stdout.write(self.style.MIGRATE_HEADING("Disclosure folder parity"))
         drift = []
-        for doc in KnowledgeDocument.objects.all():
+        # Historical source rows are retained for audit/reconciliation but are
+        # deliberately non-current and have no retrievable chunks. Folder parity
+        # applies to active Knowledge sources only.
+        for doc in KnowledgeDocument.objects.filter(is_current=True):
             parts = str(doc.file_path or "").replace("\\", "/").split("/")
             expected = None
             if "knowledge_docs" in parts:

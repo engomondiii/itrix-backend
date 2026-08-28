@@ -95,6 +95,11 @@ class Client(BaseModel):
     # Stamped on every password change. A client-JWT minted BEFORE this moment is refused,
     # which is how a stateless token gets invalidated (services/session_invalidation.py).
     password_changed_at = models.DateTimeField(null=True, blank=True)
+    # Monotonic token-generation boundary. Integer versioning avoids the sub-second
+    # ambiguity of comparing JWT ``iat`` (whole seconds) with database timestamps. Every
+    # password/session invalidation increments this value; access, refresh and WS tickets
+    # carry the version and are rejected when it no longer matches.
+    session_version = models.PositiveBigIntegerField(default=0)
 
     # ── v6.0 Phase 2: the customer lifecycle ─────────────────────────────────
     # A Client becomes a CUSTOMER when a contract is executed. The distinction matters

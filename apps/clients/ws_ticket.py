@@ -17,7 +17,11 @@ WS_TICKET_MAX_AGE_SECONDS = 30 * 60
 
 def mint_client_ws_ticket(client) -> str:
     return signing.dumps(
-        {"v": 1, "client_id": str(client.id)},
+        {
+            "v": 2,
+            "client_id": str(client.id),
+            "session_version": int(getattr(client, "session_version", 0) or 0),
+        },
         salt=WS_TICKET_SALT,
         compress=True,
     )
@@ -30,9 +34,20 @@ def resolve_client_ws_ticket(ticket: str, *, max_age: int = WS_TICKET_MAX_AGE_SE
     except signing.BadSignature:
         return None
 
-    if not isinstance(payload, dict) or payload.get("v") != 1 or not payload.get("client_id"):
+    if not isinstance(payload, dict) or payload.get("v") not in {1, 2} or not payload.get("client_id"):
         return None
 
     from apps.clients.models import Client
 
-    return Client.objects.filter(id=payload["client_id"], is_active=True).first()
+    client = Client.objects.filter(id=payload["client_id"], is_active=True).first()
+    if client is None:
+        return None
+    # v1 tickets predate the revocation generation and are accepted only before any
+    # password/session invalidation. v2 tickets must match the current generation.
+    claimed = payload.get("session_version")
+    if claimed is None:
+        return client if int(getattr(client, "session_version", 0) or 0) == 0 and client.password_changed_at is None else None
+    try:
+        return client if int(claimed) == int(getattr(client, "session_version", 0) or 0) else None
+    except (TypeError, ValueError):
+        return None

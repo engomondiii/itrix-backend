@@ -123,3 +123,33 @@ def test_the_admin_cannot_edit_an_assent_record():
     assert admin.has_add_permission(None) is False
     assert admin.has_change_permission(None) is False
     assert admin.has_delete_permission(None) is False
+
+
+def test_client_reassent_uses_client_jwt_and_unpublished_is_only_draft_acknowledgement(settings):
+    from apps.clients.tokens import build_tokens_for_client
+    from apps.legal.models import AssentRecord
+    from tests.factories.client_factory import ClientFactory
+
+    settings.ENABLE_CLIENT_PORTAL = True
+    settings.LEGAL_PUBLISHED = False
+    client = ClientFactory(email="reassent@example.com")
+    api = APIClient()
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {build_tokens_for_client(client)['access']}")
+
+    response = api.post(
+        "/api/v1/portal/legal/assent/",
+        {"instruments": [{"slug": "terms", "version": "1.2"}]},
+        format="json",
+    )
+    assert response.status_code == 201
+    record = AssentRecord.objects.filter(client=client).latest("created_at")
+    assert record.instrument_status == "draft_acknowledgement"
+
+
+def test_team_token_cannot_record_client_reassent(auth_client):
+    response = auth_client.post(
+        "/api/v1/portal/legal/assent/",
+        {"instruments": []},
+        format="json",
+    )
+    assert response.status_code in {401, 403}

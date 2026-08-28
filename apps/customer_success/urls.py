@@ -9,6 +9,7 @@ from apps.customer_success.views import (
     DeploymentsView,
     FeedbackView,
     KnowledgeView,
+    ImprovementView,
     OutcomesView,
     RelationshipTeamView,
     SuccessOverviewView,
@@ -27,6 +28,7 @@ urlpatterns = [
     path("changes/", ChangesView.as_view(), name="success-changes"),
     path("team/", RelationshipTeamView.as_view(), name="success-team"),
     path("knowledge/", KnowledgeView.as_view(), name="success-knowledge"),
+    path("improve/", ImprovementView.as_view(), name="success-improve"),
     # WRITE ONLY — no GET counterpart, by design (§12I).
     path("feedback/", FeedbackView.as_view(), name="success-feedback"),
 ]

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+from apps.clients.password_policy import validate_client_password
 
 from apps.clients.models import Client
 
@@ -51,6 +54,14 @@ class InviteClaimRequestSerializer(serializers.Serializer):
     # v7.1 Phase 3.
     assent = serializers.ListField(child=serializers.DictField(), required=False, default=list)
 
+    def validate_password(self, value: str | None):
+        if not value:
+            return value
+        try:
+            return validate_client_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+
 
 class InviteClaimResponseSerializer(serializers.Serializer):
     """Response for a successful claim (client profile + password-set flag + tokens)."""
@@ -63,9 +74,15 @@ class PasswordSetRequestSerializer(serializers.Serializer):
     """Body for ``POST client/auth/password/set/`` (first-time / reset)."""
 
     token = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=10)
+    password = serializers.CharField(write_only=True)
     access = serializers.CharField(required=False)
     refresh = serializers.CharField(required=False)
+
+    def validate_password(self, value: str):
+        try:
+            return validate_client_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────

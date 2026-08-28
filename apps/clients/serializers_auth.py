@@ -14,12 +14,13 @@ service, which notifies the holder rather than the requester.
 
 from __future__ import annotations
 
-from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from apps.clients.password_policy import min_length as _min_length
+from apps.clients.password_policy import validate_client_password
 
-def _min_length() -> int:
-    return int(getattr(settings, "PASSWORD_MIN_LENGTH", 12))
+
 
 
 class AssentEntrySerializer(serializers.Serializer):
@@ -41,12 +42,10 @@ class RegisterRequestSerializer(serializers.Serializer):
     assent = AssentEntrySerializer(many=True)
 
     def validate_password(self, value: str) -> str:
-        # ONE number, two places, and the backend's is the one that binds (§12).
-        if len(value or "") < _min_length():
-            raise serializers.ValidationError(
-                f"Use at least {_min_length()} characters."
-            )
-        return value
+        try:
+            return validate_client_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
 
     def validate_assent(self, value):
         if not value:
@@ -63,9 +62,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate_password(self, value: str) -> str:
-        if len(value or "") < _min_length():
-            raise serializers.ValidationError(f"Use at least {_min_length()} characters.")
-        return value
+        try:
+            return validate_client_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -73,9 +73,10 @@ class PasswordChangeSerializer(serializers.Serializer):
     newPassword = serializers.CharField(source="new_password", write_only=True)
 
     def validate_newPassword(self, value: str) -> str:
-        if len(value or "") < _min_length():
-            raise serializers.ValidationError(f"Use at least {_min_length()} characters.")
-        return value
+        try:
+            return validate_client_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
 
 
 class VerifyEmailConfirmSerializer(serializers.Serializer):

@@ -53,6 +53,9 @@ def build_tokens_for_client(client) -> dict[str, str]:
         "nda_signed": bool(client.nda_signed),
         "iat": now,
         "jti": uuid.uuid4().hex,
+        # Monotonic revocation boundary. Unlike JWT iat, this cannot lose precision when a
+        # password change and token issue happen in the same second.
+        "session_version": int(getattr(client, "session_version", 0) or 0),
     }
     access = {**base, "token_type": "access", "exp": now + _ACCESS_TTL}
     refresh = {**base, "token_type": "refresh", "exp": now + _REFRESH_TTL}
@@ -71,3 +74,20 @@ def decode_client_token(token: str) -> dict:
         audience=CLIENT_AUDIENCE,
         options={"require": ["exp", "aud"]},
     )
+
+
+def token_matches_current_session(client, payload: dict) -> bool:
+    """Return whether a decoded client token belongs to the client's current session generation.
+
+    New tokens carry ``session_version``. Legacy tokens minted before the migration remain
+    usable only while no session invalidation has ever occurred. Once ``password_changed_at``
+    is set, a missing generation fails closed.
+    """
+    current = int(getattr(client, "session_version", 0) or 0)
+    claimed = payload.get("session_version")
+    if claimed is None:
+        return current == 0 and getattr(client, "password_changed_at", None) is None
+    try:
+        return int(claimed) == current
+    except (TypeError, ValueError):
+        return False

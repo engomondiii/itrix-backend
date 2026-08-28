@@ -33,5 +33,6 @@ def invalidate_other_sessions(client) -> None:
     change does not leave a customer mysteriously signed out everywhere.
     """
     client.password_changed_at = timezone.now()
-    client.save(update_fields=["password_changed_at", "updated_at"])
+    client.session_version = int(getattr(client, "session_version", 0) or 0) + 1
+    client.save(update_fields=["password_changed_at", "session_version", "updated_at"])
     logger.info("clients.sessions_invalidated client=%s", client.id)

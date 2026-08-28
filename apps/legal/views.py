@@ -19,6 +19,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.clients.backends import ClientJWTAuthentication
+from apps.clients.permissions import IsAuthenticatedClient
 from apps.legal.constants import ASSENT_REQUIRED_SLUGS
 from apps.legal.serializers import AssentReceiptSerializer, AssentRequestSerializer
 from apps.legal.services import assent as assent_svc
@@ -68,6 +70,9 @@ class LegalInstrumentsView(APIView):
 
 
 class PortalAssentView(APIView):
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
     """
     POST portal/legal/assent/ — CLIENT plane.
 
@@ -92,12 +97,11 @@ class PortalAssentView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        client = getattr(request, "client", None) or getattr(request.user, "client", None)
-        if client is None:
-            return Response(
-                {"detail": "A client session is required to record assent."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        # ClientJWTAuthentication returns the Client itself as request.user. Do not look
+        # for a nested ``.client`` attribute (that shape belongs to other security planes),
+        # otherwise a valid client JWT authenticates successfully and this re-assent path
+        # still rejects the caller as unauthenticated.
+        client = request.user
 
         self._warn_on_version_mismatch(data.get("instruments") or [])
 

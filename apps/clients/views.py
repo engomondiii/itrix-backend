@@ -69,6 +69,13 @@ class InviteClaimView(APIView):
             "requiresPasswordSet": requires_password_set,
             **tokens,
         }
+        if requires_password_set:
+            # The invitation has already been verified and consumed. Bridge into the
+            # dedicated password-set capability instead of reusing the invite token for a
+            # second purpose. The BFF stores this value in an httpOnly transient cookie.
+            from apps.clients.services.set_password import issue_set_password_token
+
+            body["setPasswordToken"] = issue_set_password_token(client)
         return Response(body, status=status.HTTP_201_CREATED)
 
 
@@ -91,7 +98,12 @@ from apps.clients.serializers import (  # noqa: E402
     PortalPoCSerializer,
 )
 from apps.clients.services.client_creator import authenticate_client  # noqa: E402
-from apps.clients.tokens import build_tokens_for_client, decode_client_token  # noqa: E402
+from apps.clients.tokens import (  # noqa: E402
+    build_tokens_for_client,
+    decode_client_token,
+    token_matches_current_session,
+)
+from apps.clients.throttles import AUTH_THROTTLES  # noqa: E402
 
 
 def _portal_enabled_response():
@@ -106,6 +118,9 @@ class ClientLoginView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
+    # Credentials use the dedicated per-address + per-IP buckets rather than the broad
+    # API throttle. DRF supplies the real Retry-After header from these classes.
+    throttle_classes = AUTH_THROTTLES
 
     def post(self, request):
         if not getattr(settings, "ENABLE_CLIENT_PORTAL", False):
@@ -144,8 +159,9 @@ class ClientTokenRefreshView(APIView):
         if payload.get("token_type") != "refresh":
             return Response({"detail": "Not a refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
         client = Client.objects.filter(id=payload.get("client_id"), is_active=True).first()
-        if client is None:
-            return Response({"detail": "Client not found."}, status=status.HTTP_401_UNAUTHORIZED)
+        if client is None or not token_matches_current_session(client, payload):
+            # One generic shape for unknown/inactive/revoked session state.
+            return Response({"detail": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(build_tokens_for_client(client), status=status.HTTP_200_OK)
 
 
@@ -276,6 +292,85 @@ class PortalOverviewView(APIView):
             "lastUpdated": conv.last_message_at,
         }
         return Response(PortalOverviewSerializer(payload).data)
+
+
+class PortalBriefingView(APIView):
+    """GET portal/briefing/ — a client-safe projection of the current My Review.
+
+    The persisted ResultPage remains the source of truth. This endpoint never regenerates
+    analysis and never returns tier, score, hidden persona, internal source metadata or a
+    commercial pathway. Product recommendation is shown only after the deterministic
+    Problem-Mirror gate permits one.
+    """
+
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
+    def get(self, request):
+        from apps.conversations.models_thread import Thread
+        from apps.conversations.services.engagement_state import recommendation_allowed
+        from apps.result_page.models import ResultPage
+
+        client = request.user
+        result = ResultPage.objects.filter(lead=client.lead).first()
+        if result is None or result.generation_status != ResultPage.GenerationStatus.READY:
+            return Response({"detail": "Briefing is not ready."}, status=status.HTTP_404_NOT_FOUND)
+
+        thread = (
+            Thread.objects.filter(client=client).order_by("-updated_at").first()
+            or Thread.objects.filter(lead=client.lead).order_by("-updated_at").first()
+        )
+        route = getattr(client.lead, "product_route", "general") or "general"
+        if thread is not None and not recommendation_allowed(thread):
+            route = "general"
+        if route not in {"alpha_compute", "alpha_core", "both", "general"}:
+            route = "general"
+
+        sections: list[dict] = []
+        mirror = result.problem_mirror_structured or {}
+        stated = [str(v).strip() for v in (mirror.get("statedFacts") or []) if str(v).strip()]
+        mirror_parts = [*stated]
+        for key in ("affectedDecision", "consequence", "constraints", "evidenceGap", "successCondition"):
+            value = mirror.get(key)
+            if isinstance(value, str) and value.strip():
+                mirror_parts.append(value.strip())
+        if mirror_parts:
+            sections.append({"key": "problem_mirror", "title": "Problem Mirror", "body": " ".join(mirror_parts), "updated": False})
+
+        if result.alpha_fit_summary:
+            sections.append({"key": "alpha_fit", "title": "Current fit", "body": result.alpha_fit_summary, "updated": False})
+
+        if result.diagnosis:
+            parts = []
+            for row in result.diagnosis:
+                if not isinstance(row, dict):
+                    continue
+                text = row.get("observation") or row.get("summary") or row.get("pressure")
+                if text:
+                    parts.append(str(text).strip())
+            if parts:
+                sections.append({"key": "diagnosis", "title": "Diagnosis", "body": " ".join(parts), "updated": False})
+
+        if result.kpi_preview:
+            labels = []
+            for row in result.kpi_preview:
+                if isinstance(row, dict):
+                    label = row.get("label")
+                    metric = row.get("metric")
+                    if label:
+                        labels.append(f"{label}: {metric}" if metric else str(label))
+            if labels:
+                sections.append({"key": "kpis", "title": "What to measure", "body": "; ".join(labels), "updated": False})
+
+        return Response({
+            "productRoute": route,
+            # Commercial/legal pathway is intentionally absent until a separately governed
+            # contract flow has an authoritative basis.
+            "licensePathway": None,
+            "sections": sections,
+            "lastUpdated": result.generated_at,
+            "updatedNotice": False,
+        })
 
 
 class PortalConversationListView(APIView):
@@ -770,6 +865,7 @@ class PortalNextBestActionView(APIView):
     them would surface a commercial deliberation they never asked to be part of.
     """
 
+    authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request):

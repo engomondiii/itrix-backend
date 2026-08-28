@@ -25,6 +25,7 @@ from apps.clients.views_auth import (
 )
 from apps.clients.views import (
     PortalNextBestActionView,
+    PortalBriefingView,
     PortalWSTicketView,
     ClientLoginView,
     ClientLogoutView,
@@ -70,6 +71,7 @@ urlpatterns = [
     # Portal data endpoints (CLIENT)
     path("portal/ws-ticket/", PortalWSTicketView.as_view(), name="portal-ws-ticket"),
     path("portal/overview/", PortalOverviewView.as_view(), name="portal-overview"),
+    path("portal/briefing/", PortalBriefingView.as_view(), name="portal-briefing"),
     path("portal/conversations/", PortalConversationListView.as_view(), name="portal-conversations"),
     path(
         "portal/conversations/<uuid:conversation_id>/messages/",

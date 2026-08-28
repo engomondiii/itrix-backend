@@ -227,3 +227,64 @@ class ExplodingBackend(BaseEmailBackend):
 class SilentBackend(BaseEmailBackend):
     def send_messages(self, email_messages):  # noqa: ARG002
         return 0
+
+@override_settings(
+    ENABLE_EMAIL_DELIVERY=True,
+    EMAIL_PROVIDER="smtp",
+    EMAIL_BACKEND="tests.test_emails.test_smtp_delivery.FlakyConnectionBackend",
+    EMAIL_FROM="gpslab@iwl.kr",
+    REQUIRE_EMAIL_VERIFICATION=False,
+)
+def test_transient_smtp_failure_can_retry_on_a_fresh_connection():
+    FlakyConnectionBackend.attempts = 0
+    log = send_email(
+        kind=EmailLog.Kind.PASSWORD_RESET,
+        to_email="visitor@gmail.com",
+        subject="s",
+        body="b",
+        delivery_attempts=2,
+    )
+    assert log.status == EmailLog.Status.SENT
+    assert FlakyConnectionBackend.attempts == 2
+
+
+@override_settings(
+    ENABLE_EMAIL_DELIVERY=True,
+    EMAIL_PROVIDER="smtp",
+    EMAIL_BACKEND="tests.test_emails.test_smtp_delivery.PermanentAuthFailureBackend",
+    EMAIL_FROM="gpslab@iwl.kr",
+    REQUIRE_EMAIL_VERIFICATION=False,
+)
+def test_permanent_smtp_auth_failure_is_not_retried():
+    PermanentAuthFailureBackend.attempts = 0
+    log = send_email(
+        kind=EmailLog.Kind.PASSWORD_RESET,
+        to_email="visitor@gmail.com",
+        subject="s",
+        body="b",
+        delivery_attempts=3,
+    )
+    assert log.status == EmailLog.Status.FAILED
+    assert PermanentAuthFailureBackend.attempts == 1
+
+
+class FlakyConnectionBackend(BaseEmailBackend):
+    attempts = 0
+
+    def send_messages(self, email_messages):  # noqa: ARG002
+        import smtplib
+
+        type(self).attempts += 1
+        if type(self).attempts == 1:
+            raise smtplib.SMTPServerDisconnected("temporary disconnect")
+        return 1
+
+
+class PermanentAuthFailureBackend(BaseEmailBackend):
+    attempts = 0
+
+    def send_messages(self, email_messages):  # noqa: ARG002
+        import smtplib
+
+        type(self).attempts += 1
+        raise smtplib.SMTPAuthenticationError(535, b"authentication failed")

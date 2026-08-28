@@ -104,3 +104,51 @@ def test_the_token_is_never_stored_in_plaintext(api_client):
     for record in PasswordResetToken.objects.all():
         assert token not in record.token_hash
         assert len(record.token_hash) == 64
+
+
+def test_password_reset_email_opts_into_bounded_delivery_retry(settings, monkeypatch):
+    settings.PASSWORD_RESET_EMAIL_ATTEMPTS = 2
+    client = ClientFactory(email="retry-reset@example.com")
+    seen = {}
+
+    def fake_send_email(**kwargs):
+        seen.update(kwargs)
+        from apps.emails.models import EmailLog
+
+        return EmailLog.objects.create(
+            kind=kwargs["kind"],
+            to_email=kwargs["to_email"],
+            subject=kwargs["subject"],
+            body=kwargs["body"],
+            status=EmailLog.Status.STUBBED,
+        )
+
+    monkeypatch.setattr("apps.emails.services.password_reset_builder.send_email", fake_send_email)
+    reset_svc.request_reset(client.email)
+    assert seen["delivery_attempts"] == 2
+
+
+def test_password_reset_records_a_reset_specific_log_when_delivery_fails(caplog, monkeypatch):
+    from apps.emails.models import EmailLog
+
+    client = ClientFactory(email="failed-reset@example.com")
+
+    def fake_builder(target, *, token):  # noqa: ARG001
+        return EmailLog.objects.create(
+            kind=EmailLog.Kind.PASSWORD_RESET,
+            to_email=target.email,
+            subject="Reset your itriX password",
+            body="not delivered",
+            status=EmailLog.Status.FAILED,
+            error="provider unavailable",
+        )
+
+    monkeypatch.setattr(
+        "apps.emails.services.password_reset_builder.build_password_reset_email",
+        fake_builder,
+    )
+    with caplog.at_level("ERROR", logger="itrix"):
+        reset_svc.request_reset(client.email)
+
+    assert "clients.password_reset_delivery_failed" in caplog.text
+    assert client.email not in caplog.text

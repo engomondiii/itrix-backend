@@ -30,6 +30,8 @@ two is the whole of a support conversation.
 from __future__ import annotations
 
 import logging
+import smtplib
+import socket
 
 from django.conf import settings
 
@@ -142,6 +144,33 @@ def _deliver_resend(*, to_email: str, subject: str, body: str) -> str:
     return (result or {}).get("id", "") if isinstance(result, dict) else ""
 
 
+def _transient_smtp_error(exc: Exception) -> bool:
+    """Whether another SMTP connection attempt has a realistic chance of succeeding."""
+    # Authentication is never transient. SMTP 4xx responses are explicitly temporary;
+    # 5xx responses are permanent for the current message/credentials. Connection drops
+    # and timeouts do not carry an SMTP status, so they are retryable on a fresh connection.
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return False
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        responses = list((exc.recipients or {}).values())
+        return bool(responses) and all(
+            isinstance(item, tuple) and item and 400 <= int(item[0]) < 500
+            for item in responses
+        )
+    if isinstance(exc, smtplib.SMTPResponseException):
+        return 400 <= int(exc.smtp_code or 0) < 500
+    return isinstance(
+        exc,
+        (
+            smtplib.SMTPServerDisconnected,
+            socket.timeout,
+            TimeoutError,
+            ConnectionError,
+            OSError,
+        ),
+    )
+
+
 def send_email(
     *,
     kind: str,
@@ -153,6 +182,7 @@ def send_email(
     cc=None,
     attachments=None,
     scheduled_at=None,
+    delivery_attempts: int = 1,
 ) -> EmailLog:
     """Build + (optionally) send an email, always returning the EmailLog record."""
     # `from_email` is accepted for signature compatibility with every existing caller.
@@ -220,18 +250,36 @@ def send_email(
         logger.error("email.no_provider kind=%s", kind)
         return log
 
-    try:
-        if provider == "smtp":
-            message_id = _deliver_smtp(to_email=to_email, subject=subject, body=body, cc=cc)
-        else:
-            message_id = _deliver_resend(to_email=to_email, subject=subject, body=body)
-        log.status = EmailLog.Status.SENT
-        log.provider_message_id = message_id or ""
-        log.save(update_fields=["status", "provider_message_id", "updated_at"])
-        logger.info("email.sent provider=%s kind=%s", provider, kind)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Email send failed (%s)", provider)
-        log.status = EmailLog.Status.FAILED
-        log.error = str(exc)[:2000]
-        log.save(update_fields=["status", "error", "updated_at"])
-    return log
+    attempts = max(1, min(3, int(delivery_attempts or 1)))
+    for attempt in range(1, attempts + 1):
+        try:
+            if provider == "smtp":
+                message_id = _deliver_smtp(to_email=to_email, subject=subject, body=body, cc=cc)
+            else:
+                message_id = _deliver_resend(to_email=to_email, subject=subject, body=body)
+            log.status = EmailLog.Status.SENT
+            log.provider_message_id = message_id or ""
+            log.error = ""
+            log.save(update_fields=["status", "provider_message_id", "error", "updated_at"])
+            logger.info("email.sent provider=%s kind=%s attempt=%s", provider, kind, attempt)
+            return log
+        except Exception as exc:  # noqa: BLE001
+            retry = provider == "smtp" and attempt < attempts and _transient_smtp_error(exc)
+            if retry:
+                # No recipient, subject, body or credential in the log line. The next
+                # loop iteration creates a fresh SMTP connection through Django.
+                logger.warning(
+                    "email.transient_failure_retry provider=smtp kind=%s attempt=%s/%s error=%s",
+                    kind,
+                    attempt,
+                    attempts,
+                    exc.__class__.__name__,
+                )
+                continue
+            logger.exception("Email send failed (%s)", provider)
+            log.status = EmailLog.Status.FAILED
+            log.error = str(exc)[:2000]
+            log.save(update_fields=["status", "error", "updated_at"])
+            return log
+
+    return log  # pragma: no cover - the loop always returns or records a final failure

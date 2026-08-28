@@ -738,6 +738,13 @@ ENABLE_PASSWORD_RESET = env_bool("ENABLE_PASSWORD_RESET", True)
 REQUIRE_EMAIL_VERIFICATION = env_bool("REQUIRE_EMAIL_VERIFICATION", True)
 VERIFICATION_TOKEN_TTL_HOURS = int(env("VERIFICATION_TOKEN_TTL_HOURS", "48"))
 RESET_TOKEN_TTL_MINUTES = int(env("RESET_TOKEN_TTL_MINUTES", "60"))
+# Password-reset mail is the one transactional message for which a transient SMTP
+# disconnect leaves the user completely unable to proceed. Retry only transient transport
+# failures, and keep the bound small so an unhealthy mail host cannot tie up request
+# workers indefinitely. Other email kinds keep the sender's one-attempt default.
+PASSWORD_RESET_EMAIL_ATTEMPTS = max(
+    1, min(3, int(env("PASSWORD_RESET_EMAIL_ATTEMPTS", "2") or 2))
+)
 
 # ONE number, and this is the one that binds. Terms §3A, Security §3A and
 # Surface 1 v8.0 §16.7 all state it too; if they ever differ, this is the truth

@@ -38,4 +38,5 @@ def build_password_reset_email(client, *, token: str) -> EmailLog:
         subject=_SUBJECT,
         body=render(_BODY, context),
         lead=getattr(client, "lead", None),
+        delivery_attempts=int(getattr(settings, "PASSWORD_RESET_EMAIL_ATTEMPTS", 2)),
     )

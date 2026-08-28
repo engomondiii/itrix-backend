@@ -74,9 +74,21 @@ def request_reset(email: str, *, ip: str | None = None) -> None:
         )
 
     try:
+        from apps.emails.models import EmailLog
         from apps.emails.services.password_reset_builder import build_password_reset_email
 
-        build_password_reset_email(client, token=token)
+        mail = build_password_reset_email(client, token=token)
+        # `send_email()` records provider failures in EmailLog instead of raising, because
+        # every outbound attempt must leave an audit row. Inspect that result here so a
+        # reset-specific delivery failure is visible in Railway logs without exposing the
+        # address or token. The public endpoint still returns the same 202 for every
+        # address, preserving the anti-enumeration contract.
+        if mail.status == EmailLog.Status.FAILED:
+            logger.error(
+                "clients.password_reset_delivery_failed client=%s email_log=%s",
+                client.id,
+                mail.id,
+            )
     except Exception:  # noqa: BLE001
         logger.exception("password reset email failed for client %s", client.id)
 

@@ -204,6 +204,8 @@ def _astop_summary(records: list[ASTOPEngagement]) -> dict:
 def _entitlement_summary(records: list[ASTOPEngagement]) -> dict:
     now = timezone.now()
     status_counts = Counter(_normalised(record.entitlement_status, fallback="unset") for record in records)
+    terms_status = Counter()
+    rights_type = Counter()
     active = 0
     expired = 0
     revoked = 0
@@ -212,6 +214,12 @@ def _entitlement_summary(records: list[ASTOPEngagement]) -> dict:
         status = str(record.entitlement_status or "").strip().lower()
         revocation = str(record.revocation_status or "").strip().lower()
         is_expired = record.entitlement_expires_at is not None and record.entitlement_expires_at <= now
+        scope = record.lo_scope if isinstance(record.lo_scope, dict) else {}
+        terms = scope.get("governed_terms") if isinstance(scope.get("governed_terms"), dict) else {}
+        terms_status[_normalised(terms.get("status"), fallback="missing")] += 1
+        rights = terms.get("rights") if isinstance(terms.get("rights"), dict) else {}
+        if rights.get("rights_type"):
+            rights_type[_normalised(rights.get("rights_type"), fallback="unset")] += 1
         if is_expired:
             expired += 1
         if revocation == "revoked":
@@ -232,6 +240,11 @@ def _entitlement_summary(records: list[ASTOPEngagement]) -> dict:
         "expiredEntitlements": expired,
         "revokedEntitlements": revoked,
         "blockedOrSuspendedEntitlements": blocked_or_suspended,
+        # Aggregate-safe only: never emit account economics or provenance here.
+        "governedLicenseOutTerms": {
+            "byStatus": dict(sorted(terms_status.items())),
+            "byRightsType": dict(sorted(rights_type.items())),
+        },
     }
 
 
@@ -327,7 +340,6 @@ def summary() -> dict:
         },
         "dependencies": {
             "alphaCoreOpenedOpportunities": "P1-7: no authoritative Core opportunity-opening record exists yet.",
-            "governedLoEconomics": "P1-4: report only after governed LO economics/rights fields exist.",
             "closedAstopHistoricalConversions": "ASTOPEngagement stores current stage only; closed rows cannot reconstruct prior funnel stages.",
             "explicitAiNoWaiverEvents": "ai_waiver_decision=none is also the schema default, so it cannot distinguish an explicit no-waiver decision from an untouched assessment.",
         },

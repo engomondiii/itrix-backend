@@ -11,6 +11,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.leads.views import LeadViewSet
 from apps.leads.views_entitlement import ASTOPEntitlementLifecycleView
+from apps.leads.views_lo import GovernedLOTermsView
 
 app_name = "leads"
 
@@ -22,6 +23,11 @@ urlpatterns = [
         "<uuid:lead_id>/astop-entitlement/",
         ASTOPEntitlementLifecycleView.as_view(),
         name="astop-entitlement-lifecycle",
+    ),
+    path(
+        "<uuid:lead_id>/astop-lo-terms/",
+        GovernedLOTermsView.as_view(),
+        name="astop-lo-terms",
     ),
     *router.urls,
 ]

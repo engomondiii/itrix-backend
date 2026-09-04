@@ -78,6 +78,23 @@ def _proof_values():
     }
 
 
+def _governed_terms():
+    return {
+        "rights": {
+            "rights_type": "None",
+            "licensed_party": "Acme Corp",
+            "business_unit": "Observation platform",
+            "field_of_use": "agent observation",
+            "environments": ["production"],
+            "redistribution": "not authorized",
+            "audit_terms": "contract-defined audit terms",
+        },
+        "economics": {"support_security_upgrades": "as executed in the License-Out"},
+        "status": "final",
+        "provenance": {"source_reference": "executed License-Out"},
+    }
+
+
 def _lo_record(*, stage=ASTOPStage.LO_DEPLOYMENT, entitlement_status=""):
     lead = _verified_lead()
     record = ASTOPEngagement.objects.create(
@@ -86,7 +103,7 @@ def _lo_record(*, stage=ASTOPStage.LO_DEPLOYMENT, entitlement_status=""):
         qualification_context=_qualification_context(),
         evaluation_agreement="Controlled evaluation agreement",
         evaluation_scope=_evaluation_scope(),
-        lo_scope={"field_of_use": "agent observation"},
+        lo_scope={"field_of_use": "agent observation", "governed_terms": _governed_terms()},
         lo_executed_at=timezone.now(),
         entitlement_status=entitlement_status,
         controlled_build_id="build-verified",
@@ -119,6 +136,7 @@ def test_activation_requires_governed_production_prerequisites():
     assert "controlled_build_required" in text
     assert "attribution_required" in text
     assert "evaluation_agreement_required" in text
+    assert "governed_terms_required" in text
 
 
 def test_pending_entitlement_can_activate_when_all_gates_pass():

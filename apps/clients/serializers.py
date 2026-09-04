@@ -162,6 +162,13 @@ class PortalEvaluationSerializer(serializers.Serializer):
     verifiedValue = serializers.JSONField(required=False, default=dict)
     customerFeeStatus = serializers.CharField(required=False, allow_blank=True, default="")
     finalAssessmentFee = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True, default=None)
+    # Customer-safe LO projection only. Internal economics, provenance and audit terms
+    # are intentionally not serializer fields.
+    loStatus = serializers.CharField(required=False, allow_blank=True, default="")
+    licensedScopeSummary = serializers.JSONField(required=False, allow_null=True, default=None)
+    entitlementState = serializers.CharField(required=False, allow_blank=True, default="")
+    entitlementExpiresAt = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    nextRequiredAction = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class PortalPoCSerializer(serializers.Serializer):

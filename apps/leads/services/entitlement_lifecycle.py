@@ -19,6 +19,7 @@ from apps.leads.services.commercial_progression import (
     _stage_gate_reasons,
     _unique_reasons,
 )
+from apps.leads.services.lo_terms import governed_terms_gate
 
 
 ACTIVE_STATUSES = {"active", "authorized", "enabled"}
@@ -52,7 +53,6 @@ def entitlement_lifecycle_state(record: ASTOPEngagement, *, now=None) -> str:
     if status in {"revoking", "suspended", "blocked"}:
         return status
     if revocation not in {"", "none", "cleared"}:
-        # Unknown revocation state fails closed rather than being reported active.
         return "blocked"
     if status == "expired":
         return "expired"
@@ -103,13 +103,7 @@ def update_astop_entitlement(
     reason: str = "",
     by=None,
 ) -> EntitlementLifecycleResult:
-    """Activate, expire or revoke the existing ASTOP License-Out entitlement.
-
-    Activation reuses the complete governed production gate. Expiry and revocation are
-    terminal changes and intentionally do not call the normal ASTOP stage writer: doing
-    so at VERIFY_EXPAND would reject the very revocation we need to record because that
-    stage correctly requires an active entitlement.
-    """
+    """Activate, expire or revoke the existing ASTOP License-Out entitlement."""
     record = ASTOPEngagement.objects.select_for_update().filter(lead=lead).first()
     if record is None:
         raise ValueError("astop_entitlement_gate:astop_engagement_required")
@@ -138,6 +132,10 @@ def update_astop_entitlement(
 
         reasons = list(_stage_gate_reasons(lead, record, record.stage))
         reasons.extend(_production_entitlement_reasons(record))
+        # Production access must be bounded by the actual executed License-Out terms.
+        # Missing/draft/mismatched rights or economics fail closed; no implicit price or
+        # scope defaults are synthesized here.
+        reasons.extend(governed_terms_gate(record))
         reasons = list(_unique_reasons(reasons))
         if reasons:
             raise ValueError("astop_entitlement_gate:" + ",".join(reasons))
@@ -151,7 +149,7 @@ def update_astop_entitlement(
         if record.entitlement_expires_at is None or record.entitlement_expires_at > now:
             record.entitlement_expires_at = now
 
-    else:  # revoke
+    else:
         if before == "revoked":
             return EntitlementLifecycleResult(record, before, before, False)
         if before == "expired":

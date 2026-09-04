@@ -14,6 +14,7 @@ from apps.leads.services.entitlement_lifecycle import (
     entitlement_lifecycle_state,
     update_astop_entitlement,
 )
+from apps.leads.services.readiness import READINESS_KEYS
 from tests.factories.client_factory import ClientFactory
 from tests.factories.lead_factory import LeadFactory
 from tests.factories.user_factory import AdminUserFactory, ViewerUserFactory
@@ -95,6 +96,10 @@ def _governed_terms():
     }
 
 
+def _release_readiness():
+    return {key: {"status": "READY"} for key in READINESS_KEYS}
+
+
 def _lo_record(*, stage=ASTOPStage.LO_DEPLOYMENT, entitlement_status=""):
     lead = _verified_lead()
     record = ASTOPEngagement.objects.create(
@@ -103,7 +108,11 @@ def _lo_record(*, stage=ASTOPStage.LO_DEPLOYMENT, entitlement_status=""):
         qualification_context=_qualification_context(),
         evaluation_agreement="Controlled evaluation agreement",
         evaluation_scope=_evaluation_scope(),
-        lo_scope={"field_of_use": "agent observation", "governed_terms": _governed_terms()},
+        lo_scope={
+            "field_of_use": "agent observation",
+            "governed_terms": _governed_terms(),
+            "release_readiness": _release_readiness(),
+        },
         lo_executed_at=timezone.now(),
         entitlement_status=entitlement_status,
         controlled_build_id="build-verified",
@@ -137,6 +146,7 @@ def test_activation_requires_governed_production_prerequisites():
     assert "attribution_required" in text
     assert "evaluation_agreement_required" in text
     assert "governed_terms_required" in text
+    assert "readiness_threat_model_not_provided" in text
 
 
 def test_pending_entitlement_can_activate_when_all_gates_pass():

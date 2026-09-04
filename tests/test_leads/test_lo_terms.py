@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import pytest
 from django.utils import timezone
-from rest_framework.test import APIClient
 
 from apps.clients.serializers import PortalEvaluationSerializer
 from apps.leads.models import ASTOPEngagement, ASTOPStage, LeadActivity, TrustStatus
 from apps.leads.services.entitlement_lifecycle import update_astop_entitlement
 from apps.leads.services.lo_terms import customer_safe_lo_summary, set_governed_lo_terms
+from apps.leads.services.readiness import READINESS_KEYS
 from tests.factories.client_factory import ClientFactory
 from tests.factories.lead_factory import LeadFactory
 from tests.factories.user_factory import AdminUserFactory, UserFactory
@@ -62,7 +62,11 @@ def _lead_and_record():
         evaluation_result={"status": "passed", "reproducible": True},
         security_result={"status": "passed"},
         integration_feasibility={"status": "passed"},
-        lo_scope={"field_of_use": "agent observation", "environment": "production"},
+        lo_scope={
+            "field_of_use": "agent observation",
+            "environment": "production",
+            "release_readiness": {key: {"status": "READY"} for key in READINESS_KEYS},
+        },
         controlled_build_id="build-verified",
         attribution_id="attr-verified",
     )

@@ -20,6 +20,7 @@ from apps.leads.services.commercial_progression import (
     _unique_reasons,
 )
 from apps.leads.services.lo_terms import governed_terms_gate
+from apps.leads.services.readiness import readiness_gate
 
 
 ACTIVE_STATUSES = {"active", "authorized", "enabled"}
@@ -132,10 +133,8 @@ def update_astop_entitlement(
 
         reasons = list(_stage_gate_reasons(lead, record, record.stage))
         reasons.extend(_production_entitlement_reasons(record))
-        # Production access must be bounded by the actual executed License-Out terms.
-        # Missing/draft/mismatched rights or economics fail closed; no implicit price or
-        # scope defaults are synthesized here.
         reasons.extend(governed_terms_gate(record))
+        reasons.extend(readiness_gate(record))
         reasons = list(_unique_reasons(reasons))
         if reasons:
             raise ValueError("astop_entitlement_gate:" + ",".join(reasons))

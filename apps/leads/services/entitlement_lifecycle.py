@@ -2,12 +2,13 @@
 
 The ASTOP engagement remains the single entitlement record. This service does not create
 another licensing database; it gives the existing execution/expiry/revocation fields one
-writer for terminal lifecycle changes while preserving commercial_progression as the
+writer for entitlement lifecycle changes while preserving commercial progression as the
 authority for progression and production-entitlement prerequisites.
 """
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -27,6 +28,9 @@ ACTIVE_STATUSES = {"active", "authorized", "enabled"}
 BLOCKING_REVOCATION_STATUSES = {"revoked", "revoking", "suspended", "blocked"}
 TERMINAL_STATES = {"expired", "revoked"}
 ENTITLEMENT_STAGES = {ASTOPStage.LO_DEPLOYMENT, ASTOPStage.VERIFY_EXPAND}
+_ENTITLEMENT_WRITES: ContextVar[frozenset[str]] = ContextVar(
+    "itrix_governed_entitlement_writes", default=frozenset()
+)
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,11 @@ class EntitlementLifecycleResult:
 
 def _normal(value) -> str:
     return str(value or "").strip().lower()
+
+
+def is_governed_entitlement_write(record_id) -> bool:
+    """True only while this service owns an ASTOP entitlement-state mutation."""
+    return str(record_id) in _ENTITLEMENT_WRITES.get()
 
 
 def entitlement_lifecycle_state(record: ASTOPEngagement, *, now=None) -> str:
@@ -156,14 +165,20 @@ def update_astop_entitlement(
         record.entitlement_status = "revoked"
         record.revocation_status = "revoked"
 
-    record.save(
-        update_fields=[
-            "entitlement_status",
-            "entitlement_expires_at",
-            "revocation_status",
-            "updated_at",
-        ]
-    )
+    current = _ENTITLEMENT_WRITES.get()
+    token = _ENTITLEMENT_WRITES.set(current | {str(record.pk)})
+    try:
+        record.save(
+            update_fields=[
+                "entitlement_status",
+                "entitlement_expires_at",
+                "revocation_status",
+                "updated_at",
+            ]
+        )
+    finally:
+        _ENTITLEMENT_WRITES.reset(token)
+
     after = entitlement_lifecycle_state(record)
     changed = before != after or previous_expiry != record.entitlement_expires_at
     if changed:

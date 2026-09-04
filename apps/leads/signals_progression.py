@@ -25,6 +25,11 @@ _FEE_ONLY_FIELDS = {
     "customer_fee_status",
     "updated_at",
 }
+_ENTITLEMENT_FIELDS = {
+    "entitlement_status",
+    "entitlement_expires_at",
+    "revocation_status",
+}
 
 
 def _sync(lead) -> None:
@@ -66,6 +71,30 @@ def _protect_governed_trust_resolution(sender, instance, update_fields=None, **k
         return
     raise ResourceConflict(
         "Existing REVIEW/REJECT trust state must be handled through the governed trust-review workflow."
+    )
+
+
+@receiver(pre_save, sender=ASTOPEngagement)
+def _protect_entitlement_lifecycle_writer(sender, instance, update_fields=None, **kwargs):
+    """Make the governed entitlement lifecycle the only writer after engagement creation."""
+    if instance._state.adding:
+        return
+    if update_fields is not None and not _ENTITLEMENT_FIELDS.intersection(set(update_fields)):
+        return
+
+    previous = ASTOPEngagement.objects.filter(pk=instance.pk).values(*_ENTITLEMENT_FIELDS).first()
+    if previous is None:
+        return
+    changed = any(previous[field] != getattr(instance, field) for field in _ENTITLEMENT_FIELDS)
+    if not changed:
+        return
+
+    from apps.leads.services.entitlement_lifecycle import is_governed_entitlement_write
+
+    if is_governed_entitlement_write(instance.pk):
+        return
+    raise ResourceConflict(
+        "ASTOP entitlement state must be changed through the governed astop-entitlement lifecycle."
     )
 
 

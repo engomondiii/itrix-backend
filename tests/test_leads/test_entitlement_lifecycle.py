@@ -7,9 +7,10 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
+from apps.core.exceptions import ResourceConflict
 from apps.leads.models import ASTOPEngagement, ASTOPStage, LeadActivity, TrustStatus
 from apps.leads.serializers import ASTOPProgressSerializer
-from apps.leads.services.commercial_progression import alpha_compute_gate
+from apps.leads.services.commercial_progression import alpha_compute_gate, apply_astop_progress
 from apps.leads.services.entitlement_lifecycle import (
     entitlement_lifecycle_state,
     update_astop_entitlement,
@@ -167,10 +168,29 @@ def test_pending_entitlement_can_activate_when_all_gates_pass():
     assert entitlement_lifecycle_state(record) == "active"
 
 
+def test_generic_progression_writer_cannot_activate_entitlement_outside_lifecycle():
+    lead, record = _lo_record()
+
+    with pytest.raises(ResourceConflict, match="governed astop-entitlement lifecycle"):
+        apply_astop_progress(
+            lead,
+            stage=ASTOPStage.LO_DEPLOYMENT,
+            values={"entitlement_status": "active"},
+        )
+
+    record.refresh_from_db()
+    assert record.entitlement_status == ""
+    assert entitlement_lifecycle_state(record) == "pending"
+
+
 def test_expiry_state_is_derived_from_actual_timestamp():
     _, record = _lo_record(entitlement_status="active")
-    record.entitlement_expires_at = timezone.now() - timedelta(seconds=1)
-    record.save(update_fields=["entitlement_expires_at", "updated_at"])
+    # Test setup bypasses lifecycle signals deliberately to model an entitlement whose
+    # persisted expiry has naturally passed without an explicit operator action.
+    ASTOPEngagement.objects.filter(pk=record.pk).update(
+        entitlement_expires_at=timezone.now() - timedelta(seconds=1)
+    )
+    record.refresh_from_db()
 
     assert entitlement_lifecycle_state(record) == "expired"
 

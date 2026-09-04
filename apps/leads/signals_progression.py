@@ -6,7 +6,7 @@ from django.dispatch import receiver
 
 from apps.core.exceptions import ResourceConflict
 from apps.evaluations.models import Evaluation, EvaluationPackage
-from apps.leads.models import ASTOPEngagement, Lead, TrustStatus
+from apps.leads.models import ASTOPEngagement, ASTOPStage, Lead, TrustStatus
 
 # Fee deliberation/finalization is intentionally orthogonal to product progression.
 _FEE_ONLY_FIELDS = {
@@ -75,15 +75,37 @@ def _protect_governed_trust_resolution(sender, instance, update_fields=None, **k
 
 
 @receiver(pre_save, sender=ASTOPEngagement)
-def _protect_entitlement_lifecycle_writer(sender, instance, update_fields=None, **kwargs):
-    """Make the governed entitlement lifecycle the only writer after engagement creation."""
+def _protect_lo_execution_and_entitlement_writers(sender, instance, update_fields=None, **kwargs):
+    """Protect executed-LO truth and keep entitlement changes on their governed writer."""
     if instance._state.adding:
         return
-    if update_fields is not None and not _ENTITLEMENT_FIELDS.intersection(set(update_fields)):
+
+    previous = ASTOPEngagement.objects.filter(pk=instance.pk).values(
+        "lo_executed_at", *_ENTITLEMENT_FIELDS
+    ).first()
+    if previous is None:
         return
 
-    previous = ASTOPEngagement.objects.filter(pk=instance.pk).values(*_ENTITLEMENT_FIELDS).first()
-    if previous is None:
+    if update_fields is None or "lo_executed_at" in set(update_fields):
+        before_execution = previous["lo_executed_at"]
+        after_execution = instance.lo_executed_at
+        if before_execution != after_execution:
+            if before_execution is not None:
+                raise ResourceConflict("Executed ASTOP License-Out timestamp is immutable.")
+            if after_execution is not None:
+                if instance.stage not in {ASTOPStage.LO_DEPLOYMENT, ASTOPStage.VERIFY_EXPAND}:
+                    raise ResourceConflict(
+                        "ASTOP License-Out may only be executed from the governed License-Out stage."
+                    )
+                from apps.leads.services.lo_terms import governed_terms_gate
+
+                reasons = governed_terms_gate(instance)
+                if reasons:
+                    raise ResourceConflict(
+                        "ASTOP License-Out execution requires final governed terms and scope."
+                    )
+
+    if update_fields is not None and not _ENTITLEMENT_FIELDS.intersection(set(update_fields)):
         return
     changed = any(previous[field] != getattr(instance, field) for field in _ENTITLEMENT_FIELDS)
     if not changed:

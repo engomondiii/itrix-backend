@@ -5,6 +5,7 @@ import pytest
 from django.utils import timezone
 
 from apps.clients.serializers import PortalEvaluationSerializer
+from apps.core.exceptions import ResourceConflict
 from apps.leads.models import ASTOPEngagement, ASTOPStage, LeadActivity, TrustStatus
 from apps.leads.services.entitlement_lifecycle import update_astop_entitlement
 from apps.leads.services.lo_terms import customer_safe_lo_summary, set_governed_lo_terms
@@ -163,10 +164,22 @@ def test_governed_terms_do_not_inject_fixed_astop_pricing():
     assert record.lo_scope["governed_terms"]["economics"] == submitted
 
 
-def test_entitlement_activation_fails_without_governed_terms():
-    lead, record = _lead_and_record()
+def test_lo_execution_requires_final_governed_terms_and_scope():
+    _, record = _lead_and_record()
     record.lo_executed_at = timezone.now()
-    record.save(update_fields=["lo_executed_at", "updated_at"])
+
+    with pytest.raises(ResourceConflict, match="final governed terms"):
+        record.save(update_fields=["lo_executed_at", "updated_at"])
+
+    record.refresh_from_db()
+    assert record.lo_executed_at is None
+
+
+def test_entitlement_activation_fails_for_legacy_executed_row_without_governed_terms():
+    lead, record = _lead_and_record()
+    # Historical-state setup deliberately bypasses model signals: lifecycle activation
+    # must still fail closed when an old executed row has no governed terms snapshot.
+    ASTOPEngagement.objects.filter(pk=record.pk).update(lo_executed_at=timezone.now())
     with pytest.raises(ValueError, match="governed_terms_required"):
         update_astop_entitlement(lead, action="activate")
 
@@ -196,6 +209,22 @@ def test_executed_snapshot_cannot_be_silently_overwritten():
         _set_final(lead, by=admin, rights=_rights(field_of_use="another field"))
 
 
+def test_executed_lo_timestamp_cannot_be_cleared_or_rewritten():
+    lead, record = _lead_and_record()
+    _set_final(lead)
+    record.refresh_from_db()
+    executed_at = timezone.now()
+    record.lo_executed_at = executed_at
+    record.save(update_fields=["lo_executed_at", "updated_at"])
+
+    record.lo_executed_at = None
+    with pytest.raises(ResourceConflict, match="timestamp is immutable"):
+        record.save(update_fields=["lo_executed_at", "updated_at"])
+
+    record.refresh_from_db()
+    assert record.lo_executed_at == executed_at
+
+
 def test_identical_internal_write_is_idempotent():
     lead, _ = _lead_and_record()
     admin = AdminUserFactory()
@@ -210,9 +239,12 @@ def test_scope_mismatch_blocks_production_activation():
     lead, record = _lead_and_record()
     _set_final(lead, rights=_rights(field_of_use="bounded field"))
     record.refresh_from_db()
-    record.lo_executed_at = timezone.now()
-    record.lo_scope = {**record.lo_scope, "field_of_use": "different field"}
-    record.save(update_fields=["lo_scope", "lo_executed_at", "updated_at"])
+    # Build an intentionally inconsistent historical state without weakening the current
+    # execution guard; activation must still re-check the governed scope.
+    ASTOPEngagement.objects.filter(pk=record.pk).update(
+        lo_executed_at=timezone.now(),
+        lo_scope={**record.lo_scope, "field_of_use": "different field"},
+    )
 
     with pytest.raises(ValueError, match="field_of_use_outside_governed_scope"):
         update_astop_entitlement(lead, action="activate")

@@ -141,15 +141,21 @@ class ThreadDetailSerializer(serializers.ModelSerializer):
     lastActivityAt = serializers.DateTimeField(source="last_activity_at", read_only=True)
     turns = serializers.SerializerMethodField()
     shell = serializers.SerializerMethodField()
+    engagement = serializers.SerializerMethodField()
 
     class Meta:
         model = Thread
-        fields = ["threadId", "title", "context", "lastActivityAt", "turns", "shell"]
+        fields = ["threadId", "title", "context", "lastActivityAt", "turns", "shell", "engagement"]
         read_only_fields = fields
 
     def get_turns(self, obj):
         messages = Message.objects.filter(thread=obj).order_by("seq", "created_at")
         return ThreadTurnSerializer(messages, many=True).data
+
+    def get_engagement(self, obj):
+        from apps.conversations.services import engagement_state
+
+        return engagement_state.public_state(obj)
 
     def get_shell(self, obj):
         """

@@ -50,6 +50,19 @@ class FunctionalFamily(models.TextChoices):
     )
 
 
+class StrategicLane(models.TextChoices):
+    """Canonical five strategic lanes from Strategic Customer Journey v2.2 figures 56–60."""
+
+    EXECUTIVE_COMPUTE_ECONOMICS = "executive_compute_economics", "Executive Compute Economics"
+    INFRASTRUCTURE_CAPACITY_STRATEGY = "infrastructure_capacity_strategy", "Infrastructure Capacity Strategy"
+    ARCHITECTURE_PLATFORM_FIT = "architecture_platform_fit", "Architecture & Platform Fit"
+    TECHNICAL_VALIDATION_DELIVERY_RISK = "technical_validation_delivery_risk", "Technical Validation & Delivery Risk"
+    STRATEGIC_PARTNERSHIP_COMMERCIAL_TRANSFER = (
+        "strategic_partnership_commercial_transfer",
+        "Strategic Partnership & Commercial Transfer",
+    )
+
+
 class ValidationStatus(models.TextChoices):
     HYPOTHESIS = "hypothesis", "Hypothesis"
     VALIDATED = "validated", "Validated"
@@ -74,6 +87,17 @@ class Persona(BaseModel):
         max_length=40, choices=FunctionalFamily.choices, db_index=True
     )
     pitch_archetype = models.CharField(max_length=120, blank=True, default="")
+    # Hidden strategic-customer lane. This is authoritative roster configuration from
+    # Strategic Customer Journey v2.2 figures 56–60 and is NEVER a visitor-facing label.
+    strategic_lane = models.CharField(
+        max_length=64, choices=StrategicLane.choices, blank=True, default="", db_index=True
+    )
+    strategic_lane_code = models.CharField(max_length=16, blank=True, default="")
+
+    # Optional named reference used only where an authoritative test/source names one.
+    # These do not verify the current visitor's identity and must never grant access.
+    reference_person = models.CharField(max_length=200, blank=True, default="")
+    reference_role = models.CharField(max_length=240, blank=True, default="")
 
     # How this buyer decides.
     buying_role = models.CharField(max_length=200, blank=True, default="")

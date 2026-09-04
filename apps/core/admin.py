@@ -65,7 +65,8 @@ STATUS_TONES: dict[str, str] = {
     "stubbed": "muted", "PENDING": "muted", "New": "primary", "Contacted": "info", "Qualifying": "info",
     "Meeting Booked": "info", "NDA": "info", "Evaluation": "info", "PoC": "info", "Negotiation": "info",
     "Nurture": "muted", "edited": "info", "awaiting_decision": "warning", "halted": "warning",
-    "invited": "info", "controlled_public": "info", "nda_only": "warning", "customer_contract": "warning",
+    "invited": "info", "controlled_public": "info", "authorized": "warning",
+    "nda_only": "warning", "customer_contract": "warning",
     "envelope_downgrade": "warning", "settle_replacement": "info", "normal": "info", "low": "muted",
     "high": "warning",
     # bad / terminal

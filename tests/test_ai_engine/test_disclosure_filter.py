@@ -19,11 +19,22 @@ def test_public_context_only_public():
     assert [c["disclosure_level"] for c in kept] == ["public"]
 
 
-def test_nda_context_allows_public_and_nda():
+def test_nda_context_does_not_authorize_agreement_gated_content_by_itself():
     chunks = [_chunk("public"), _chunk("controlled_public"), _chunk("nda_only"), _chunk("internal_only")]
-    kept = filter_chunks(chunks, context="nda")
+    kept = filter_chunks(chunks, context="nda", nda_signed=True)
     levels = {c["disclosure_level"] for c in kept}
-    assert levels == {"public", "controlled_public", "nda_only"}
+    assert levels == {"public", "controlled_public"}
+
+
+def test_nda_plus_explicit_document_authorization_can_reach_that_document():
+    chunks = [
+        {"text": "allowed", "disclosure_level": "nda_only", "document_id": "doc-a"},
+        {"text": "other", "disclosure_level": "nda_only", "document_id": "doc-b"},
+    ]
+    kept = filter_chunks(
+        chunks, context="nda", nda_signed=True, authorized_document_ids={"doc-a"}
+    )
+    assert [c["text"] for c in kept] == ["allowed"]
 
 
 def test_prohibited_never_allowed():

@@ -41,7 +41,7 @@ can be asked why.
 After a move, re-register and re-embed:
 
     python manage.py register_knowledge_docs
-    python manage.py embed_knowledge_docs      # if vectors are in use
+    python manage.py reingest_namespace --all  # clears stale vectors, then rebuilds current sources
 
 Until re-registration runs, the DATABASE still records the old level. That is why this
 command reports the drift between the folder and the ``KnowledgeDocument`` row: the two

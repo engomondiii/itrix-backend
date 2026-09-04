@@ -42,7 +42,7 @@ class Command(BaseCommand):
         if not instruments_svc.published():
             self.stdout.write(
                 self.style.WARNING(
-                    "    LEGAL_PUBLISHED is false — the instruments are served as DRAFTS."
+                    "    LEGAL_PUBLISHED is false — the instruments are not currently published."
                 )
             )
         self.stdout.write("")

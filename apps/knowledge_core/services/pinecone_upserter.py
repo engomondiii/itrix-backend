@@ -83,6 +83,15 @@ class PineconeUpserter:
                 self.index.delete(ids=ids[i : i + 1000], namespace=namespace)
             return True
         except Exception as exc:  # noqa: BLE001
+            # During a full namespace rebuild, the namespace is deliberately removed
+            # before individual documents are re-ingested. Deleting stale ids from a
+            # namespace that no longer exists is therefore a successful no-op.
+            if "not found" in str(exc).lower() or "404" in str(exc):
+                logger.debug(
+                    "Namespace '%s' did not exist while deleting stale ids — nothing to delete.",
+                    namespace,
+                )
+                return True
             logger.exception("Pinecone id delete failed for namespace '%s'", namespace)
             raise PineconeUpsertError(
                 f"Pinecone stale-vector delete failed for namespace {namespace!r}: {exc}"

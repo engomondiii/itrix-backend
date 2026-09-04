@@ -33,6 +33,11 @@ class ReviewSession(BaseModel):
     )
     client_id = models.CharField(max_length=128, blank=True, default="", db_index=True)
     visitor_type = models.CharField(max_length=32, blank=True, default="unknown")
+    # User-selected presentation language for the structured review flow.
+    locale = models.CharField(max_length=12, blank=True, default="en")
+    # Hash of the BFF-owned review-browser binding. It protects status/access-code
+    # polling without exposing a durable credential to browser JavaScript.
+    access_binding_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     status = models.CharField(
         max_length=12, choices=Status.choices, default=Status.STARTED, db_index=True

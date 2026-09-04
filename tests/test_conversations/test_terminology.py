@@ -60,8 +60,9 @@ def test_the_conversation_prompt_never_teaches_the_internal_name():
         pressures=[],
         chunks=[],
     )
-    # The internal name appears once — inside the rule that forbids using it.
-    # The affirmative brand teaching uses the public name.
-    assert "itriX Technologies" in prompt
-    assert "INTERNAL" in prompt
-    assert "must never appear" in prompt
+    # The internal name appears only inside the rule that forbids using it; current
+    # public terminology comes from authorized current retrieval rather than a hardcoded
+    # product definition in the prompt.
+    assert "Knowledge Core" in prompt
+    assert "internal name" in prompt.lower()
+    assert "never mention" in prompt.lower()

@@ -17,7 +17,7 @@ import jwt
 from rest_framework import authentication, exceptions
 
 from apps.clients.models import Client
-from apps.clients.tokens import decode_client_token
+from apps.clients.tokens import decode_client_token, token_matches_current_session
 
 
 class ClientJWTAuthentication(authentication.BaseAuthentication):
@@ -46,6 +46,10 @@ class ClientJWTAuthentication(authentication.BaseAuthentication):
         client = Client.objects.filter(id=payload.get("client_id"), is_active=True).first()
         if client is None:
             raise exceptions.AuthenticationFailed("Client not found or inactive.")
+        if not token_matches_current_session(client, payload):
+            # Deliberately one generic auth failure: do not reveal when or why sessions
+            # were invalidated.
+            raise exceptions.AuthenticationFailed("Client session is no longer valid.")
 
         # Attach the payload so views/permissions can read NDA state without a re-decode.
         request.client_token = payload  # type: ignore[attr-defined]

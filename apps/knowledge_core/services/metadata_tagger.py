@@ -31,6 +31,16 @@ def build_chunk_metadata(*, document, chunk) -> dict:
         # This does not fabricate facts; it only resolves conflicts between old and
         # current source documents in favour of the explicitly current source.
         "canonical_priority": _canonical_priority(document),
+        "source_authority": getattr(document, "source_authority", "working") or "working",
+        "source_current": bool(getattr(document, "is_current", True)),
+        "verified_at": getattr(getattr(document, "verified_at", None), "isoformat", lambda: "")(),
+        "canonical_rule": (getattr(document, "canonical_rule", "") or "")[:512],
+        "approved_audience": list(getattr(document, "approved_audience", None) or []),
+        "allowed_journey_stages": list(getattr(document, "allowed_journey_stages", None) or []),
+        "permitted_paraphrase": getattr(document, "permitted_paraphrase", "approved") or "approved",
+        "technology_family": getattr(document, "technology_family", "general") or "general",
+        "claim_ceiling": int(getattr(document, "claim_ceiling", 0) or 0),
+        **tag_with_customer_scope({}, document),
     }
 
 
@@ -74,8 +84,11 @@ def _claim_level(document, chunk) -> int:
     return {
         "public": 1,
         "controlled_public": 2,
+        "authorized": 3,
         "nda_only": 3,
-        "internal_only": 4,
+        "customer_contract": 4,
+        "internal_only": 5,
+        "prohibited": 0,
     }.get(disclosure, 1)
 
 

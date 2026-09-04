@@ -50,14 +50,9 @@ def lookup_invite(code: str) -> tuple[bool, str]:
     if not token:
         return False, ""
 
-    payload = None
-    for expected in (ct.TOKEN_ACCOUNT_INVITE, ct.TOKEN_CLIENT_PAGE):
-        try:
-            payload = ct.verify(token, expected_typ=expected)
-            break
-        except ct.CapabilityTokenError:
-            continue
-    if payload is None:
+    try:
+        payload = ct.verify(token, expected_typ=ct.TOKEN_ACCOUNT_INVITE)
+    except ct.CapabilityTokenError:
         return False, ""
 
     from apps.leads.models import Lead
@@ -82,7 +77,7 @@ def lookup_invite(code: str) -> tuple[bool, str]:
         return False, ""
 
     base = (getattr(settings, "FRONTEND_WEB_URL", "") or "").rstrip("/")
-    return True, f"{base}/c/{token}/create-account" if base else f"/c/{token}/create-account"
+    return True, f"{base}/invite/{token}/create-account" if base else f"/invite/{token}/create-account"
 
 
 def mint_invite(lead) -> str:
@@ -118,13 +113,9 @@ def claim_invite(
     """
     Consume a capability token → create the Client (reveal ③).
 
-    Accepts EITHER an ``account_invite`` token (the dedicated single-use invite) OR the
-    ``client_page`` token the visitor already holds in their URL. Both are signed
-    capability tokens bound to the same lead via ``sub``; accepting the client_page
-    token lets the front-end claim with the token it already has, without a separate
-    invite-token round-trip. Security is preserved because the journey gate
-    (``account_invite_allowed``) is re-checked here regardless of token type — a
-    client_page token can only create a workspace once the journey authorizes it.
+    Accepts only the dedicated single-use ``account_invite`` token. Personalized
+    My Review access no longer uses a bearer capability token in a URL, so review access
+    can never be repurposed as an account-creation credential.
 
     Returns ``(client, requires_password_set)``. Raises ``InviteError`` on an invalid,
     expired, wrong-typed, or already-consumed token, or if the lead may not be invited.
@@ -142,17 +133,10 @@ def claim_invite(
     already exists and already has a record. Making the safe behaviour the default means a new
     caller added later gets the gate without knowing it exists.
     """
-    # Accept either token type. Verify signature+expiry once we know which it is.
-    payload = None
-    last_error: Exception | None = None
-    for expected in (ct.TOKEN_ACCOUNT_INVITE, ct.TOKEN_CLIENT_PAGE):
-        try:
-            payload = ct.verify(token, expected_typ=expected)
-            break
-        except ct.CapabilityTokenError as exc:
-            last_error = exc
-    if payload is None:
-        raise InviteError(f"Invalid invite: {last_error}")
+    try:
+        payload = ct.verify(token, expected_typ=ct.TOKEN_ACCOUNT_INVITE)
+    except ct.CapabilityTokenError as exc:
+        raise InviteError(f"Invalid invite: {exc}") from exc
 
     from apps.leads.models import Lead
 
@@ -178,9 +162,8 @@ def claim_invite(
     # existing account.
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 1) GATE. The journey must permit an invite. Re-checked at claim time regardless of
-    #    which token type was presented — this is what makes accepting the long-lived
-    #    client_page token safe.
+    # 1) GATE. The journey must still permit an invite when the single-use invitation
+    #    is claimed. Review access and invitation access are deliberately separate.
     existing = Client.objects.filter(lead=lead).select_related("credential").first()
     if existing is None and not account_invite_allowed(lead):
         raise InviteError("This lead is no longer eligible for a workspace invite.")

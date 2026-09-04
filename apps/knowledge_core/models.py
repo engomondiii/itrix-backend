@@ -12,11 +12,12 @@ Knowledge Core models.
   reference) used by the AI engine's claims discipline / hallucination guard.
 
 Disclosure levels match ``itrix-web/src/constants/disclosure.ts`` and the Knowledge
-Core governance: public / controlled_public / nda_only / internal_only / prohibited.
+Core governance: Public / Controlled public / Authorized / Agreement-gated / Private workspace / Role-restricted; PROHIBITED is a separate non-embedding sentinel.
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 from apps.core.models import BaseModel
@@ -24,11 +25,38 @@ from storage.utils import knowledge_doc_upload_path
 
 
 class DisclosureLevel(models.TextChoices):
+    # Six-state disclosure model plus a fail-closed PROHIBITED sentinel.
     PUBLIC = "public", "Public"
     CONTROLLED_PUBLIC = "controlled_public", "Controlled public"
-    NDA_ONLY = "nda_only", "NDA only"
-    INTERNAL_ONLY = "internal_only", "Internal only"
-    PROHIBITED = "prohibited", "Prohibited"
+    AUTHORIZED = "authorized", "Authorized"
+    NDA_ONLY = "nda_only", "Agreement-gated / NDA"
+    CUSTOMER_CONTRACT = "customer_contract", "Private workspace / customer contract"
+    INTERNAL_ONLY = "internal_only", "Role-restricted / internal"
+    PROHIBITED = "prohibited", "Prohibited — never embed or retrieve"
+
+
+class SourceAuthority(models.TextChoices):
+    AUTHORITATIVE = "authoritative", "Authoritative register / executed record"
+    GOVERNING = "governing", "Current approved governing document"
+    WORKING = "working", "Working technical document"
+    LEGACY = "legacy", "Legacy / superseded material"
+
+
+class ParaphrasePermission(models.TextChoices):
+    NONE = "none", "No external paraphrase"
+    SUMMARY = "summary", "Approved summary only"
+    APPROVED = "approved", "Approved wording / bounded paraphrase"
+    FULL = "full", "Full-source paraphrase within disclosure ceiling"
+
+
+class TechnologyFamily(models.TextChoices):
+    GENERAL = "general", "General / cross-cutting"
+    AXIOM = "axiom", "AXIOM"
+    CRE = "cre", "CRE"
+    FQNM = "fqnm", "FQNM"
+    ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
+    ALPHA_CORE = "alpha_core", "ALPHA Core"
+    CROSS_CUTTING = "cross_cutting", "Boundary-aware / cross-cutting"
 
 
 class IngestionStatus(models.TextChoices):
@@ -59,8 +87,32 @@ class KnowledgeDocument(BaseModel):
         help_text="Pinecone namespace, e.g. alpha-compute / alpha-core / proofs.",
     )
     disclosure_level = models.CharField(
-        max_length=20, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
+        max_length=24, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
     )
+
+    # Governing response metadata. Retrieval permission and disclosure permission are
+    # deliberately separate: a document can be indexed for an authorized plane while
+    # still carrying a narrower approved audience/stage/paraphrase ceiling.
+    source_authority = models.CharField(
+        max_length=20, choices=SourceAuthority.choices, default=SourceAuthority.WORKING, db_index=True
+    )
+    is_current = models.BooleanField(default=True, db_index=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    canonical_rule = models.CharField(max_length=512, blank=True, default="")
+    approved_audience = models.JSONField(default=list, blank=True)
+    allowed_journey_stages = models.JSONField(default=list, blank=True)
+    approval_owner = models.CharField(max_length=255, blank=True, default="")
+    approval_date = models.DateField(null=True, blank=True)
+    review_after = models.DateField(null=True, blank=True)
+    permitted_paraphrase = models.CharField(
+        max_length=16, choices=ParaphrasePermission.choices, default=ParaphrasePermission.APPROVED
+    )
+    technology_family = models.CharField(
+        max_length=20, choices=TechnologyFamily.choices, default=TechnologyFamily.GENERAL, db_index=True
+    )
+    # Claim level ceiling used by orchestration.  0 means metadata has not assigned a
+    # special ceiling; the normal journey/disclosure ceiling still applies.
+    claim_ceiling = models.PositiveSmallIntegerField(default=0)
 
     ingestion_status = models.CharField(
         max_length=12,
@@ -101,7 +153,7 @@ class KnowledgeChunk(BaseModel):
     )
     namespace = models.CharField(max_length=120, db_index=True)
     disclosure_level = models.CharField(
-        max_length=20, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
+        max_length=24, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
     )
     chunk_index = models.PositiveIntegerField(default=0)
     heading = models.CharField(max_length=512, blank=True, default="")
@@ -131,7 +183,7 @@ class ClaimRecord(BaseModel):
     )
     text = models.TextField()
     disclosure_level = models.CharField(
-        max_length=20, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
+        max_length=24, choices=DisclosureLevel.choices, default=DisclosureLevel.PUBLIC
     )
     public_reference = models.CharField(max_length=512, blank=True, default="")
     is_prohibited = models.BooleanField(default=False)
@@ -141,3 +193,89 @@ class ClaimRecord(BaseModel):
 
     def __str__(self) -> str:
         return f"Claim({self.disclosure_level}): {self.text[:50]}"
+
+
+class HardFact(BaseModel):
+    """Structured owner-verifiable fact; prose retrieval must not upgrade its status."""
+
+    class Category(models.TextChoices):
+        PATENT = "patent", "Patent / IP"
+        CORPORATE = "corporate", "Corporate"
+        COMMERCIAL = "commercial", "Commercial"
+        BENCHMARK = "benchmark", "Benchmark"
+        CUSTOMER = "customer", "Customer"
+        TRANSACTION = "transaction", "Transaction"
+
+    key = models.SlugField(max_length=160, unique=True)
+    category = models.CharField(max_length=24, choices=Category.choices, db_index=True)
+    public_statement = models.TextField(blank=True, default="")
+    jurisdiction = models.CharField(max_length=80, blank=True, default="")
+    internal_reference = models.CharField(max_length=120, blank=True, default="")
+    official_application_number = models.CharField(max_length=120, blank=True, default="")
+    filing_date = models.DateField(null=True, blank=True)
+    publication_status = models.CharField(max_length=120, blank=True, default="")
+    prosecution_status = models.CharField(max_length=120, blank=True, default="")
+    verified_grant_number = models.CharField(max_length=120, blank=True, default="")
+    ownership_assignment = models.CharField(max_length=255, blank=True, default="")
+    source_document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.SET_NULL, null=True, blank=True, related_name="hard_facts"
+    )
+    source_reference = models.CharField(max_length=512, blank=True, default="")
+    source_authority = models.CharField(
+        max_length=20, choices=SourceAuthority.choices, default=SourceAuthority.AUTHORITATIVE, db_index=True
+    )
+    is_current = models.BooleanField(default=True, db_index=True)
+    disclosure_level = models.CharField(
+        max_length=24, choices=DisclosureLevel.choices, default=DisclosureLevel.INTERNAL_ONLY
+    )
+    approved_audience = models.JSONField(default=list, blank=True)
+    claim_ceiling = models.PositiveSmallIntegerField(default=1)
+    last_verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["category", "key"]
+
+
+class ContentAuthorization(BaseModel):
+    """Explicit per-content authorization, deliberately independent of NDA/account state."""
+
+    class SubjectKind(models.TextChoices):
+        CLIENT = "client", "Client"
+        LEAD = "lead", "Lead"
+        THREAD = "thread", "Thread"
+
+    document = models.ForeignKey(
+        KnowledgeDocument, on_delete=models.CASCADE, related_name="content_authorizations"
+    )
+    subject_kind = models.CharField(max_length=16, choices=SubjectKind.choices, db_index=True)
+    subject_id = models.CharField(max_length=64, db_index=True)
+    scope = models.CharField(max_length=255, blank=True, default="")
+    reason = models.CharField(max_length=512, blank=True, default="")
+    authorized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="knowledge_authorizations"
+    )
+    active = models.BooleanField(default=True, db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "subject_kind", "subject_id"],
+                name="uniq_knowledge_document_subject_authorization",
+            )
+        ]
+
+
+class KnowledgeConflict(BaseModel):
+    """Auditable unresolved conflict among equally authoritative applicable sources."""
+
+    query_fingerprint = models.CharField(max_length=64, db_index=True)
+    topic = models.CharField(max_length=160, blank=True, default="")
+    authority = models.CharField(max_length=20, choices=SourceAuthority.choices)
+    document_ids = models.JSONField(default=list, blank=True)
+    detail = models.CharField(max_length=1024, blank=True, default="")
+    resolved = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]

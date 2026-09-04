@@ -41,7 +41,7 @@ _SURFACE_TOKEN_TYPE = {
 }
 
 
-def reveal_for_state(lead, state: str) -> dict | None:
+def reveal_for_state(lead, state: str, *, thread=None) -> dict | None:
     """
     Return a reveal descriptor for ``state`` (or None if the state reveals nothing).
 
@@ -51,10 +51,10 @@ def reveal_for_state(lead, state: str) -> dict | None:
     surface = STATE_REVEAL.get(normalized)
     if not surface:
         return None
-    return _build(lead, surface, normalized)
+    return _build(lead, surface, normalized, thread=thread)
 
 
-def reveal_for_event(lead, event: str, state: str) -> dict | None:
+def reveal_for_event(lead, event: str, state: str, *, thread=None) -> dict | None:
     """
     Return a reveal descriptor fired by an EVENT rather than by arriving at a state.
 
@@ -64,13 +64,22 @@ def reveal_for_event(lead, event: str, state: str) -> dict | None:
     surface = EVENT_REVEAL.get(event)
     if not surface:
         return None
-    return _build(lead, surface, normalize_state(state))
+    return _build(lead, surface, normalize_state(state), thread=thread)
 
 
-def _build(lead, surface: str, state: str) -> dict:
+def _build(lead, surface: str, state: str, *, thread=None) -> dict:
     token_type = _SURFACE_TOKEN_TYPE.get(surface)
     token = None
-    if token_type is not None:
+    if surface == RevealSurface.CLIENT_PAGE.value:
+        # Client-page access is NOT a JWT capability URL anymore. Mint a short-lived,
+        # opaque, one-time exchange code bound to the current visitor/client session.
+        # A caller without a thread cannot safely establish that binding, so it gets no
+        # public credential rather than falling back to an unbound bearer link.
+        if thread is not None:
+            from apps.result_page.services.client_access import issue_for_lead
+
+            token = issue_for_lead(lead, thread=thread)
+    elif token_type is not None:
         single_use = token_type == ct.TOKEN_ACCOUNT_INVITE
         ttl = None
         if token_type == ct.TOKEN_ACCOUNT_INVITE:
@@ -84,6 +93,10 @@ def _build(lead, surface: str, state: str) -> dict:
             ttl_seconds=ttl,
             single_use=single_use,
         )
+    if surface == RevealSurface.CLIENT_PAGE.value:
+        # My Review uses a browser-bound one-time exchange code, never a capability
+        # token and never a URL credential. Keep the contract semantically distinct.
+        return {"surface": surface, "state": state, "access_code": token}
     return {"surface": surface, "state": state, "capability_token": token}
 
 
@@ -121,19 +134,6 @@ def emit_shell_update(lead, *, thread=None) -> None:
         from apps.realtime.presence import subject_group
 
         contract = shell.for_subject(lead, thread=thread)
-        broadcast_shell_update(
-            subject_group(str(lead.id)),
-            {
-                "journey_state": contract["journey_state"],
-                "state_key": contract["state_key"],
-                "sidebar_sections": contract["sidebar_sections"],
-                "conversation_header": contract["conversation_header"],
-                "composer_label": contract["composer_label"],
-                "question_loop_open": contract["question_loop_open"],
-                "attachments_enabled": contract["attachments_enabled"],
-                "disclosure_ceiling": contract["disclosure_ceiling"],
-                "identity_state": contract["identity_state"],
-            },
-        )
+        broadcast_shell_update(subject_group(str(lead.id)), contract)
     except Exception:  # noqa: BLE001 - never break a transition on a fan-out hiccup
         logger.debug("shell.update emit skipped (realtime unavailable)")

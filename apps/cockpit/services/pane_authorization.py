@@ -46,6 +46,7 @@ logger = logging.getLogger("itrix")
 SECTION_ARTIFACT_TYPES: dict[str, tuple[str, ...]] = {
     "artifacts": (
         "reflection", "pitch_room", "review_summary",
+        "executive_brief", "technical_brief", "product_brief",
         "boundary_waste_map", "poc_evidence", "integration_readiness",
     ),
     "documents": ("document",),

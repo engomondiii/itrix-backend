@@ -32,6 +32,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.clients.backends import ClientJWTAuthentication
 from apps.clients.permissions import IsAuthenticatedClient
 from apps.customer_success.permissions import HasSuccessOverlay
 from apps.customer_success.serializers import (
@@ -52,6 +53,7 @@ from apps.customer_success.services import (
     success_plan,
     success_review,
     support_router,
+    improvement_router,
 )
 
 logger = logging.getLogger("itrix")
@@ -60,6 +62,7 @@ logger = logging.getLogger("itrix")
 class _SuccessView(APIView):
     """Shared base: client-JWT plus the overlay gate."""
 
+    authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient, HasSuccessOverlay]
 
     @property
@@ -237,6 +240,22 @@ class KnowledgeView(_SuccessView):
                 "releaseNotes": ReleaseNoteSerializer(notes, many=True).data,
             }
         )
+
+
+class ImprovementView(_SuccessView):
+    """POST portal/success/improve/ — deterministic routing from the success composer."""
+
+    def post(self, request):
+        message = request.data.get("message") if isinstance(request.data, dict) else None
+        if not isinstance(message, str) or not message.strip():
+            return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(message) > 8000:
+            return Response({"detail": "Message is too long."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            receipt = improvement_router.route(self.client, message)
+        except ValueError:
+            return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(receipt, status=status.HTTP_201_CREATED)
 
 
 class FeedbackView(_SuccessView):

@@ -66,7 +66,7 @@ def test_the_assent_endpoint_refuses_without_a_client_session():
     assert response.status_code in (401, 403)
 
 
-def test_a_version_mismatch_is_logged_loudly_but_the_server_versions_are_stored(caplog, settings):
+def test_a_version_mismatch_is_logged_loudly_but_the_server_versions_are_stored(settings):
     """
     ── THE CLIENT'S VERSIONS ARE ACCEPTED AND THEN IGNORED ─────────────────
     The frontend sends what it RENDERED, which is the honest thing for it to send. The record
@@ -76,18 +76,21 @@ def test_a_version_mismatch_is_logged_loudly_but_the_server_versions_are_stored(
     What the client's copy is FOR is this check: if it disagrees, the visitor read something
     other than what binds them, and that deserves a loud log rather than a silent write.
     """
-    import logging
-
     from django.db import transaction
+    from unittest.mock import patch
 
     from apps.legal.services import assent as assent_svc
     from apps.legal.views import PortalAssentView
 
+    settings.LEGAL_PUBLISHED = True
     settings.LEGAL_TERMS_VERSION = "1.1"
-    with caplog.at_level(logging.ERROR, logger="itrix"):
+    # ``itrix`` deliberately owns its console handler with ``propagate=False``.  Patch
+    # the logger method directly so this test verifies the actual contract (an ERROR is
+    # emitted) without depending on pytest's root-log capture implementation.
+    with patch("apps.legal.views.logger.error") as logged:
         PortalAssentView._warn_on_version_mismatch([{"slug": "terms", "version": "0.9"}])
-
-    assert any("version_mismatch" in r.message for r in caplog.records)
+    logged.assert_called_once()
+    assert "legal.version_mismatch" in logged.call_args.args[0]
 
     # And the write still stores the server's version.
     with transaction.atomic():
@@ -95,15 +98,16 @@ def test_a_version_mismatch_is_logged_loudly_but_the_server_versions_are_stored(
     assert record.version_of("terms") == "1.1"
 
 
-def test_a_matching_version_logs_nothing(caplog, settings):
-    import logging
+def test_a_matching_version_logs_nothing(settings):
+    from unittest.mock import patch
 
     from apps.legal.views import PortalAssentView
 
+    settings.LEGAL_PUBLISHED = True
     settings.LEGAL_TERMS_VERSION = "1.1"
-    with caplog.at_level(logging.ERROR, logger="itrix"):
+    with patch("apps.legal.views.logger.error") as logged:
         PortalAssentView._warn_on_version_mismatch([{"slug": "terms", "version": "1.1"}])
-    assert not any("version_mismatch" in r.message for r in caplog.records)
+    logged.assert_not_called()
 
 
 def test_the_admin_cannot_edit_an_assent_record():
@@ -119,3 +123,33 @@ def test_the_admin_cannot_edit_an_assent_record():
     assert admin.has_add_permission(None) is False
     assert admin.has_change_permission(None) is False
     assert admin.has_delete_permission(None) is False
+
+
+def test_client_reassent_uses_client_jwt_and_unpublished_is_only_draft_acknowledgement(settings):
+    from apps.clients.tokens import build_tokens_for_client
+    from apps.legal.models import AssentRecord
+    from tests.factories.client_factory import ClientFactory
+
+    settings.ENABLE_CLIENT_PORTAL = True
+    settings.LEGAL_PUBLISHED = False
+    client = ClientFactory(email="reassent@example.com")
+    api = APIClient()
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {build_tokens_for_client(client)['access']}")
+
+    response = api.post(
+        "/api/v1/portal/legal/assent/",
+        {"instruments": [{"slug": "terms", "version": "1.2"}]},
+        format="json",
+    )
+    assert response.status_code == 201
+    record = AssentRecord.objects.filter(client=client).latest("created_at")
+    assert record.instrument_status == "draft_acknowledgement"
+
+
+def test_team_token_cannot_record_client_reassent(auth_client):
+    response = auth_client.post(
+        "/api/v1/portal/legal/assent/",
+        {"instruments": []},
+        format="json",
+    )
+    assert response.status_code in {401, 403}

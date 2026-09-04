@@ -1,5 +1,5 @@
-# itriX backend — dependencies (unpinned source list)
-Django
+# itriX backend — dependency source list (security-critical framework pin explicit)
+Django==5.2.17
 djangorestframework
 djangorestframework-simplejwt
 django-cors-headers

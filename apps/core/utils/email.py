@@ -45,9 +45,8 @@ def send_email(
 
     if not settings.ENABLE_EMAIL_DELIVERY:
         logger.info(
-            "[email-disabled] would send '%s' to %s (set ENABLE_EMAIL_DELIVERY=True to deliver)",
-            subject,
-            ", ".join(recipients),
+            "email.disabled recipient_count=%s",
+            len(recipients),
         )
         return False
 
@@ -60,8 +59,8 @@ def send_email(
             html_message=html_body,
             fail_silently=False,
         )
-        logger.info("Sent email '%s' to %s", subject, ", ".join(recipients))
+        logger.info("email.sent recipient_count=%s", len(recipients))
         return True
     except Exception:  # noqa: BLE001 - delivery must never break a request
-        logger.exception("Failed to send email '%s'", subject)
+        logger.exception("email.send_failed")
         return False

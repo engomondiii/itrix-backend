@@ -103,19 +103,24 @@ def record_in_transaction(
             "attests to nothing identifiable."
         )
 
+    status_value = (
+        "published_assent" if instruments_svc.published() else "draft_acknowledgement"
+    )
     record = AssentRecord.objects.create(
         client=client,
         client_email_at_assent=resolved_email,
         instruments=entries,
+        instrument_status=status_value,
         path=path,
         accepted_at_client=accepted_at_client,
         ip_address=ip_address or None,
         user_agent=(user_agent or "")[:300],
     )
     logger.info(
-        "legal.assent_recorded path=%s client=%s versions=%s",
+        "legal.assent_recorded path=%s client=%s status=%s versions=%s",
         path,
         getattr(client, "id", None),
+        status_value,
         {e["slug"]: e["version"] for e in entries},
     )
     return record
@@ -141,8 +146,13 @@ def has_current_assent(client) -> bool:
     record = latest_for(client)
     if record is None:
         return False
+    expected_status = (
+        "published_assent" if instruments_svc.published() else "draft_acknowledgement"
+    )
+    if record.instrument_status != expected_status:
+        return False
     for slug in ASSENT_REQUIRED_SLUGS:
-        current = instruments_svc.version_of(slug)
+        current = instruments_svc.display_version_of(slug)
         if not current or record.version_of(slug) != current:
             return False
     return True

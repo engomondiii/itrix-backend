@@ -48,7 +48,7 @@ class LoginView(APIView):
         user = serializer.authenticate_user(request)
 
         tokens = build_tokens_for_user(user)
-        logger.info("Login succeeded for %s (%s)", user.email, user.role)
+        logger.info("team.login succeeded role=%s", user.role)
         return Response(
             {
                 "access": tokens["access"],

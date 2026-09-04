@@ -7,8 +7,7 @@ prompt + pressures, product/license routing, tier, and the conversation/context 
 (public | client_page | portal | review | console). The runtime builds this once and
 passes it to the agent, so agents never reach into Django models ad hoc.
 
-The plane + NDA state become the HARD disclosure ceiling handed to the retriever
-(Backend v4 §3.1) — no prompt can raise it.
+The identity plane establishes the baseline disclosure ceiling. NDA/agreement state is a prerequisite signal only; restricted content still requires an explicit per-content authorization. No prompt, account, title or NDA can raise access by itself.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ PLANE_CLIENT = "client"
 PLANE_TEAM = "team"
 
 CEILING_PUBLIC = "controlled_public"
-CEILING_NDA = "nda_only"
+CEILING_NDA = "nda_only"  # legacy label retained for serialized compatibility only
 CEILING_INTERNAL = "internal_only"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +83,9 @@ class AgentContext:
         if self.plane == PLANE_TEAM:
             return CEILING_INTERNAL
         if self.plane == PLANE_CLIENT:
-            return CEILING_NDA if self.nda_signed else CEILING_PUBLIC
+            # Account, email verification and NDA are not disclosure levels. Restricted
+            # content is authorized document-by-document by KnowledgeRetriever.
+            return CEILING_PUBLIC
         return CEILING_PUBLIC
 
     @property
@@ -109,6 +110,28 @@ class AgentContext:
                 return RETRIEVAL_NDA
             return RETRIEVAL_CONTROLLED
         return RETRIEVAL_PUBLIC
+
+
+    @property
+    def knowledge_access_kwargs(self) -> dict:
+        """Subject/prerequisite metadata for per-document Knowledge authorization."""
+        subjects: dict[str, str] = {}
+        if self.client_id:
+            subjects["client"] = str(self.client_id)
+        if self.lead_id:
+            subjects["lead"] = str(self.lead_id)
+        thread_id = str((self.extra or {}).get("thread_id") or "")
+        if thread_id:
+            subjects["thread"] = thread_id
+        return {
+            "authorization_subjects": subjects,
+            "nda_signed": bool(self.nda_signed),
+            "contract_executed": bool(self.contract_executed),
+            "customer_scope": str(self.client_id or ""),
+            "audience": str((self.extra or {}).get("audience") or "general"),
+            "journey_stage": str((self.extra or {}).get("journey_state") or ""),
+            "claim_ceiling": int((self.extra or {}).get("claim_ceiling") or 0),
+        }
 
     @classmethod
     def from_lead(cls, lead, *, context_label: str = "public", plane: str = PLANE_PUBLIC) -> "AgentContext":

@@ -48,17 +48,61 @@ def test_documents_payload_carries_the_folder_arrays_the_screen_maps():
     assert "folder" in first and isinstance(first["documents"], list)
 
 
-def test_data_room_documents_lock_until_the_nda_is_signed():
-    row = ClientFactory(nda_signed=False)
-    data = _authed(row).get("/api/v1/portal/documents/").json()
-    locked = [d["locked"] for f in data["dataRoomFolders"] for d in f["documents"]]
-    assert locked and all(locked)
+def test_nda_does_not_unlock_restricted_documents_without_explicit_authorization():
+    from apps.knowledge_core.models import KnowledgeDocument
 
-    row.nda_signed = True
-    row.save(update_fields=["nda_signed"])
+    KnowledgeDocument.objects.create(
+        title="Restricted method note",
+        namespace="tests",
+        disclosure_level="nda_only",
+        is_current=True,
+    )
+    row = ClientFactory(nda_signed=True)
     data = _authed(row).get("/api/v1/portal/documents/").json()
-    unlocked = [d["locked"] for f in data["dataRoomFolders"] for d in f["documents"]]
-    assert unlocked and not any(unlocked)
+    restricted = [d for f in data["dataRoomFolders"] for d in f["documents"]]
+    assert restricted and all(d["locked"] for d in restricted)
+    assert data["ndaSigned"] is True
+    assert data["dataRoomAuthorized"] is False
+
+
+def test_nda_plus_explicit_content_authorization_unlocks_only_that_document():
+    from apps.knowledge_core.models import ContentAuthorization, KnowledgeDocument
+
+    allowed = KnowledgeDocument.objects.create(
+        title="Authorized method note", namespace="tests", disclosure_level="nda_only", is_current=True
+    )
+    other = KnowledgeDocument.objects.create(
+        title="Still restricted", namespace="tests", disclosure_level="nda_only", is_current=True
+    )
+    row = ClientFactory(nda_signed=True)
+    ContentAuthorization.objects.create(
+        document=allowed,
+        subject_kind=ContentAuthorization.SubjectKind.CLIENT,
+        subject_id=str(row.id),
+        reason="test authorization",
+    )
+
+    data = _authed(row).get("/api/v1/portal/documents/").json()
+    rows = {d["title"]: d for f in data["dataRoomFolders"] for d in f["documents"]}
+    assert rows[allowed.title]["locked"] is False
+    assert rows[other.title]["locked"] is True
+    assert data["dataRoomAuthorized"] is True
+
+
+def test_explicit_nda_only_authorization_still_requires_the_agreement_prerequisite():
+    from apps.knowledge_core.models import ContentAuthorization, KnowledgeDocument
+
+    document = KnowledgeDocument.objects.create(
+        title="NDA-gated authorized note", namespace="tests", disclosure_level="nda_only", is_current=True
+    )
+    row = ClientFactory(nda_signed=False)
+    ContentAuthorization.objects.create(
+        document=document, subject_kind=ContentAuthorization.SubjectKind.CLIENT, subject_id=str(row.id)
+    )
+    data = _authed(row).get("/api/v1/portal/documents/").json()
+    row_data = next(d for f in data["dataRoomFolders"] for d in f["documents"] if d["title"] == document.title)
+    assert row_data["locked"] is True
+    assert data["dataRoomAuthorized"] is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -53,9 +53,38 @@ def advance_on_turn(thread, body: str) -> None:
     if thread is None:
         return
 
-    from apps.conversations.services import thread_state
+    from apps.conversations.services import engagement_state, thread_state
 
-    # 1) First turn on an empty thread opens the review. Idempotent for later turns.
+    # Purpose recognition and relationship state are evaluated before the numbered
+    # qualification ladder. A Visitor / Technical Evaluator is allowed to stay in the
+    # public exploration lane indefinitely; seniority, company, message depth and turn
+    # count never open the customer qualification band.
+    engagement_decision = None
+    try:
+        engagement_decision = engagement_state.update_from_turn(thread, body or "")
+    except Exception:  # noqa: BLE001
+        logger.exception("engagement-state update failed for thread %s", getattr(thread, "id", "?"))
+
+    # Turn-local deterministic copy. Both HTTP and WebSocket transports read this same
+    # Thread instance, so the v2.2 stated-mode-change requirement cannot disappear when
+    # the model is unavailable. Always overwrite to avoid repeating a stale offer.
+    setattr(
+        thread,
+        "_mode_change_offer",
+        engagement_state.mode_change_offer_text(thread)
+        if engagement_decision is not None and engagement_decision.mode_change_offered
+        else "",
+    )
+
+    if not engagement_state.is_customer(thread):
+        # Always clear turn-local commercial orchestration. Realtime consumers keep one
+        # Thread instance alive for the socket lifetime, so stale attributes would
+        # otherwise leak an earlier CTA into a later Visitor answer.
+        setattr(thread, "_client_page_reveal", None)
+        setattr(thread, "_contact_ask", None)
+        return
+
+    # Only an explicit Customer/Strategic Customer relationship enters review.
     try:
         thread_state.enter_in_review(thread)
     except Exception:  # noqa: BLE001
@@ -78,7 +107,12 @@ def advance_on_turn(thread, body: str) -> None:
     # The qualification band is states 1-2. We only evaluate the stop rule / loop close
     # while inside it; past it we fall through to the reveal check.
     if state_number in (1, 2):
-        _evaluate_and_close_loop(thread, state_number, body)
+        _evaluate_and_close_loop(
+            thread,
+            state_number,
+            body,
+            ignore_proceed_signal=bool(engagement_decision and engagement_decision.mode_change_accepted),
+        )
 
     # 2) CLIENT-PAGE REVEAL (3 -> 4). Runs on EVERY turn, with its own gates: it acts
     # once the loop has closed (DIAGNOSED) AND an email has been given anywhere in the
@@ -94,7 +128,9 @@ def advance_on_turn(thread, body: str) -> None:
     _maybe_ask_for_contact(thread, body)
 
 
-def _evaluate_and_close_loop(thread, state_number: int, body: str) -> None:
+def _evaluate_and_close_loop(
+    thread, state_number: int, body: str, *, ignore_proceed_signal: bool = False
+) -> None:
     """The stop-rule evaluation + loop close, factored out of advance_on_turn."""
     from apps.conversations.services import thread_state
 
@@ -109,6 +145,7 @@ def _evaluate_and_close_loop(thread, state_number: int, body: str) -> None:
             journey_state=state_number,
             questions_asked=_questions_asked(thread),
             last_visitor_text=body or "",
+            ignore_proceed_signal=ignore_proceed_signal,
         )
     except Exception:  # noqa: BLE001
         logger.debug("stop-rule evaluation failed for thread %s", getattr(thread, "id", "?"))
@@ -199,7 +236,9 @@ def suggest_next(thread, *, message=None) -> dict:
     if thread is None or not _adaptive_on():
         return {}
 
-    from apps.conversations.services import thread_state
+    from apps.conversations.services import engagement_state, thread_state
+    if not engagement_state.is_customer(thread):
+        return {}
 
     state_number = thread_state.current_state_number(thread)
     if state_number not in (1, 2):

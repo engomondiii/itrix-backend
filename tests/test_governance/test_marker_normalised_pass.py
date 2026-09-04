@@ -30,7 +30,7 @@ pytestmark = pytest.mark.django_db
 #
 #     HARD_BLOCK      \d+\s?x faster · \d+%\s+faster
 #     PROHIBITED_CLAIM  "always faster" · "guarantees lower power"
-#     CANONICAL         \bmagic\b · lookup-table execution
+#     CANONICAL         \bmagic\b · other governed output-style substitutions
 #     STREAM_ONLY       $-prefixed figures · N% of the value
 #
 # An earlier draft of this file used "guarantee", which is NOT in the set — so the tests

@@ -118,9 +118,12 @@ class UnknownSidebarSection(Exception):
 # The ceiling each identity plane may reach. The PLANE always wins over the state
 # (Architecture v2.6 §12.1) — a state can only ever narrow, never widen.
 _PLANE_CEILING = {
+    # Identity/account/contract labels do not themselves authorize content. The shell
+    # advertises only the baseline; individual restricted resources are separately
+    # authorized server-side.
     IDENTITY_ANONYMOUS: "controlled_public",
-    IDENTITY_IDENTIFIED: "nda_only",
-    IDENTITY_AUTHENTICATED_CUSTOMER: "customer_contract",
+    IDENTITY_IDENTIFIED: "controlled_public",
+    IDENTITY_AUTHENTICATED_CUSTOMER: "controlled_public",
 }
 
 # What "current work" a state represents, for the conversation header.
@@ -142,12 +145,12 @@ def resolve_identity_state(subject) -> str:
     """
     Derive ``identity_state`` from what the subject actually is.
 
-    anonymous              — no client account, no verified email
-    identified             — a Client account exists (or the lead volunteered an email)
-    authenticated_customer — the client holds an executed contract
+    anonymous              — no client account / durable identified record
+    identified             — a Client account exists (or a lead supplied contact details)
+    authenticated_customer — the client has an executed contract record
 
-    NOTE this is derived, never asserted by the caller. A visitor cannot claim to be
-    identified; they become identified by creating an account.
+    These are relationship/session labels, not disclosure levels. Claimed identity,
+    verified identity, NDA, contract state and per-content authorization remain distinct.
     """
     client = getattr(subject, "client", None)
     if client is None:
@@ -328,13 +331,12 @@ def disclosure_ceiling_for(state: str, identity_state: str, *, nda_signed: bool 
     """
     The effective ceiling: the MORE RESTRICTIVE of the plane's ceiling and the state's.
 
-    The plane can never be raised by the state, by a prompt, or by an attachment
-    (Architecture v2.6 §19.7 rule 6). ``nda_signed`` can only ever narrow the gap
-    between an identified client's cap and nda_only — never exceed the plane.
+    The plane can never be raised by state, account, identity claim, verification, NDA,
+    prompt or attachment. ``nda_signed`` is accepted for wire/backward compatibility but
+    is not an authorization input; restricted resources are document-authorized.
     """
+    del nda_signed
     plane_cap = _PLANE_CEILING.get(identity_state, "public")
-    if identity_state == IDENTITY_IDENTIFIED and not nda_signed:
-        plane_cap = "controlled_public"
     return min_ceiling(plane_cap, ceiling_for_state(state))
 
 
@@ -405,6 +407,15 @@ def for_subject(subject, *, thread=None, identity_state: str | None = None) -> d
     pane_sections = content_pane_sections_for(state, resolved_identity)
     rail_sections = conversation_rail_sections_for(state, resolved_identity)
 
+    engagement = {}
+    if thread is not None:
+        try:
+            from apps.conversations.services.engagement_state import public_state
+
+            engagement = public_state(thread)
+        except Exception:  # noqa: BLE001
+            engagement = {}
+
     contract: dict[str, Any] = {
         "thread_id": str(getattr(thread, "id", "") or "") or None,
         # v7.1: derived here and nowhere else (§2.6). A client that decided its own mode
@@ -426,8 +437,14 @@ def for_subject(subject, *, thread=None, identity_state: str | None = None) -> d
             thread, pane_sections
         ),
         "conversation_header": conversation_header_for(subject, state, resolved_identity),
-        # v7.1 PHASE 3 — ONE NBA FOR BOTH PLANES (§11.1). See next_best_action_for.
-        "next_best_action": next_best_action_for(subject),
+        # STR-05: no strategic route/action may surface before the Problem Mirror
+        # has been confirmed (or deliberately skipped where the journey permits it).
+        "next_best_action": next_best_action_for(subject)
+        if engagement.get("recommendationAllowed", False)
+        else None,
+        # Relationship/consent state is safe orchestration metadata for Surface 1.
+        # It contains no score, hidden persona, or sales qualification detail.
+        **engagement,
     }
     return contract
 
@@ -515,6 +532,13 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
     pane_sections = content_pane_sections_for(state_key, IDENTITY_ANONYMOUS)
     rail_sections = conversation_rail_sections_for(state_key, IDENTITY_ANONYMOUS)
 
+    try:
+        from apps.conversations.services.engagement_state import public_state
+
+        engagement = public_state(thread)
+    except Exception:  # noqa: BLE001
+        engagement = {}
+
     return {
         "thread_id": str(getattr(thread, "id", "") or "") or None,
         # A thread exists, so the mode depends on whether anything has been said in it.
@@ -546,6 +570,7 @@ def for_anonymous_thread(thread) -> dict[str, Any]:
         # No Lead exists yet, so there is no subject to reason about — and nothing the
         # precedence rule could read. None is the honest answer rather than a placeholder.
         "next_best_action": None,
+        **engagement,
     }
 
 

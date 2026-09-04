@@ -1,6 +1,7 @@
 """AI Engine URLs (mounted under /api/v1/ai/).
 
-Public: generate-result/ (Surface 1 result proxy calls this).
+``generate-result/`` is retained only as a 410 compatibility tombstone.  Surface 1 now
+uses the browser-bound review readiness/access flow.
 """
 
 from __future__ import annotations

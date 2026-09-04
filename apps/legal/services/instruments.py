@@ -41,12 +41,10 @@ _SETTINGS_KEYS: dict[str, tuple[str, str]] = {
 
 def published() -> bool:
     """
-    Whether the instruments have been signed off by counsel.
+    Whether the configured legal instruments are currently published.
 
-    Defaults FALSE. Until it is true the routes still answer — a visitor must always be able
-    to read what governs their use — but the payload says `published: false`, and
-    `itrix-web` renders the draft banner and a `noindex`. An unreviewed Terms of Service
-    presented as authoritative is worse than a delayed one.
+    Publication controls the legal status/version presented by the platform. It is independent
+    of journey state, NDA state and content authorization.
     """
     return bool(getattr(settings, "LEGAL_PUBLISHED", False))
 
@@ -65,14 +63,27 @@ def effective_of(slug: str) -> str:
     return str(getattr(settings, keys[1], "") or "")
 
 
+def display_version_of(slug: str) -> str:
+    """Version the public route is displaying right now.
+
+    When publication is disabled, ``LEGAL_DRAFT_VERSION`` remains available as a safe
+    compatibility display version. When published, the deployment-controlled effective version
+    and effective date bind.
+    """
+    if not published():
+        return str(getattr(settings, "LEGAL_DRAFT_VERSION", "1.2") or "1.2")
+    return version_of(slug)
+
+
 def all_instruments() -> list[dict]:
-    """Every instrument, in the canonical order, with its version and effective date."""
+    """Every displayed instrument plus explicit publication state."""
     return [
         {
             "slug": slug,
             "title": INSTRUMENT_TITLES[slug],
-            "version": version_of(slug),
-            "effective": effective_of(slug),
+            "version": display_version_of(slug),
+            "effective": effective_of(slug) if published() else "",
+            "published": published(),
         }
         for slug in INSTRUMENT_SLUGS
     ]
@@ -80,7 +91,7 @@ def all_instruments() -> list[dict]:
 
 def current_versions(slugs) -> list[dict]:
     """
-    The version entries for ``slugs``, ready to store on an assent record.
+    The version entries for ``slugs``, ready to store on an assent/acknowledgement record.
 
     Raises ``ValueError`` on an unknown slug or a missing version. Both are refusals rather
     than defaults, and for the same reason: an assent record naming an instrument the
@@ -92,11 +103,16 @@ def current_versions(slugs) -> list[dict]:
     for slug in slugs:
         if slug not in INSTRUMENT_SLUGS:
             raise ValueError(f"'{slug}' is not a published itriX legal instrument.")
-        version = version_of(slug)
+        version = display_version_of(slug)
         if not version:
             raise ValueError(
-                f"No version configured for '{slug}'. An assent record naming version '' "
-                "is unverifiable — set LEGAL_*_VERSION before taking assent."
+                f"No display version configured for '{slug}'. An assent record naming version '' "
+                "is unverifiable."
             )
-        out.append({"slug": slug, "version": version, "effective": effective_of(slug)})
+        out.append({
+            "slug": slug,
+            "version": version,
+            "effective": effective_of(slug) if published() else "",
+            "published": published(),
+        })
     return out

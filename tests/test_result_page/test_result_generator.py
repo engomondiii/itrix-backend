@@ -16,29 +16,22 @@ from tests.factories.scoring_factory import EXECUTION_ANSWERS, REPRESENTATION_AN
 
 pytestmark = pytest.mark.django_db
 
-# ── UPDATED IN PHASE 3 ───────────────────────────────────────────────────────
-# ``tier`` and ``scoreBreakdown`` were REMOVED from this public payload. Both are on the
-# §10.5 list of fields that must not appear on the anonymous or client plane, and this
-# endpoint is AllowAny — an unidentified visitor could read the tier we had assigned them
-# and the breakdown of how we scored them.
-#
-# The page's CONTENT is still tailored by tier and score; the visitor is simply no longer
-# shown the machinery. Surface 2 reads the same record through a team-gated serializer.
+# Customer-facing My Review contract. Internal lead ids, scores, routes, hidden
+# technology selection and commercial pathway are deliberately absent.
 WEB_RESULT_KEYS = {
-    "leadId",
-    "productRoute",
-    "licensePathway",
-    "primaryTechnologies",
     "problemMirror",
     "diagnosis",
     "alphaFitSummary",
     "kpiPreview",
     "proofPreview",
     "recommendedNextStep",
-    # Surface 1 polls this to know when the AI-assembled page has replaced the
-    # deterministic first paint (added with the client-page auto-update).
-    "usedAi",
+    "generationStatus",
+    "artifactFamily",
+    "artifactVersion",
+    "generatedAt",
+    "locale",
 }
+
 
 
 def _lead_from(answers):
@@ -70,25 +63,22 @@ def test_serialized_result_matches_web_contract():
     assert set(data.keys()) == WEB_RESULT_KEYS
 
 
-def test_primary_technologies_are_canonical_ids():
+def test_internal_route_fields_are_retained_server_side_but_not_serialized():
     lead = _lead_from(REPRESENTATION_ANSWERS)
     result_obj, _ = ResultGenerator().generate_for_lead(lead)
+    assert all(t in {"axiom", "cre", "fqnm"} for t in result_obj.primary_technologies)
+    assert result_obj.product_route in {"ALPHA Compute", "ALPHA Core", "Both", "General"}
     data = ResultPageSerializer(result_obj).data
-    assert all(t in {"axiom", "cre", "fqnm"} for t in data["primaryTechnologies"])
+    for forbidden in ("leadId", "primaryTechnologies", "productRoute", "licensePathway", "tier", "score"):  # noqa: E501
+        assert forbidden not in data
 
 
-def test_product_route_is_display_string():
-    lead = _lead_from(EXECUTION_ANSWERS)
-    result_obj, _ = ResultGenerator().generate_for_lead(lead)
-    data = ResultPageSerializer(result_obj).data
-    assert data["productRoute"] in {"ALPHA Compute", "ALPHA Core", "Both"}
-
-
-def test_diagnosis_rows_have_required_fields():
+def test_diagnosis_rows_use_human_readable_customer_schema():
     lead = _lead_from(EXECUTION_ANSWERS)
     result_obj, _ = ResultGenerator().generate_for_lead(lead)
     for row in result_obj.diagnosis:
-        assert {"pressure", "observation", "itrixInterpretation", "alphaRole"}.issubset(row.keys())
+        assert {"title", "observation", "interpretation", "evidenceStatus"}.issubset(row.keys())
+        assert "alphaRole" not in row
 
 
 def test_proof_preview_only_public_or_nda():
@@ -105,48 +95,51 @@ def test_regeneration_is_idempotent_one_per_lead():
     assert ResultPage.objects.filter(lead=lead).count() == 1
 
 
-# ── Endpoint tests (public funnel) ───────────────────────────────────────────
+# ── Legacy/public endpoint retirement and access-bound flow ───────────────────
 def _qualify(api_client, answers):
+    from apps.review.models import ReviewSession
+
+    api_client.credentials(HTTP_X_ITRIX_SESSION="result-test-browser")
     sid = api_client.post("/api/v1/review/sessions/", {"client_id": "rp"}, format="json").json()["id"]
     api_client.post(
         f"/api/v1/review/sessions/{sid}/prompt/",
         {"prompt": "Slow solver", "pressure_areas": ["speed"], "environment": "cae"},
         format="json",
     )
-    q = api_client.post(f"/api/v1/review/sessions/{sid}/qualify/", {"answers": answers}, format="json").json()
-    return sid, q["lead_id"]
+    response = api_client.post(
+        f"/api/v1/review/sessions/{sid}/qualify/", {"answers": answers}, format="json"
+    )
+    assert response.status_code == 200
+    session = ReviewSession.objects.get(pk=sid)
+    return sid, str(session.placeholder_lead_id)
 
 
-def test_generate_result_endpoint_public(api_client):
+def test_legacy_public_generate_result_endpoint_is_retired(api_client):
     sid, lead_id = _qualify(api_client, EXECUTION_ANSWERS)
     resp = api_client.post(
         "/api/v1/ai/generate-result/", {"lead_id": lead_id, "session_id": sid}, format="json"
     )
-    assert resp.status_code == 200
-    assert set(resp.json().keys()) == WEB_RESULT_KEYS
+    assert resp.status_code == 410
+    assert resp.json()["error"]["code"] == "legacy_generation_retired"
 
 
-def test_get_result_page_public(api_client):
-    sid, lead_id = _qualify(api_client, EXECUTION_ANSWERS)
-    api_client.post("/api/v1/ai/generate-result/", {"lead_id": lead_id}, format="json")
+def test_result_page_by_lead_uuid_is_not_public(api_client):
+    _sid, lead_id = _qualify(api_client, EXECUTION_ANSWERS)
     resp = api_client.get(f"/api/v1/result-page/{lead_id}/")
-    assert resp.status_code == 200
-    assert resp.json()["leadId"] == lead_id
+    assert resp.status_code in (401, 403)
 
 
-def test_get_result_page_by_session_id_resolves(api_client):
-    sid, lead_id = _qualify(api_client, EXECUTION_ANSWERS)
-    # The web may carry the session id as the (placeholder) lead id.
+def test_result_page_by_review_session_uuid_is_not_public(api_client):
+    sid, _lead_id = _qualify(api_client, EXECUTION_ANSWERS)
     resp = api_client.get(f"/api/v1/result-page/{sid}/")
-    assert resp.status_code == 200
-    assert resp.json()["leadId"] == lead_id
+    assert resp.status_code in (401, 403)
 
 
-def test_unknown_lead_returns_404(api_client):
+def test_result_detail_does_not_enumerate_random_ids_to_anonymous_users(api_client):
     import uuid as _uuid
 
     resp = api_client.get(f"/api/v1/result-page/{_uuid.uuid4()}/")
-    assert resp.status_code == 404
+    assert resp.status_code in (401, 403)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -39,6 +39,17 @@ def _commercial_lead():
     return lead
 
 
+def _confirmed_customer_thread(lead, *, session="sess-nba-confirmed"):
+    """A customer thread whose STR-03 recommendation gate has been satisfied."""
+    from apps.conversations.services import engagement_state, threads as thread_svc
+
+    thread = thread_svc.create_thread(visitor_session=session, lead=lead)
+    thread.relationship_state = engagement_state.REL_CUSTOMER
+    thread.mirror_status = engagement_state.MIRROR_CONFIRMED
+    thread.save(update_fields=["relationship_state", "mirror_status", "updated_at"])
+    return thread
+
+
 def _signals(**overrides) -> dict:
     base = {
         "blocking_support": False,
@@ -166,7 +177,8 @@ def test_the_portal_and_the_cockpit_reach_the_same_primary():
     from apps.journey.services import shell
 
     lead = _commercial_lead()
-    portal = shell.for_subject(lead)["next_best_action"]
+    thread = _confirmed_customer_thread(lead)
+    portal = shell.for_subject(lead, thread=thread)["next_best_action"]
     cockpit = nba_precedence.for_lead(lead, nba_candidates(lead)).to_client_payload()
     assert portal == cockpit
 

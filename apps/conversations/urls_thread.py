@@ -26,6 +26,7 @@ from apps.conversations.views_thread import (
     ThreadPaneView,
     ThreadShellView,
     ThreadTurnsView,
+    ThreadRetryView,
 )
 
 app_name = "threads"
@@ -33,6 +34,7 @@ app_name = "threads"
 urlpatterns = [
     path("", ThreadListCreateView.as_view(), name="thread-list-create"),
     path("<uuid:thread_id>/turns/", ThreadTurnsView.as_view(), name="thread-turns"),
+    path("<uuid:thread_id>/retry/", ThreadRetryView.as_view(), name="thread-retry"),
     path("<uuid:thread_id>/messages/", ThreadMessagesView.as_view(), name="thread-messages"),
     path("<uuid:thread_id>/shell/", ThreadShellView.as_view(), name="thread-shell"),
     # v7.1 Phase 2 — the pane's CONTENTS, authorized separately from its section list.

@@ -25,13 +25,17 @@ def test_qualify_advances_to_diagnosed_and_stamps_value():
     assert result.changed is True
 
 
-def test_reveal_client_page_mints_token():
+def test_reveal_client_page_never_mints_an_unbound_bearer_credential():
     lead = LeadFactory(journey_state="DIAGNOSED")
     result = reveal_client_page(lead)
     lead.refresh_from_db()
     assert lead.journey_state == JourneyState.CLIENT_PAGE
     assert result.reveal["surface"] == "client_page"
-    assert result.reveal["capability_token"]
+    # My Review no longer uses a JWT/bearer URL.  Without a concrete browser/client
+    # thread there is no safe binding, so the reveal fails closed instead of minting a
+    # transferable credential.
+    assert "capability_token" not in result.reveal
+    assert result.reveal["access_code"] is None
 
 
 def test_invalid_transition_raises():

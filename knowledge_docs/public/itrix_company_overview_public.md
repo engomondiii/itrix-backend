@@ -8,9 +8,7 @@ benchmark figures and no performance guarantees.
 
 ## What is itriX?
 
-itriX is a computational infrastructure company. It commercialises patented
-mathematics that changes **the form a computation is expressed in before that
-computation is executed**.
+itriX is a computational infrastructure company. It develops and commercialises computational methods and infrastructure that can change **the form a computation is expressed in before that computation is executed**. The supplied source set identifies Korean patent applications for the core method families; it does not verify granted-patent status.
 
 The one-sentence version: **don't scale inefficient computation — make computation
 worth scaling first.**
@@ -64,14 +62,11 @@ shortage of it. Both are consequences of the shape of the work.
 
 ---
 
-## The Knowledge Core: three patented technologies
+## The Knowledge Core: three technology families with Korean patent applications
 
-itriX holds three granted Korean patents. They are separate inventions with one
-shared thesis: **representation before execution.**
+The supplied authoritative source set identifies three Korean patent applications across the AXIOM, CRE and FQNM technology families. Grant status is not represented as verified in the public Knowledge Core. They share one thesis: **representation before execution.**
 
 ### AXIOM — rearranging algebra
-
-**Patent P260-07KR.**
 
 AXIOM is a mathematical framework for changing the *representation and placement* of
 a computation so that its fit with hardware changes. It works in three movements:
@@ -88,19 +83,16 @@ it rather than its definition.
 
 ### CRE — structure-preserving real embedding
 
-**Patent P253-84KR.**
-
 CRE concerns operators that are naturally expressed over complex numbers. It embeds
 them into a real-valued form in a way that preserves their structure rather than
 approximating it — two values travelling together as one bundle with a rotation,
 instead of two separately-tracked quantities.
 
-CRE supports AXIOM's thesis; it does not replace it. The two are distinct patents
-with distinct claims and should not be collapsed into one name.
+CRE supports AXIOM's thesis; it does not replace it. The two are distinct method families and should not be collapsed into one name.
 
 ### FQNM — conservation as counting
 
-**Patent P253-18KR.** Published as arXiv:2604.06947 (math.NA).
+FQNM is also described in arXiv:2604.06947 (math.NA), an arXiv preprint.
 
 FQNM stands for Fast Quantized Numerical Method. It re-poses conservation-type
 computation as movement between integer states rather than as arithmetic on
@@ -146,39 +138,11 @@ ALPHA Core is not a required runtime/SDK stage after ALPHA Compute and is not a 
 
 The relationship is therefore: **complementary but independent**. ALPHA Compute can be the complete software production solution. ALPHA Core is an optional hardware extension when validated evidence supports deeper hardware integration.
 
-## How itriX engages commercially
+## How a strategic evaluation can progress
 
-### One-Third Value Participation
+A visitor can remain in public or controlled technical evaluation without entering a commercial path. When a person explicitly asks itriX to evaluate a concrete organizational workload or decision, the system can offer a Strategic Customer transition and, if accepted, reflect the problem before recommending a next action.
 
-For validated production value, itriX uses **one-third value participation**: the
-customer retains 67% of Verified Net Advantage and itriX participates in 33%, subject
-to the agreed baseline and contract.
-
-Assessment and proof-of-concept work are separate stages and may carry separately
-agreed fees. Value participation must therefore not be described as meaning that the
-whole engagement has no up-front or pre-production cost; it applies to verified value
-under the commercial agreement.
-
-### The typical path
-
-1. **A non-confidential conversation.** A description of where computational
-   pressure is being felt — cost, latency, energy, stability, memory movement,
-   hardware utilisation, or an architectural ceiling. No confidential technical
-   detail is needed or wanted at this stage.
-2. **A representation review.** ALPHA Compute looks at whether the pressure appears
-   structural rather than cyclical, and where representation might be the leverage.
-3. **An NDA, where the conversation needs to go deeper.** Construction detail,
-   methodology and evaluation design sit behind an NDA — not as a sales gate, but
-   because that is where the patented specifics live.
-4. **A scoped proof of concept.** A defined workload, agreed measurements, and a
-   result that either supports the hypothesis or does not.
-5. **Licensing and integration,** where the PoC supports it.
-
-### Licensing pathways
-
-Non-exclusive, exclusive, and strategic. Which is appropriate depends on the
-workload, the industry, and how central the technology would become to the partner's
-own roadmap.
+Possible later actions are independent decisions rather than a mandatory funnel. Depending on the selected action, evidence and authorization, they may include a controlled evaluation, an agreement-protected technical exchange, a proof of concept, integration work, or a commercial discussion. An NDA protects information that has separately been authorized for disclosure; signing one does not itself create disclosure entitlement. A controlled evaluation is not a PoC unless the customer explicitly chooses a PoC. Commercial terms and rights are established only through the applicable approved or executed agreement.
 
 ---
 
@@ -224,7 +188,7 @@ This distinction is load-bearing, and itriX states it in its own materials.
 - No guaranteed savings, speedups or accuracy improvements.
 - No absolutes: not "always", not "every workload", not "replaces your hardware".
 - No competitor comparisons.
-- No quantitative performance figure outside a validated proof of concept.
+- No quantitative performance figure without workload-specific validated evidence against an appropriate frozen baseline.
 
 The honest framing is conditional throughout: *may*, *in eligible cases*, *subject
 to validation*. This is not hedging for its own sake — a company whose thesis is
@@ -258,21 +222,13 @@ The ALPHA system spans software and, optionally, hardware. ALPHA Compute is soft
 
 **Do I need to share confidential information to start?**
 No. The first conversation is a non-confidential description of where computational
-pressure is being felt. Construction detail and evaluation methodology sit behind an
-NDA, and nothing requires you to disclose a workload to have that first
-conversation.
+pressure is being felt. Construction detail and evaluation methodology are shared only when the applicable disclosure is separately authorized and any required agreement protection is in place. An NDA by itself does not create access, and nothing requires you to disclose a workload to have that first conversation.
 
 **How much faster will my workload run?**
-That question cannot be answered honestly before an evaluation. itriX does not
-publish or promise figures outside a validated proof of concept. Assessment and PoC
-stages may have separately agreed fees; validated production value can then be subject
-to the one-third value-participation model.
+That question cannot be answered honestly before workload-specific validation against a frozen baseline. itriX does not publish or promise workload-specific performance figures without supporting evidence. The appropriate validation form may be a controlled evaluation or, if explicitly selected, a proof of concept; commercial terms are handled separately.
 
 **Is the technology proven?**
-The mathematics is published and patented: three granted Korean patents, a
-peer-reviewable arXiv paper, and a master's thesis. Whether it produces a benefit on
-*your* workload is exactly what a proof of concept is for. itriX separates those two
-statements deliberately and does not let them share a sentence.
+The supplied evidence includes three Korean patent applications, an arXiv preprint and a master's thesis. Those facts do not establish performance on a particular workload. Workload-specific advantage requires an appropriately scoped validation against an agreed baseline; that validation is not automatically a proof of concept.
 
 **Which industries does this apply to?**
 The technology is domain-general, because representation is domain-general. It is
@@ -281,5 +237,4 @@ scale, physics and engineering simulation, semiconductor and memory design,
 autonomy, aerospace, climate and energy modelling, and constrained edge deployment.
 
 **Where do I start?**
-Describe where computation is limiting you, in non-confidential terms. That is
-enough to begin a representation review.
+You can begin by asking any public question or, if you want itriX to evaluate a concrete workload, describe the computational pressure in non-confidential terms. The system will not assume a commercial path from that alone.

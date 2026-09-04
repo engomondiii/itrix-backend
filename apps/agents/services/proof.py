@@ -39,7 +39,7 @@ class ProofAgent(BaseAgent):
         from apps.ai_engine.services.knowledge_retriever import KnowledgeRetriever
         from apps.ai_engine.services.system_prompt_builder import build_system_prompt
 
-        chunks = KnowledgeRetriever().retrieve(ctx.prompt or "proof", namespace="general", top_k=8, context=ctx.retrieval_context)
+        chunks = KnowledgeRetriever().retrieve(ctx.prompt or "proof", namespace="general", top_k=8, context=ctx.retrieval_context, **ctx.knowledge_access_kwargs)
         try:
             system = build_system_prompt(
                 product_route=ctx.product_route, license_pathway=ctx.license_pathway,

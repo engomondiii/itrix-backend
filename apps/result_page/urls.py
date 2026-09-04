@@ -1,7 +1,10 @@
 """Result Page URLs (mounted under /api/v1/result-page/).
 
-    GET  {lead_id}/   PUBLIC
-    POST generate/    JWT
+    GET  {lead_id}/   TEAM only
+    POST generate/    TEAM only
+
+Public My Review access is mounted separately under ``client-page/current/`` and is
+resolved only through a browser-bound server-side access session.
 """
 
 from __future__ import annotations

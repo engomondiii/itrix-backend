@@ -450,22 +450,21 @@ ATTACHMENT_RETENTION_DAYS = int(env("ATTACHMENT_RETENTION_DAYS", "365"))
 # `GET legal/instruments/` and the frontend disagree, `useLegalAssent` warns in development,
 # and `audit_assent` reports it — because the mismatch means every assent being recorded is
 # attached to a version the visitor did not read.
-LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", "1.1")
-LEGAL_TERMS_EFFECTIVE = env("LEGAL_TERMS_EFFECTIVE", "")
-LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", "1.1")
-LEGAL_PRIVACY_EFFECTIVE = env("LEGAL_PRIVACY_EFFECTIVE", "")
-LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.1")
-LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "")
-LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.1")
-LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "")
+LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", "1.2")
+LEGAL_TERMS_EFFECTIVE = env("LEGAL_TERMS_EFFECTIVE", "2026-08-28")
+LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", "1.2")
+LEGAL_PRIVACY_EFFECTIVE = env("LEGAL_PRIVACY_EFFECTIVE", "2026-08-28")
+LEGAL_SECURITY_VERSION = env("LEGAL_SECURITY_VERSION", "1.2")
+LEGAL_SECURITY_EFFECTIVE = env("LEGAL_SECURITY_EFFECTIVE", "2026-08-28")
+LEGAL_DISCLOSURE_VERSION = env("LEGAL_DISCLOSURE_VERSION", "1.2")
+LEGAL_DISCLOSURE_EFFECTIVE = env("LEGAL_DISCLOSURE_EFFECTIVE", "2026-08-28")
+# Compatibility display version used only if an operator deliberately disables publication.
+LEGAL_DRAFT_VERSION = env("LEGAL_DRAFT_VERSION", "1.2")
 
-# Whether counsel has signed the instruments off.
-#
-# DEFAULTS FALSE, and the routes still answer with it false — a visitor must always be able to
-# read what governs their use. What changes is that the payload says `published: false`, and
-# itrix-web renders a draft banner and a noindex. An unreviewed Terms of Service presented as
-# authoritative is worse than a delayed one.
-LEGAL_PUBLISHED = env("LEGAL_PUBLISHED", "False").lower() == "true"
+# v1.2 is the published MVP instrument from 2026-08-28. Deployments may still set this false
+# as an emergency publication kill-switch, but the release default is the effective v1.2 set.
+# Publication is an assent/version fact only; it never changes disclosure authorization.
+LEGAL_PUBLISHED = env("LEGAL_PUBLISHED", "True").lower() == "true"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # v6.0 Phase 3
@@ -751,6 +750,13 @@ ENABLE_PASSWORD_RESET = env_bool("ENABLE_PASSWORD_RESET", True)
 REQUIRE_EMAIL_VERIFICATION = env_bool("REQUIRE_EMAIL_VERIFICATION", True)
 VERIFICATION_TOKEN_TTL_HOURS = int(env("VERIFICATION_TOKEN_TTL_HOURS", "48"))
 RESET_TOKEN_TTL_MINUTES = int(env("RESET_TOKEN_TTL_MINUTES", "60"))
+# Password-reset mail is the one transactional message for which a transient SMTP
+# disconnect leaves the user completely unable to proceed. Retry only transient transport
+# failures, and keep the bound small so an unhealthy mail host cannot tie up request
+# workers indefinitely. Other email kinds keep the sender's one-attempt default.
+PASSWORD_RESET_EMAIL_ATTEMPTS = max(
+    1, min(3, int(env("PASSWORD_RESET_EMAIL_ATTEMPTS", "2") or 2))
+)
 
 # ONE number, and this is the one that binds. Terms §3A, Security §3A and
 # Surface 1 v8.0 §16.7 all state it too; if they ever differ, this is the truth

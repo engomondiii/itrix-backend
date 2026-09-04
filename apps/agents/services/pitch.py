@@ -165,7 +165,7 @@ class PitchAgent(BaseAgent):
         # (§10.5) and are stripped before any client-plane payload.
         persona_room = resolve_persona_room(ctx, ceiling=retrieval_context)
         chunks = KnowledgeRetriever().retrieve(
-            ctx.prompt or pitch_type, namespace=self._namespace(ctx), top_k=8, context=retrieval_context
+            ctx.prompt or pitch_type, namespace=self._namespace(ctx), top_k=8, context=retrieval_context, **ctx.knowledge_access_kwargs
         )
         try:
             system = build_system_prompt(

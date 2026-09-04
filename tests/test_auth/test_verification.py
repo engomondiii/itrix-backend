@@ -142,3 +142,33 @@ def test_an_unconfirmed_account_may_still_sign_in(api_client, settings):
     )
     assert res.status_code == 200
     assert res.data["client"]["emailVerified"] is False
+
+
+def test_anonymous_resend_with_email_really_mints_and_sends(api_client):
+    from unittest.mock import patch
+
+    client = ClientFactory(email="resend-now@example.com")
+    url = reverse("clients:auth-verify-resend")
+
+    with patch("apps.clients.services.verification.send") as send:
+        response = api_client.post(url, {"email": client.email}, format="json")
+
+    assert response.status_code == 202
+    record = EmailVerificationToken.objects.get(client=client, consumed_at__isnull=True)
+    assert record.email == client.email
+    send.assert_called_once()
+
+
+def test_authenticated_resend_can_omit_email(api_client):
+    from unittest.mock import patch
+    from apps.clients.tokens import build_tokens_for_client
+
+    client = ClientFactory(email="resend-auth@example.com")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {build_tokens_for_client(client)['access']}")
+
+    with patch("apps.clients.services.verification.send") as send:
+        response = api_client.post(reverse("clients:auth-verify-resend"), {}, format="json")
+
+    assert response.status_code == 202
+    assert EmailVerificationToken.objects.filter(client=client, consumed_at__isnull=True).exists()
+    send.assert_called_once()

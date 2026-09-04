@@ -135,6 +135,15 @@ def close_qualification_loop(thread, *, reason: str = "") -> bool:
     if _ANON_ORDER.get(getattr(thread, "current_state", "ARRIVED"), 1) >= _ANON_ORDER["DIAGNOSED"]:
         return False
     _mirror_onto_thread(thread, "DIAGNOSED")
+    # STR-03 is a first-class governed artifact, not model prose hidden inside the
+    # next answer. Generate it as soon as the customer qualification loop closes.
+    try:
+        from apps.journey.constants import ARTIFACT_REFLECTION
+        from apps.journey.services import artifacts
+
+        artifacts.generate(thread, ARTIFACT_REFLECTION)
+    except Exception:  # noqa: BLE001
+        logger.exception("reflection artifact generation failed for thread %s", getattr(thread, "id", "?"))
     _emit_anonymous_shell_update(thread)
     return True
 

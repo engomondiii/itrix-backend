@@ -69,6 +69,13 @@ class InviteClaimView(APIView):
             "requiresPasswordSet": requires_password_set,
             **tokens,
         }
+        if requires_password_set:
+            # The invitation has already been verified and consumed. Bridge into the
+            # dedicated password-set capability instead of reusing the invite token for a
+            # second purpose. The BFF stores this value in an httpOnly transient cookie.
+            from apps.clients.services.set_password import issue_set_password_token
+
+            body["setPasswordToken"] = issue_set_password_token(client)
         return Response(body, status=status.HTTP_201_CREATED)
 
 
@@ -91,7 +98,12 @@ from apps.clients.serializers import (  # noqa: E402
     PortalPoCSerializer,
 )
 from apps.clients.services.client_creator import authenticate_client  # noqa: E402
-from apps.clients.tokens import build_tokens_for_client, decode_client_token  # noqa: E402
+from apps.clients.tokens import (  # noqa: E402
+    build_tokens_for_client,
+    decode_client_token,
+    token_matches_current_session,
+)
+from apps.clients.throttles import AUTH_THROTTLES  # noqa: E402
 
 
 def _portal_enabled_response():
@@ -106,6 +118,9 @@ class ClientLoginView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
+    # Credentials use the dedicated per-address + per-IP buckets rather than the broad
+    # API throttle. DRF supplies the real Retry-After header from these classes.
+    throttle_classes = AUTH_THROTTLES
 
     def post(self, request):
         if not getattr(settings, "ENABLE_CLIENT_PORTAL", False):
@@ -144,8 +159,9 @@ class ClientTokenRefreshView(APIView):
         if payload.get("token_type") != "refresh":
             return Response({"detail": "Not a refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
         client = Client.objects.filter(id=payload.get("client_id"), is_active=True).first()
-        if client is None:
-            return Response({"detail": "Client not found."}, status=status.HTTP_401_UNAUTHORIZED)
+        if client is None or not token_matches_current_session(client, payload):
+            # One generic shape for unknown/inactive/revoked session state.
+            return Response({"detail": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(build_tokens_for_client(client), status=status.HTTP_200_OK)
 
 
@@ -278,6 +294,85 @@ class PortalOverviewView(APIView):
         return Response(PortalOverviewSerializer(payload).data)
 
 
+class PortalBriefingView(APIView):
+    """GET portal/briefing/ — a client-safe projection of the current My Review.
+
+    The persisted ResultPage remains the source of truth. This endpoint never regenerates
+    analysis and never returns tier, score, hidden persona, internal source metadata or a
+    commercial pathway. Product recommendation is shown only after the deterministic
+    Problem-Mirror gate permits one.
+    """
+
+    authentication_classes = [ClientJWTAuthentication]
+    permission_classes = [IsAuthenticatedClient]
+
+    def get(self, request):
+        from apps.conversations.models_thread import Thread
+        from apps.conversations.services.engagement_state import recommendation_allowed
+        from apps.result_page.models import ResultPage
+
+        client = request.user
+        result = ResultPage.objects.filter(lead=client.lead).first()
+        if result is None or result.generation_status != ResultPage.GenerationStatus.READY:
+            return Response({"detail": "Briefing is not ready."}, status=status.HTTP_404_NOT_FOUND)
+
+        thread = (
+            Thread.objects.filter(client=client).order_by("-updated_at").first()
+            or Thread.objects.filter(lead=client.lead).order_by("-updated_at").first()
+        )
+        route = getattr(client.lead, "product_route", "general") or "general"
+        if thread is not None and not recommendation_allowed(thread):
+            route = "general"
+        if route not in {"alpha_compute", "alpha_core", "both", "general"}:
+            route = "general"
+
+        sections: list[dict] = []
+        mirror = result.problem_mirror_structured or {}
+        stated = [str(v).strip() for v in (mirror.get("statedFacts") or []) if str(v).strip()]
+        mirror_parts = [*stated]
+        for key in ("affectedDecision", "consequence", "constraints", "evidenceGap", "successCondition"):
+            value = mirror.get(key)
+            if isinstance(value, str) and value.strip():
+                mirror_parts.append(value.strip())
+        if mirror_parts:
+            sections.append({"key": "problem_mirror", "title": "Problem Mirror", "body": " ".join(mirror_parts), "updated": False})
+
+        if result.alpha_fit_summary:
+            sections.append({"key": "alpha_fit", "title": "Current fit", "body": result.alpha_fit_summary, "updated": False})
+
+        if result.diagnosis:
+            parts = []
+            for row in result.diagnosis:
+                if not isinstance(row, dict):
+                    continue
+                text = row.get("observation") or row.get("summary") or row.get("pressure")
+                if text:
+                    parts.append(str(text).strip())
+            if parts:
+                sections.append({"key": "diagnosis", "title": "Diagnosis", "body": " ".join(parts), "updated": False})
+
+        if result.kpi_preview:
+            labels = []
+            for row in result.kpi_preview:
+                if isinstance(row, dict):
+                    label = row.get("label")
+                    metric = row.get("metric")
+                    if label:
+                        labels.append(f"{label}: {metric}" if metric else str(label))
+            if labels:
+                sections.append({"key": "kpis", "title": "What to measure", "body": "; ".join(labels), "updated": False})
+
+        return Response({
+            "productRoute": route,
+            # Commercial/legal pathway is intentionally absent until a separately governed
+            # contract flow has an authoritative basis.
+            "licensePathway": None,
+            "sections": sections,
+            "lastUpdated": result.generated_at,
+            "updatedNotice": False,
+        })
+
+
 class PortalConversationListView(APIView):
     """GET portal/conversations/ — CLIENT. The client's conversation threads."""
 
@@ -390,39 +485,71 @@ class PortalConversationMessagesView(APIView):
 
 
 class PortalDocumentsView(APIView):
-    """GET portal/documents/ — CLIENT. NDA-aware data room."""
+    """GET portal/documents/ — CLIENT. Authorization-aware data room.
+
+    An NDA is displayed as protection state, never as the permission itself. Restricted
+    documents unlock only when this client has an active explicit ContentAuthorization
+    and any required agreement prerequisite is also satisfied.
+    """
 
     authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request):
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from apps.knowledge_core.models import ContentAuthorization, KnowledgeDocument
+
         client = request.user
-        nda = client.nda_signed
-        # Public materials are always available; NDA-only materials unlock post-signature.
-        # Grouped into the folder shape the Documents screen renders (see the
-        # serializer's SHAPE FIX note): open folders always show, data-room folders
-        # carry the locked flag until the NDA is signed.
-        open_folders = [
-            {
-                "folder": "Overview",
-                "documents": [
-                    {"title": "itriX overview", "disclosure": "public", "href": "", "locked": False},
-                    {"title": "ALPHA approach summary", "disclosure": "controlled_public", "href": "", "locked": False},
-                ],
+        now = timezone.now()
+        authorized_ids = set(
+            ContentAuthorization.objects.filter(
+                subject_kind=ContentAuthorization.SubjectKind.CLIENT,
+                subject_id=str(client.id),
+                active=True,
+            )
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+            .values_list("document_id", flat=True)
+        )
+
+        docs = list(
+            KnowledgeDocument.objects.filter(is_current=True)
+            .exclude(disclosure_level__in=["internal_only", "prohibited", "customer_contract"])
+            .order_by("namespace", "title")
+        )
+        open_docs = []
+        restricted_docs = []
+        for doc in docs:
+            level = doc.disclosure_level
+            row = {
+                "title": doc.title,
+                "disclosure": level,
+                "href": "",
+                "locked": False,
             }
-        ]
-        data_room_folders = [
-            {
-                "folder": "Technical materials",
-                "documents": [
-                    {"title": "Technical deep-dive", "disclosure": "nda_only", "href": "", "locked": not nda},
-                    {"title": "Evaluation methodology", "disclosure": "nda_only", "href": "", "locked": not nda},
-                ],
-            }
-        ]
+            if level in {"public", "controlled_public"}:
+                open_docs.append(row)
+                continue
+            explicitly_authorized = doc.id in authorized_ids
+            agreement_ok = level != "nda_only" or bool(client.nda_signed)
+            row["locked"] = not (explicitly_authorized and agreement_ok)
+            restricted_docs.append(row)
+
+        open_folders = [{"folder": "Available materials", "documents": open_docs}]
+        data_room_folders = [{"folder": "Authorized materials", "documents": restricted_docs}]
+        # This is the only client-plane data-room unlock bit. It is derived from
+        # explicit per-document authorization (plus any agreement prerequisite),
+        # never from account, email-verification, journey or NDA state alone.
+        data_room_authorized = any(not row["locked"] for row in restricted_docs)
         return Response(
             PortalDataRoomSerializer(
-                {"ndaSigned": nda, "openFolders": open_folders, "dataRoomFolders": data_room_folders}
+                {
+                    "ndaSigned": bool(client.nda_signed),
+                    "dataRoomAuthorized": data_room_authorized,
+                    "openFolders": open_folders,
+                    "dataRoomFolders": data_room_folders,
+                }
             ).data
         )
 
@@ -573,8 +700,9 @@ class PortalNdaRequestView(APIView):
     INBOX_BODY = (
         "Thank you — we have your request for an NDA. The itriX team will prepare it "
         "and send it to the address on your account for signature. You will see it "
-        "here in your inbox as well, so you can keep an eye on either. Once it is "
-        "signed and countersigned, your confidential data room opens automatically."
+        "here in your inbox as well, so you can keep an eye on either. Signing the NDA "
+        "protects later confidential exchange; access to restricted material is granted "
+        "separately when that specific material is authorized."
     )
 
     def post(self, request):
@@ -694,11 +822,9 @@ class PortalTeamInviteView(APIView):
         delivery_enabled = bool(getattr(settings, "ENABLE_EMAIL_DELIVERY", False))
         if delivery_enabled and mail.status != EmailLog.Status.SENT:
             logger.error(
-                "portal.team_invite delivery failed client=%s email=%s log=%s error=%s",
+                "portal.team_invite delivery failed client=%s mail_log=%s",
                 client.id,
-                email,
                 mail.id,
-                mail.error,
             )
             return Response(
                 {"detail": "We could not send that invitation. Please try again."},
@@ -739,6 +865,7 @@ class PortalNextBestActionView(APIView):
     them would surface a commercial deliberation they never asked to be part of.
     """
 
+    authentication_classes = [ClientJWTAuthentication]
     permission_classes = [IsAuthenticatedClient]
 
     def get(self, request):

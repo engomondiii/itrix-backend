@@ -14,6 +14,7 @@ is only exercised for legacy / email-only invites.
 from __future__ import annotations
 
 import logging
+import secrets
 
 from django.db import transaction
 from django.utils import timezone
@@ -25,6 +26,23 @@ logger = logging.getLogger("itrix")
 
 class SetPasswordError(Exception):
     """Raised when a set-password token is invalid, expired, or already used."""
+
+
+@transaction.atomic
+def issue_set_password_token(client: Client, *, ttl_hours: int = 1) -> str:
+    """Mint/rotate a narrow first-time password capability for a proven invite claim.
+
+    This is deliberately a distinct credential from the invitation token. Calling it is
+    appropriate only *after* the invitation has been validated and consumed.
+    """
+    credential, _ = ClientCredential.objects.select_for_update().get_or_create(client=client)
+    if credential.has_password:
+        raise SetPasswordError("This account already has a password.")
+    token = secrets.token_urlsafe(32)
+    credential.set_password_token = token
+    credential.set_password_expires_at = timezone.now() + timezone.timedelta(hours=ttl_hours)
+    credential.save(update_fields=["set_password_token", "set_password_expires_at", "updated_at"])
+    return token
 
 
 @transaction.atomic
@@ -62,6 +80,11 @@ def set_password_with_token(token: str, password: str) -> Client:
     if not client.is_active:
         raise SetPasswordError("This account is not active.")
 
+    from apps.clients.services.session_invalidation import invalidate_other_sessions
+
+    # Any temporary access minted during the invite claim is now stale. The response
+    # mints a fresh pair after this function returns.
+    invalidate_other_sessions(client)
     client.last_login_at = timezone.now()
     client.save(update_fields=["last_login_at", "updated_at"])
     logger.info("Client %s set password via token", client.id)

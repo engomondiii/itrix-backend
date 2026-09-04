@@ -9,6 +9,7 @@ from apps.review.views import (
     QualifyView,
     ReviewChatView,
     ReviewSessionCreateView,
+    ReviewResultStatusView,
 )
 
 app_name = "review"
@@ -24,6 +25,11 @@ urlpatterns = [
         "sessions/<uuid:session_id>/qualify/",
         QualifyView.as_view(),
         name="qualify",
+    ),
+    path(
+        "sessions/<uuid:session_id>/result-status/",
+        ReviewResultStatusView.as_view(),
+        name="result-status",
     ),
     path(
         "sessions/<uuid:session_id>/chat/",

@@ -64,6 +64,17 @@ class AssentRecord(BaseModel):
     # [{"slug": "terms", "version": "1.1", "effective": "2026-08-01"}, ...]
     # THE VERSIONS THE VISITOR WAS SHOWN — not the versions current at query time.
     instruments = models.JSONField(default=list)
+    # A development/counsel-review acknowledgement is evidence of what was shown, not
+    # an assertion that the draft was effective. Publication later forces a fresh assent.
+    instrument_status = models.CharField(
+        max_length=24,
+        choices=[
+            ("draft_acknowledgement", "Draft acknowledgement"),
+            ("published_assent", "Published-instrument assent"),
+        ],
+        default="published_assent",
+        db_index=True,
+    )
 
     path = models.CharField(
         max_length=24, choices=Path.choices, default=Path.INVITE_CLAIM, db_index=True

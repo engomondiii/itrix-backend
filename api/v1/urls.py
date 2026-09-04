@@ -27,7 +27,12 @@ from apps.agents.views import (
     ConsoleConversationListView,
     ConsoleMessageView,
 )
-from apps.result_page.views import ResultPageClientChatView, ResultPageClientView
+from apps.result_page.views import (
+    LegacyResultPageTokenView,
+    ResultPageAccessExchangeView,
+    ResultPageClientChatView,
+    ResultPageClientView,
+)
 
 
 def api_index(_request):
@@ -80,7 +85,7 @@ def api_index(_request):
                 "analytics-pitch",
                 "settings",
             ],
-            "public_groups": ["visitors", "review", "ai", "result-page", "lead-capture", "client-page", "accounts"],
+            "public_groups": ["visitors", "review", "ai", "lead-capture", "client-page", "accounts"],
         }
     )
 
@@ -97,8 +102,12 @@ urlpatterns = [
     path("agents/", include("apps.agents.urls")),           # TEAM (partial: run, behind ENABLE_AGENTS)
     path("", include("apps.clients.urls")),                 # PUBLIC invite claim + CLIENT auth/portal/*
     # ── Phase 2 (v4.0) — Conversation, Realtime & Client Portal ──────────────
-    path("client-page/<str:token>/chat/", ResultPageClientChatView.as_view(), name="client-page-chat"),  # PUBLIC token
-    path("client-page/<str:token>/", ResultPageClientView.as_view(), name="client-page"),                # PUBLIC token
+    path("client-page/access/exchange/", ResultPageAccessExchangeView.as_view(), name="client-page-access-exchange"),
+    path("client-page/current/chat/", ResultPageClientChatView.as_view(), name="client-page-chat"),
+    path("client-page/current/", ResultPageClientView.as_view(), name="client-page-current"),
+    # Old JWT-in-URL links are deliberately retired rather than silently accepted.
+    path("client-page/<str:token>/chat/", LegacyResultPageTokenView.as_view(), name="client-page-chat-legacy"),
+    path("client-page/<str:token>/", LegacyResultPageTokenView.as_view(), name="client-page-legacy"),
     path("conversations/", include("apps.conversations.urls")),   # TEAM console reads
     # ── Phase 1 (v6.0) — the conversation spine ──────────────────────────────
     path("threads/", include("apps.conversations.urls_thread")),  # PUBLIC session-scoped
@@ -125,7 +134,7 @@ urlpatterns = [
     path("cockpit/leads/<uuid:lead_id>/", CockpitLeadView.as_view(), name="cockpit-lead"),
     # ── Phase 2 — Intelligence Core ──────────────────────────────────────────
     path("ai/", include("apps.ai_engine.urls")),                          # PUBLIC generate-result
-    path("result-page/", include("apps.result_page.urls")),              # public GET + JWT generate
+    path("result-page/", include("apps.result_page.urls")),              # TEAM-only result administration
     path(
         "lead-capture/email/",
         LeadEmailCaptureView.as_view(),

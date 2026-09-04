@@ -32,9 +32,16 @@ def test_prohibited_language_is_scrubbed():
     assert "guarantee" not in d.text.lower()
 
 
-def test_alpha_core_canonical_wording_enforced():
+def test_product_definitions_are_not_rewritten_to_legacy_alpha_core_wording():
+    """Product doctrine is source-governed, not hard-coded in the language scrubber.
+
+    The retired Appendix-B substitution rewrote any ALPHA Core sentence to the obsolete
+    ``table-free index-ordered algebraic execution`` phrase.  Current architecture keeps
+    factual product boundaries in the governed prompt / authorized source layer instead,
+    so the claim checker must not silently manufacture that legacy definition.
+    """
     d = check("ALPHA Core uses a lookup table execution model.", claim_level=1)
-    assert "table-free index-ordered algebraic execution" in d.text
+    assert "table-free index-ordered algebraic execution" not in d.text
 
 
 def test_benchmark_claim_forced_to_human_review():

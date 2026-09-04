@@ -7,16 +7,6 @@ from apps.leads.models import ASTOPEngagement
 from apps.leads.services.lo_terms import customer_safe_lo_summary
 
 
-def _ttfv_seconds(record: ASTOPEngagement | None) -> int | None:
-    if record is None:
-        return None
-    start = record.authorized_install_at
-    end = record.reproducible_value_at
-    if start is None or end is None or end < start:
-        return None
-    return int((end - start).total_seconds())
-
-
 def _verified_value_status(record: ASTOPEngagement | None) -> str:
     if record is None or not record.has_verified_value:
         return "not_verified"
@@ -51,7 +41,9 @@ def snapshot(client) -> dict:
     return {
         "customerSuccessActive": overlay.is_active(client),
         "astopStage": record.stage if record else "",
-        "ttfvSeconds": _ttfv_seconds(record),
+        # Canonical model semantics deliberately return None for incomplete or invalid
+        # timestamp ordering. Never turn an invalid negative interval into customer-visible 0.
+        "ttfvSeconds": record.ttfv_seconds if record else None,
         "verifiedValue": bool(record and record.has_verified_value),
         "verifiedValueStatus": _verified_value_status(record),
         "support": {

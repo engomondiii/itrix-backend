@@ -340,11 +340,21 @@ class ASTOPEngagement(BaseModel):
         ordering = ["-updated_at"]
 
     @property
+    def ttfv_status(self) -> str:
+        """Internal validity signal for time-to-first-value timestamp ordering."""
+        if self.authorized_install_at is None or self.reproducible_value_at is None:
+            return "unavailable"
+        if self.reproducible_value_at < self.authorized_install_at:
+            return "invalid"
+        return "valid"
+
+    @property
     def ttfv_seconds(self):
-        if not self.authorized_install_at or not self.reproducible_value_at:
+        """Elapsed seconds only for complete, correctly ordered timestamps."""
+        if self.ttfv_status != "valid":
             return None
         delta = self.reproducible_value_at - self.authorized_install_at
-        return max(0, int(delta.total_seconds()))
+        return int(delta.total_seconds())
 
     @property
     def has_verified_value(self) -> bool:

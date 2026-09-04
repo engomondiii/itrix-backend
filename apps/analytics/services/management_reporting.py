@@ -111,21 +111,19 @@ def _trust_summary(leads: list[Lead]) -> dict:
 
 
 def _valid_ttfv_seconds(records: list[ASTOPEngagement]) -> list[int]:
-    values: list[int] = []
-    for record in records:
-        start = record.authorized_install_at
-        end = record.reproducible_value_at
-        if start is None or end is None or end < start:
-            continue
-        values.append(int((end - start).total_seconds()))
-    return values
+    # TTFV truth lives on ASTOPEngagement. Reporting must not reimplement timestamp math
+    # and accidentally diverge from the customer/workspace semantics.
+    return [value for record in records if (value := record.ttfv_seconds) is not None]
 
 
 def _ttfv_summary(records: list[ASTOPEngagement]) -> dict:
     values = _valid_ttfv_seconds(records)
+    validity = Counter(record.ttfv_status for record in records)
     if not values:
         return {
             "validRecordCount": 0,
+            "invalidRecordCount": validity.get("invalid", 0),
+            "unavailableRecordCount": validity.get("unavailable", 0),
             "averageSeconds": None,
             "medianSeconds": None,
             "minSeconds": None,
@@ -133,6 +131,8 @@ def _ttfv_summary(records: list[ASTOPEngagement]) -> dict:
         }
     return {
         "validRecordCount": len(values),
+        "invalidRecordCount": validity.get("invalid", 0),
+        "unavailableRecordCount": validity.get("unavailable", 0),
         "averageSeconds": round(sum(values) / len(values), 2),
         "medianSeconds": median(values),
         "minSeconds": min(values),

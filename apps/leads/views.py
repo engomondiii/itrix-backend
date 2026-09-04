@@ -367,24 +367,18 @@ class LeadViewSet(
 
     @action(detail=True, methods=["post"], url_path="astop", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
     def astop(self, request, pk=None):
+        from apps.leads.services.commercial_progression import apply_astop_progress
+        from rest_framework.exceptions import ValidationError
+
         lead = self.get_object()
         ser = ASTOPProgressSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         values = dict(ser.validated_data)
         stage = values.pop("stage")
-        record, _ = ASTOPEngagement.objects.get_or_create(lead=lead)
-        for field, value in values.items():
-            setattr(record, field, value)
-        record.stage = stage
-        # Production entitlement is impossible without an executed License-Out.
-        production_requested = stage == "verify_expand" or bool(str(values.get("entitlement_status") or "").strip())
-        if production_requested and not record.lo_executed_at:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({"stage": "An executed License-Out is required before production entitlement or Verify & Expand."})
-        record.save()
-        lead.current_marketing_stage = CommercialStage.ASTOP
-        lead.commercial_progress = {**(lead.commercial_progress or {}), "astop_stage": stage, "astop_verified_value_gate": record.has_verified_value}
-        lead.save(update_fields=["current_marketing_stage", "commercial_progress", "updated_at"])
+        try:
+            apply_astop_progress(lead, stage=stage, values=values)
+        except ValueError as exc:
+            raise ValidationError({"gate": str(exc)}) from exc
         return self._detail_response(lead)
 
     @action(detail=True, methods=["post"], url_path="alpha-assessment", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])

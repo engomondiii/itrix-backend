@@ -310,6 +310,22 @@ class ASTOPProgressSerializer(serializers.Serializer):
     verified_value = serializers.JSONField(required=False)
     expansion = serializers.JSONField(required=False)
 
+    def validate(self, attrs):
+        object_fields = (
+            "qualification_context", "evaluation_scope", "baseline", "decision_fidelity",
+            "measured_savings", "estimated_savings", "evaluation_result", "security_result",
+            "integration_feasibility", "lo_scope", "verified_value", "expansion",
+        )
+        for field in object_fields:
+            if field in attrs and not isinstance(attrs[field], dict):
+                raise serializers.ValidationError({field: "Expected a JSON object."})
+        for field in ("measured_savings", "estimated_savings"):
+            if field in attrs and "value" not in attrs[field]:
+                raise serializers.ValidationError(
+                    {field: "Savings evidence must include an explicit value (which may be null)."}
+                )
+        return attrs
+
 
 class AlphaAssessmentSerializer(serializers.Serializer):
     separate_workload = serializers.CharField()

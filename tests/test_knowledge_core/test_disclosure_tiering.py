@@ -88,3 +88,20 @@ def test_noncurrent_astop_pricing_chunk_cannot_be_retrieved(db):
         candidate_levels={"public"}, audience="visitor", journey_stage="PUBLIC-SAFE", claim_ceiling=2,
     )
     assert rows == []
+
+
+def test_journey_states_map_to_knowledge_disclosure_stages():
+    from apps.ai_engine.services.knowledge_retriever import _stage_allowed
+
+    assert _stage_allowed(["PUBLIC-SAFE"], "ARRIVED")
+    assert _stage_allowed(["PUBLIC-SAFE"], "IN_REVIEW")
+    assert _stage_allowed(["PUBLIC-SAFE"], "DIAGNOSED")
+    assert _stage_allowed(["QUALIFIED"], "INVITED")
+    assert _stage_allowed(["NDA"], "NDA_REVIEW")
+    assert _stage_allowed(["EVALUATION"], "ASSESSMENT")
+    assert _stage_allowed(["EVALUATION"], "POC")
+    assert _stage_allowed(["EVALUATION"], "INTEGRATION")
+    assert _stage_allowed(["LICENSED"], "CUSTOMER_SUCCESS")
+
+    assert not _stage_allowed(["NDA"], "ARRIVED")
+    assert not _stage_allowed(["LICENSED"], "INTEGRATION")

@@ -101,11 +101,38 @@ def _audience_allowed(values: list[str], audience: str) -> bool:
     return "all" in values or "general" in values or (audience or "general").lower() in values
 
 
+_JOURNEY_TO_KNOWLEDGE_STAGE = {
+    "ARRIVED": "PUBLIC-SAFE",
+    "IN_REVIEW": "PUBLIC-SAFE",
+    "DIAGNOSED": "PUBLIC-SAFE",
+    "CLIENT_PAGE": "PUBLIC-SAFE",
+    "INVITED": "QUALIFIED",
+    "NDA_REVIEW": "NDA",
+    "ASSESSMENT": "EVALUATION",
+    "POC": "EVALUATION",
+    "INTEGRATION": "EVALUATION",
+    "CUSTOMER_SUCCESS": "LICENSED",
+    "DORMANT": "PUBLIC-SAFE",
+    # Read-side compatibility only.
+    "CLIENT": "NDA",
+    "ENGAGED": "EVALUATION",
+}
+
+
+def _knowledge_stage(journey_stage: str) -> str:
+    raw = (journey_stage or "").strip().upper()
+    if not raw:
+        return ""
+    if raw in {"PUBLIC-SAFE", "QUALIFIED", "NDA", "EVALUATION", "LICENSED"}:
+        return raw.lower()
+    return _JOURNEY_TO_KNOWLEDGE_STAGE.get(raw, raw).lower()
+
+
 def _stage_allowed(values: list[str], journey_stage: str) -> bool:
     values = [str(v).strip().lower() for v in (values or []) if str(v).strip()]
     if not values:
         return True
-    stage = (journey_stage or "").strip().lower()
+    stage = _knowledge_stage(journey_stage)
     return bool(stage and (stage in values or "all" in values))
 
 

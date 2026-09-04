@@ -151,6 +151,56 @@ class PortalDataRoomSerializer(serializers.Serializer):
     ndaDiscussionReason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class CustomerSafeVerifiedValueField(serializers.JSONField):
+    """Fail closed on internal ASTOP verified-value/economic metadata.
+
+    The portal view historically passed the raw ``ASTOPEngagement.verified_value`` JSON.
+    That record may now carry cost-basis, assumptions and provenance for governed economic
+    translation. Those are internal evidence, not a customer serialization contract.
+    """
+
+    def to_representation(self, value):
+        if not isinstance(value, dict):
+            return {}
+
+        # A deliberately prepared customer-safe projection may pass through, but only the
+        # documented public keys survive. This keeps measured and estimated states explicit.
+        if "technical" in value or "economic" in value:
+            technical = value.get("technical") if isinstance(value.get("technical"), dict) else {}
+            economic = value.get("economic") if isinstance(value.get("economic"), dict) else {}
+            safe_technical = {}
+            for kind in ("measured", "estimated"):
+                item = technical.get(kind) if isinstance(technical.get(kind), dict) else {}
+                safe_technical[kind] = {
+                    "sourceMeasurement": item.get("sourceMeasurement"),
+                    "available": bool(item.get("available")),
+                    "value": item.get("value") if item.get("available") else None,
+                }
+            return {
+                "verified": bool(value.get("verified")),
+                "technical": safe_technical,
+                "economic": {
+                    "status": economic.get("status") or "UNAVAILABLE",
+                    "verified": bool(economic.get("verified")),
+                    "sourceMeasurement": economic.get("sourceMeasurement"),
+                    "value": economic.get("value"),
+                    "currency": economic.get("currency"),
+                    "unit": economic.get("unit"),
+                    "claimScope": economic.get("claimScope"),
+                },
+            }
+
+        # Legacy/raw record: expose only the high-level status/basis. Never serialize an
+        # embedded economic_translation, provenance, assumptions or internal cost basis.
+        result = {}
+        for key in ("status", "basis"):
+            scalar = value.get(key)
+            if isinstance(scalar, (str, int, float, bool)) or scalar is None:
+                if scalar is not None:
+                    result[key] = scalar
+        return result
+
+
 class PortalEvaluationSerializer(serializers.Serializer):
     exists = serializers.BooleanField()
     kind = serializers.CharField(default="alpha_compute")
@@ -159,7 +209,7 @@ class PortalEvaluationSerializer(serializers.Serializer):
     kpis = serializers.ListField(child=serializers.DictField(), default=list)
     reportHref = serializers.CharField(allow_blank=True)
     ttfvSeconds = serializers.IntegerField(required=False, allow_null=True, default=None)
-    verifiedValue = serializers.JSONField(required=False, default=dict)
+    verifiedValue = CustomerSafeVerifiedValueField(required=False, default=dict)
     customerFeeStatus = serializers.CharField(required=False, allow_blank=True, default="")
     finalAssessmentFee = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True, default=None)
     # Customer-safe LO projection only. Internal economics, provenance and audit terms

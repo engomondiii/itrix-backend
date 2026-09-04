@@ -19,6 +19,7 @@ from apps.leads.services.commercial_progression import (
     alpha_core_gate,
     controlled_evaluation_proof_gate,
 )
+from apps.leads.services.verified_value_economics import evaluate_economic_translation
 from apps.visitors.models import VisitorSession
 
 
@@ -151,6 +152,15 @@ def _governed_measured_value(record: ASTOPEngagement) -> bool:
     return controlled_evaluation_proof_gate(record).allowed
 
 
+def _economic_translation_summary(records: list[ASTOPEngagement]) -> dict:
+    statuses = Counter(evaluate_economic_translation(record).status for record in records)
+    return {
+        "measured": statuses.get("MEASURED", 0),
+        "estimated": statuses.get("ESTIMATED", 0),
+        "unavailable": statuses.get("UNAVAILABLE", 0),
+    }
+
+
 def _astop_summary(records: list[ASTOPEngagement]) -> dict:
     stage_counts = Counter(record.stage for record in records)
     qualified_stages = {
@@ -193,6 +203,7 @@ def _astop_summary(records: list[ASTOPEngagement]) -> dict:
         "evaluationToLoConversionRate": _rate(lo_reached, evaluated),
         "verifiedValueCount": sum(record.has_verified_value for record in records),
         "governedMeasuredValueCount": sum(_governed_measured_value(record) for record in records),
+        "economicTranslation": _economic_translation_summary(records),
         "ttfv": _ttfv_summary(records),
         "expansion": {
             "count": expansion_count,
@@ -335,6 +346,7 @@ def summary() -> dict:
             "ttfv": astop["ttfv"],
             "verifiedValueCount": astop["verifiedValueCount"],
             "governedMeasuredValueCount": astop["governedMeasuredValueCount"],
+            "economicTranslation": astop["economicTranslation"],
             "deploymentEntitlement": entitlements,
             "expansion": astop["expansion"],
         },

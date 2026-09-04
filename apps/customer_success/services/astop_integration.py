@@ -5,6 +5,7 @@ from apps.customer_success.models import SupportRequest
 from apps.customer_success.services import overlay
 from apps.leads.models import ASTOPEngagement
 from apps.leads.services.lo_terms import customer_safe_lo_summary
+from apps.leads.services.verified_value_economics import customer_safe_verified_value
 
 
 def _verified_value_status(record: ASTOPEngagement | None) -> str:
@@ -46,6 +47,7 @@ def snapshot(client) -> dict:
         "ttfvSeconds": record.ttfv_seconds if record else None,
         "verifiedValue": bool(record and record.has_verified_value),
         "verifiedValueStatus": _verified_value_status(record),
+        "verifiedValueSummary": customer_safe_verified_value(record),
         "support": {
             "openCount": open_support.count(),
             "blockingOpenCount": blocking_open.count(),

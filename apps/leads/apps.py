@@ -10,3 +10,8 @@ class LeadsConfig(AppConfig):
     name = "apps.leads"
     label = "leads"
     verbose_name = "Leads"
+
+    def ready(self):
+        # Register only synchronization signals for existing ASTOP/Evaluation records.
+        # No new lifecycle is introduced; authoritative writes remain in their services.
+        from apps.leads import signals_progression  # noqa: F401

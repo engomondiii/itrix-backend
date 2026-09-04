@@ -5,6 +5,7 @@ from apps.customer_success.models import SupportRequest
 from apps.customer_success.services import overlay
 from apps.leads.models import ASTOPEngagement
 from apps.leads.services.lo_terms import customer_safe_lo_summary
+from apps.leads.services.progression_state import customer_safe_progression_state
 from apps.leads.services.verified_value_economics import customer_safe_verified_value
 
 
@@ -26,6 +27,7 @@ def snapshot(client) -> dict:
     """Return ASTOP facts useful to Customer Success without internal commercial detail."""
     record = ASTOPEngagement.objects.filter(lead=client.lead).first()
     lo = customer_safe_lo_summary(record)
+    progression = customer_safe_progression_state(client.lead)
     support = SupportRequest.objects.filter(client=client)
     open_support = support.exclude(status=SupportRequest.Status.RESOLVED)
     blocking_open = open_support.filter(blocking=True)
@@ -48,6 +50,8 @@ def snapshot(client) -> dict:
         "verifiedValue": bool(record and record.has_verified_value),
         "verifiedValueStatus": _verified_value_status(record),
         "verifiedValueSummary": customer_safe_verified_value(record),
+        "governedProgression": progression,
+        "governedNextBestAction": progression["nextBestAction"],
         "support": {
             "openCount": open_support.count(),
             "blockingOpenCount": blocking_open.count(),

@@ -19,6 +19,7 @@ from apps.leads.services.commercial_progression import (
     alpha_core_gate,
     controlled_evaluation_proof_gate,
 )
+from apps.leads.services.progression_state import derive_progression_state
 from apps.leads.services.verified_value_economics import evaluate_economic_translation
 from apps.visitors.models import VisitorSession
 
@@ -108,6 +109,19 @@ def _trust_summary(leads: list[Lead]) -> dict:
         "screenedLeads": screened,
         "screeningCoverageRate": _rate(screened, len(leads)),
         "passRateAmongScreened": _rate(counts.get(TrustStatus.PASS, 0), screened),
+    }
+
+
+def _progression_summary(leads: list[Lead]) -> dict:
+    states = [derive_progression_state(lead) for lead in leads]
+    stage_counts = Counter(state.current_marketing_stage for state in states)
+    action_counts = Counter(state.next_best_action for state in states)
+    return {
+        "byMarketingStage": dict(sorted(stage_counts.items())),
+        "byNextBestAction": dict(sorted(action_counts.items())),
+        "astopVerifiedGatePass": sum(state.astop_verified_value_gate for state in states),
+        "alphaComputeGatePass": sum(state.alpha_compute_gate for state in states),
+        "alphaCoreGatePass": sum(state.alpha_core_gate for state in states),
     }
 
 
@@ -322,6 +336,7 @@ def _alpha_core_summary(evaluations: list[Evaluation]) -> dict:
         "qualifiedCoreOpportunities": pass_count,
         "gatePass": pass_count,
         "gateFail": fail_count,
+        "openedOpportunities": sum(evaluation.pkg == EvaluationPackage.CORE for evaluation in evaluations),
     }
 
 
@@ -338,6 +353,7 @@ def summary() -> dict:
     return {
         "acquisition": _acquisition_summary(leads),
         "trust": _trust_summary(leads),
+        "progression": _progression_summary(leads),
         "astop": astop,
         "alphaCompute": _alpha_compute_summary(evaluations, astop_records),
         "alphaCore": _alpha_core_summary(evaluations),
@@ -351,8 +367,7 @@ def summary() -> dict:
             "expansion": astop["expansion"],
         },
         "dependencies": {
-            "alphaCoreOpenedOpportunities": "P1-7: no authoritative Core opportunity-opening record exists yet.",
             "closedAstopHistoricalConversions": "ASTOPEngagement stores current stage only; closed rows cannot reconstruct prior funnel stages.",
-            "explicitAiNoWaiverEvents": "ai_waiver_decision=none is also the schema default, so it cannot distinguish an explicit no-waiver decision from an untouched assessment.",
+            "explicitAiNoWaiverEvents": "ai_waiver_decision=none is also the schema default, so it cannot distinguish an explicit no-waiver decision from an untouched assessment without consulting its audit activity.",
         },
     }

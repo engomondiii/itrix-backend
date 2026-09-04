@@ -77,6 +77,14 @@ class VisitorSession(BaseModel):
     )
     landing_path = models.CharField(max_length=512, blank=True, default="")
 
+    # v2.3/v3.5 — privacy-conscious acquisition attribution. These fields record
+    # how an anonymous visitor reached itriX without creating a separate marketing
+    # database or changing disclosure rights. They are internal analytics context.
+    source_channel = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    campaign_content = models.CharField(max_length=160, blank=True, default="")
+    referral_or_intro = models.CharField(max_length=255, blank=True, default="")
+    problem_topic = models.CharField(max_length=160, blank=True, default="")
+
     room_entry_count = models.PositiveIntegerField(default=0)
     last_seen_at = models.DateTimeField(auto_now=True)
 

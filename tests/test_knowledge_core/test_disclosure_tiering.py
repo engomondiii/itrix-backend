@@ -51,6 +51,40 @@ def test_superseded_product_doctrine_is_explicitly_excluded_from_registration():
         "alpha_core_problemology_public.md",
         "Brand Story of itriX.docx",
         "WP_Alpha Compute Core.docx",
+        "README_Astop.txt",
     }
     assert stale <= SUPERSEDED_FILENAMES
 
+
+
+def test_september_astop_sources_exist_in_the_governed_source_set():
+    assert (KNOWLEDGE_DOCS / "internal_only" / "ASTOP_Productization_GTM_Plan_v2.3.docx").exists()
+    assert (KNOWLEDGE_DOCS / "internal_only" / "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx").exists()
+    assert (KNOWLEDGE_DOCS / "internal_only" / "itriX_White_Paper_v3.5.docx").exists()
+    assert (KNOWLEDGE_DOCS / "controlled_public" / "prism-paper-current_v2.pdf").exists()
+    assert (KNOWLEDGE_DOCS / "public" / "astop_prism_public_safe_v2_3.md").exists()
+
+
+def test_noncurrent_astop_pricing_chunk_cannot_be_retrieved(db):
+    from apps.ai_engine.services.knowledge_retriever import _keyword_fallback
+    from apps.knowledge_core.models import KnowledgeChunk, KnowledgeDocument
+
+    stale = KnowledgeDocument.objects.create(
+        title="Legacy ASTOP Team pricing",
+        file_path="knowledge_docs/internal_only/legacy_astop_pricing.md",
+        namespace="astop",
+        disclosure_level="public",
+        source_authority="legacy",
+        is_current=False,
+        permitted_paraphrase="approved",
+    )
+    KnowledgeChunk.objects.create(
+        document=stale, namespace="astop", disclosure_level="public", chunk_index=0,
+        text="ASTOP Team costs $99/month and can be purchased by public checkout.",
+    )
+
+    rows = _keyword_fallback(
+        "What does ASTOP cost?", namespaces=("astop",), top_k=8,
+        candidate_levels={"public"}, audience="visitor", journey_stage="PUBLIC-SAFE", claim_ceiling=2,
+    )
+    assert rows == []

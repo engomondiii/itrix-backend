@@ -144,13 +144,24 @@ class PortalDataRoomSerializer(serializers.Serializer):
     dataRoomAuthorized = serializers.BooleanField()
     openFolders = PortalDocumentFolderSerializer(many=True)
     dataRoomFolders = PortalDocumentFolderSerializer(many=True)
+    ndaContextPresent = serializers.BooleanField(default=False)
+    ndaProblemContext = serializers.CharField(required=False, allow_blank=True, default="")
+    ndaWorkloadContext = serializers.CharField(required=False, allow_blank=True, default="")
+    ndaDesiredOutcome = serializers.CharField(required=False, allow_blank=True, default="")
+    ndaDiscussionReason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class PortalEvaluationSerializer(serializers.Serializer):
     exists = serializers.BooleanField()
+    kind = serializers.CharField(default="alpha_compute")
     stage = serializers.CharField(allow_blank=True)
+    astopStage = serializers.CharField(required=False, allow_blank=True, default="")
     kpis = serializers.ListField(child=serializers.DictField(), default=list)
     reportHref = serializers.CharField(allow_blank=True)
+    ttfvSeconds = serializers.IntegerField(required=False, allow_null=True, default=None)
+    verifiedValue = serializers.JSONField(required=False, default=dict)
+    customerFeeStatus = serializers.CharField(required=False, allow_blank=True, default="")
+    finalAssessmentFee = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True, default=None)
 
 
 class PortalPoCSerializer(serializers.Serializer):

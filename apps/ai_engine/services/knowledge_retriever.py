@@ -34,7 +34,7 @@ from apps.knowledge_core.services.namespace_router import normalize_namespace
 logger = logging.getLogger("itrix")
 
 VISITOR_KNOWLEDGE_NAMESPACES: tuple[str, ...] = (
-    "company", "technology", "alpha-compute", "alpha-core", "proofs", "licensing",
+    "company", "astop", "technology", "alpha-compute", "alpha-core", "proofs", "licensing",
 )
 _AUTHORITY_RANK = {"authoritative": 4, "governing": 3, "working": 2, "legacy": 1}
 _HARD_FACT_QUERY = re.compile(
@@ -78,6 +78,8 @@ def _row_to_dict(row: KnowledgeChunk, *, score=None, retrieval_backend: str = "d
         "permitted_paraphrase": getattr(doc, "permitted_paraphrase", "approved"),
         "technology_family": getattr(doc, "technology_family", "general"),
         "claim_ceiling": int(getattr(doc, "claim_ceiling", 0) or 0),
+        "entity_type": getattr(doc, "entity_type", "mixed"),
+        "evidence_status": getattr(doc, "evidence_status", "mixed"),
         "score": score,
         "retrieval_backend": retrieval_backend,
     }

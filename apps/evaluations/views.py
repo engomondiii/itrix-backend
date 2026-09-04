@@ -17,9 +17,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.exceptions import ITrixError
-from apps.core.permissions import IsDashboardUser, IsNotViewer
+from apps.core.permissions import IsAdminRole, IsDashboardUser, IsNotViewer
 from apps.evaluations.models import Evaluation
-from apps.evaluations.serializers import CreateEvaluationSerializer, EvaluationSerializer
+from apps.evaluations.serializers import AIFeeDecisionSerializer, CreateEvaluationSerializer, EvaluationSerializer, IWLOverrideSerializer
 from apps.evaluations.services.evaluation_creator import create_evaluation_for_lead
 from apps.leads.models import Lead
 
@@ -51,6 +51,39 @@ class EvaluationViewSet(
         lead = get_object_or_404(Lead, pk=serializer.validated_data["lead_id"])
         ev = create_evaluation_for_lead(lead)
         return Response(EvaluationSerializer(ev).data, status=201)
+
+
+    @action(detail=True, methods=["post"], url_path="ai-fee-decision", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def ai_fee_decision(self, request, pk=None):
+        from apps.leads.services.commercial_progression import record_ai_fee_decision
+        ser = AIFeeDecisionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ev = record_ai_fee_decision(self.get_object(), **ser.validated_data)
+        return Response(EvaluationSerializer(ev).data)
+
+    @action(detail=True, methods=["post"], url_path="iwl-override", permission_classes=[IsAuthenticated, IsDashboardUser, IsAdminRole])
+    def iwl_override(self, request, pk=None):
+        from rest_framework.exceptions import ValidationError
+        from apps.leads.services.commercial_progression import record_iwl_override
+        ser = IWLOverrideSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ev = record_iwl_override(self.get_object(), **ser.validated_data)
+        except ValueError as exc:
+            raise ValidationError({"fee": str(exc)}) from exc
+        return Response(EvaluationSerializer(ev).data)
+
+    @action(detail=True, methods=["post"], url_path="finalize-fee", permission_classes=[IsAuthenticated, IsDashboardUser, IsAdminRole])
+    def finalize_fee(self, request, pk=None):
+        from apps.leads.services.commercial_progression import finalize_assessment_fee
+        ev = finalize_assessment_fee(self.get_object())
+        return Response(EvaluationSerializer(ev).data)
+
+    @action(detail=True, methods=["get"], url_path="alpha-core-gate")
+    def alpha_core_gate(self, request, pk=None):
+        from apps.leads.services.commercial_progression import alpha_core_gate
+        decision = alpha_core_gate(self.get_object())
+        return Response({"allowed": decision.allowed, "reasons": list(decision.reasons)})
 
     # ── Nested sub-resources ─────────────────────────────────────────────────
     @action(

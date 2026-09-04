@@ -83,6 +83,21 @@ class ProductRouteCode(models.TextChoices):
     GENERAL = "general", "General"
 
 
+class CommercialStage(models.TextChoices):
+    DISCOVERY = "discovery", "Discovery"
+    SALES_PLATFORM = "sales_platform", "AI-Powered Sales Platform"
+    ASTOP = "astop", "ASTOP"
+    ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
+    ALPHA_CORE = "alpha_core", "ALPHA Core"
+
+
+class TrustStatus(models.TextChoices):
+    UNREVIEWED = "unreviewed", "Unreviewed"
+    PASS = "pass", "Pass"
+    REVIEW = "review", "Human review"
+    REJECT = "reject", "Sensitive access blocked"
+
+
 class CommercialPathCode(models.TextChoices):
     NON_EXCLUSIVE = "non_exclusive", "Non-Exclusive"
     EXCLUSIVE = "exclusive", "Exclusive"
@@ -134,6 +149,17 @@ class Lead(BaseModel):
     email = models.EmailField(blank=True, default="", db_index=True)
     industry = models.CharField(max_length=120, blank=True, default="")
     role = models.CharField(max_length=120, blank=True, default="")
+    # v2.3/v3.5 commercial qualification. These facts are deliberately separate
+    # from account identity and from the 10-state relationship ladder.
+    legal_entity = models.CharField(max_length=255, blank=True, default="")
+    corporate_domain = models.CharField(max_length=255, blank=True, default="")
+    business_unit = models.CharField(max_length=255, blank=True, default="")
+    sponsor = models.CharField(max_length=255, blank=True, default="")
+    acquisition_context = models.JSONField(default=dict, blank=True)
+    trust_screening = models.JSONField(default=dict, blank=True)
+    trust_status = models.CharField(max_length=16, choices=TrustStatus.choices, default=TrustStatus.UNREVIEWED, db_index=True)
+    current_marketing_stage = models.CharField(max_length=24, choices=CommercialStage.choices, default=CommercialStage.DISCOVERY, db_index=True)
+    commercial_progress = models.JSONField(default=dict, blank=True)
 
     # ── Routing ──────────────────────────────────────────────────────────────
     product_route = models.CharField(
@@ -267,6 +293,62 @@ class Lead(BaseModel):
     @property
     def commercial_path_display(self) -> str:
         return COMMERCIAL_PATH_DISPLAY.get(self.commercial_path, "Non-Exclusive")
+
+
+class ASTOPStage(models.TextChoices):
+    IDENTIFY_QUALIFY = "identify_qualify", "Identify & Qualify"
+    NDA_BRIEFING = "nda_briefing", "NDA & Briefing"
+    CONTROLLED_EVALUATION = "controlled_evaluation", "Controlled Evaluation"
+    LO_DEPLOYMENT = "lo_deployment", "License-Out & Deployment"
+    VERIFY_EXPAND = "verify_expand", "Verify & Expand"
+    CLOSED = "closed", "Closed"
+
+
+class ASTOPEngagement(BaseModel):
+    """Controlled ASTOP commercial/proof record attached to the existing Lead.
+
+    It is intentionally not another CRM or relationship ladder: Lead/journey remain
+    authoritative for the relationship. This record owns only ASTOP-specific
+    qualification, attributable evaluation, License-Out entitlement and verified value.
+    """
+
+    lead = models.OneToOneField(Lead, on_delete=models.CASCADE, related_name="astop_engagement")
+    stage = models.CharField(max_length=32, choices=ASTOPStage.choices, default=ASTOPStage.IDENTIFY_QUALIFY, db_index=True)
+    qualification_context = models.JSONField(default=dict, blank=True)
+    evaluation_agreement = models.CharField(max_length=255, blank=True, default="")
+    evaluation_scope = models.JSONField(default=dict, blank=True)
+    baseline = models.JSONField(default=dict, blank=True)
+    decision_fidelity = models.JSONField(default=dict, blank=True)
+    measured_savings = models.JSONField(default=dict, blank=True)
+    estimated_savings = models.JSONField(default=dict, blank=True)
+    evaluation_result = models.JSONField(default=dict, blank=True)
+    security_result = models.JSONField(default=dict, blank=True)
+    integration_feasibility = models.JSONField(default=dict, blank=True)
+    controlled_build_id = models.CharField(max_length=255, blank=True, default="")
+    attribution_id = models.CharField(max_length=255, blank=True, default="")
+    lo_scope = models.JSONField(default=dict, blank=True)
+    lo_executed_at = models.DateTimeField(null=True, blank=True)
+    entitlement_status = models.CharField(max_length=32, blank=True, default="")
+    entitlement_expires_at = models.DateTimeField(null=True, blank=True)
+    revocation_status = models.CharField(max_length=32, blank=True, default="")
+    authorized_install_at = models.DateTimeField(null=True, blank=True)
+    reproducible_value_at = models.DateTimeField(null=True, blank=True)
+    verified_value = models.JSONField(default=dict, blank=True)
+    expansion = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    @property
+    def ttfv_seconds(self):
+        if not self.authorized_install_at or not self.reproducible_value_at:
+            return None
+        delta = self.reproducible_value_at - self.authorized_install_at
+        return max(0, int(delta.total_seconds()))
+
+    @property
+    def has_verified_value(self) -> bool:
+        return bool(self.verified_value) and self.stage == ASTOPStage.VERIFY_EXPAND
 
 
 class LeadNote(BaseModel):

@@ -55,6 +55,10 @@ class VisitorSessionCreateView(APIView):
             ip_hash=_hash_ip(request),
             referrer=(request.data.get("referrer") or "")[:512],
             landing_path=(request.data.get("landing_path") or "")[:512],
+            source_channel=(request.data.get("source_channel") or "")[:64],
+            campaign_content=(request.data.get("campaign_content") or "")[:160],
+            referral_or_intro=(request.data.get("referral_or_intro") or "")[:255],
+            problem_topic=(request.data.get("problem_topic") or "")[:160],
         )
         logger.info("VisitorSession created: %s", session.id)
         return Response(

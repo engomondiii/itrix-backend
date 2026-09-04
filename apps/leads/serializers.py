@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.leads.models import Lead, LeadActivity, LeadMeeting, LeadNote
+from apps.leads.models import ASTOPEngagement, Lead, LeadActivity, LeadMeeting, LeadNote
 
 
 class LeadNoteSerializer(serializers.ModelSerializer):
@@ -131,6 +131,35 @@ class LeadDetailSerializer(_LeadBaseSerializer):
     notes = LeadNoteSerializer(many=True, read_only=True)
     activity = LeadActivitySerializer(source="activities", many=True, read_only=True)
     meetings = LeadMeetingSerializer(many=True, read_only=True)
+    legalEntity = serializers.CharField(source="legal_entity", read_only=True)
+    corporateDomain = serializers.CharField(source="corporate_domain", read_only=True)
+    businessUnit = serializers.CharField(source="business_unit", read_only=True)
+    sponsor = serializers.CharField(read_only=True)
+    acquisitionContext = serializers.JSONField(source="acquisition_context", read_only=True)
+    trustScreening = serializers.JSONField(source="trust_screening", read_only=True)
+    trustStatus = serializers.CharField(source="trust_status", read_only=True)
+    currentMarketingStage = serializers.CharField(source="current_marketing_stage", read_only=True)
+    commercialProgress = serializers.JSONField(source="commercial_progress", read_only=True)
+    astop = serializers.SerializerMethodField()
+
+    def get_astop(self, obj):
+        record = ASTOPEngagement.objects.filter(lead=obj).first()
+        if record is None:
+            return None
+        return {
+            "stage": record.stage,
+            "qualificationContext": record.qualification_context,
+            "evaluationScope": record.evaluation_scope,
+            "decisionFidelity": record.decision_fidelity,
+            "measuredSavings": record.measured_savings,
+            "estimatedSavings": record.estimated_savings,
+            "evaluationResult": record.evaluation_result,
+            "loScope": record.lo_scope,
+            "loExecutedAt": record.lo_executed_at,
+            "entitlementStatus": record.entitlement_status,
+            "verifiedValue": record.verified_value,
+            "ttfvSeconds": record.ttfv_seconds,
+        }
 
     class Meta:
         model = Lead
@@ -167,6 +196,9 @@ class LeadDetailSerializer(_LeadBaseSerializer):
             "notes",
             "activity",
             "meetings",
+            "legalEntity", "corporateDomain", "businessUnit", "sponsor",
+            "acquisitionContext", "trustScreening", "trustStatus", "currentMarketingStage",
+            "commercialProgress", "astop",
         ]
         read_only_fields = fields
 
@@ -236,3 +268,50 @@ class LeadEmailCaptureSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, allow_blank=True, default="")
     company = serializers.CharField(required=False, allow_blank=True, default="")
     source = serializers.CharField(required=False, allow_blank=True, default="web")
+
+class AcquisitionSerializer(serializers.Serializer):
+    source_channel = serializers.CharField(required=False, allow_blank=True, default="")
+    campaign_content = serializers.CharField(required=False, allow_blank=True, default="")
+    referral_or_intro = serializers.CharField(required=False, allow_blank=True, default="")
+    problem_topic = serializers.CharField(required=False, allow_blank=True, default="")
+    anonymous_session_id = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class TrustScreeningSerializer(serializers.Serializer):
+    identity_confidence = serializers.CharField(required=False, allow_blank=True, default="")
+    use_case_coherence = serializers.CharField(required=False, allow_blank=True, default="")
+    protection_acceptance = serializers.BooleanField(required=False, default=False)
+    copying_signal = serializers.BooleanField(required=False, default=False)
+    extraction_signal = serializers.BooleanField(required=False, default=False)
+    redistribution_signal = serializers.BooleanField(required=False, default=False)
+    rationale = serializers.CharField(required=True, allow_blank=False)
+    status = serializers.ChoiceField(choices=["pass", "review", "reject"])
+
+
+class ASTOPProgressSerializer(serializers.Serializer):
+    stage = serializers.ChoiceField(choices=["identify_qualify", "nda_briefing", "controlled_evaluation", "lo_deployment", "verify_expand", "closed"])
+    qualification_context = serializers.JSONField(required=False)
+    evaluation_agreement = serializers.CharField(required=False, allow_blank=True)
+    evaluation_scope = serializers.JSONField(required=False)
+    baseline = serializers.JSONField(required=False)
+    decision_fidelity = serializers.JSONField(required=False)
+    measured_savings = serializers.JSONField(required=False)
+    estimated_savings = serializers.JSONField(required=False)
+    evaluation_result = serializers.JSONField(required=False)
+    security_result = serializers.JSONField(required=False)
+    integration_feasibility = serializers.JSONField(required=False)
+    controlled_build_id = serializers.CharField(required=False, allow_blank=True)
+    attribution_id = serializers.CharField(required=False, allow_blank=True)
+    lo_scope = serializers.JSONField(required=False)
+    lo_executed_at = serializers.DateTimeField(required=False, allow_null=True)
+    entitlement_status = serializers.CharField(required=False, allow_blank=True)
+    authorized_install_at = serializers.DateTimeField(required=False, allow_null=True)
+    reproducible_value_at = serializers.DateTimeField(required=False, allow_null=True)
+    verified_value = serializers.JSONField(required=False)
+    expansion = serializers.JSONField(required=False)
+
+
+class AlphaAssessmentSerializer(serializers.Serializer):
+    separate_workload = serializers.CharField()
+    technical_route = serializers.ChoiceField(choices=["axiom", "axiom_tensor", "cre", "fqnm", "qnta"])
+    scope = serializers.CharField(required=False, allow_blank=True, default="")

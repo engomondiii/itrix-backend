@@ -279,8 +279,11 @@ class PortalOverviewView(APIView):
 
         # nextSteps must be PortalNextStepKey values, not free text.
         next_steps: list[str] = ["read_briefing", "talk_to_itrix"]
-        if client.nda_signed:
-            next_steps.append("consider_evaluation")
+        astop = getattr(lead, "astop_engagement", None) if lead is not None else None
+        if astop is None:
+            next_steps.append("consider_astop")
+        elif astop.has_verified_value:
+            next_steps.append("consider_alpha_assessment")
 
         payload = {
             "client": client,
@@ -542,6 +545,10 @@ class PortalDocumentsView(APIView):
         # explicit per-document authorization (plus any agreement prerequisite),
         # never from account, email-verification, journey or NDA state alone.
         data_room_authorized = any(not row["locked"] for row in restricted_docs)
+        lead = client.lead
+        nda = getattr(lead, "nda", None) if lead is not None else None
+        nda_problem = (getattr(nda, "problem_context", "") or getattr(lead, "compute_bottleneck", "") or "").strip()
+        nda_workload = (getattr(nda, "workload_context", "") or getattr(lead, "workload_type", "") or "").strip()
         return Response(
             PortalDataRoomSerializer(
                 {
@@ -549,6 +556,11 @@ class PortalDocumentsView(APIView):
                     "dataRoomAuthorized": data_room_authorized,
                     "openFolders": open_folders,
                     "dataRoomFolders": data_room_folders,
+                    "ndaContextPresent": bool(nda_problem or nda_workload),
+                    "ndaProblemContext": nda_problem,
+                    "ndaWorkloadContext": nda_workload,
+                    "ndaDesiredOutcome": (getattr(nda, "desired_outcome", "") or "").strip(),
+                    "ndaDiscussionReason": (getattr(nda, "discussion_reason", "") or "").strip(),
                 }
             ).data
         )
@@ -563,20 +575,41 @@ class PortalEvaluationView(APIView):
     def get(self, request):
         lead = request.user.lead
         evaluation = None
+        astop = None
         if lead is not None:
             evaluation = lead.evaluations.order_by("-created_at").first()
-        if evaluation is None:
-            return Response(PortalEvaluationSerializer({"exists": False, "stage": "", "kpis": [], "reportHref": ""}).data)
-        return Response(
-            PortalEvaluationSerializer(
-                {
-                    "exists": True,
-                    "stage": evaluation.status,
-                    "kpis": evaluation.kpis or [],
-                    "reportHref": "",
-                }
-            ).data
-        )
+            astop = getattr(lead, "astop_engagement", None)
+        if evaluation is not None:
+            return Response(
+                PortalEvaluationSerializer(
+                    {
+                        "exists": True,
+                        "kind": "alpha_compute",
+                        "stage": evaluation.status,
+                        "kpis": evaluation.kpis or [],
+                        "reportHref": "",
+                        # Only final/customer-facing fee state crosses this boundary.
+                        "customerFeeStatus": evaluation.customer_fee_status,
+                        "finalAssessmentFee": evaluation.final_assessment_fee if evaluation.fee_finalized_at else None,
+                    }
+                ).data
+            )
+        if astop is not None:
+            return Response(
+                PortalEvaluationSerializer(
+                    {
+                        "exists": True,
+                        "kind": "astop",
+                        "stage": astop.stage,
+                        "astopStage": astop.stage,
+                        "kpis": [],
+                        "reportHref": "",
+                        "ttfvSeconds": astop.ttfv_seconds,
+                        "verifiedValue": astop.verified_value or {},
+                    }
+                ).data
+            )
+        return Response(PortalEvaluationSerializer({"exists": False, "kind": "astop", "stage": "", "kpis": [], "reportHref": ""}).data)
 
 
 class PortalPoCView(APIView):
@@ -722,6 +755,31 @@ class PortalNdaRequestView(APIView):
                 status=status.HTTP_200_OK,
             )
 
+        # A request for agreement protection needs a non-confidential problem/workload
+        # context. Reuse what the relationship already knows rather than asking twice.
+        lead = client.lead
+        from apps.nda.services.nda_creator import create_nda_for_lead
+
+        nda = create_nda_for_lead(lead)
+        problem = str(request.data.get("problemContext") or nda.problem_context or lead.compute_bottleneck or "").strip()
+        workload = str(request.data.get("workloadContext") or nda.workload_context or lead.workload_type or "").strip()
+        desired = str(request.data.get("desiredOutcome") or nda.desired_outcome or "").strip()
+        reason = str(request.data.get("discussionReason") or nda.discussion_reason or "").strip()
+        if not (problem or workload):
+            return Response(
+                {
+                    "detail": "Please tell us what problem or workload you would like to discuss under this NDA.",
+                    "code": "nda_context_required",
+                    "contextRequired": True,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        nda.problem_context = problem
+        nda.workload_context = workload
+        nda.desired_outcome = desired
+        nda.discussion_reason = reason
+        nda.save(update_fields=["problem_context", "workload_context", "desired_outcome", "discussion_reason", "updated_at"])
+
         already_requested = client.nda_requested_at is not None
         if not already_requested:
             client.nda_requested_at = timezone.now()
@@ -767,6 +825,7 @@ class PortalNdaRequestView(APIView):
                     f"Client: {client.id}\n"
                     f"Email: {client.email}\n"
                     f"Organisation: {client.organization or '(not given)'}\n"
+                    f"Problem/workload: {(getattr(getattr(client.lead, 'nda', None), 'problem_context', '') or getattr(client.lead, 'workload_type', ''))[:500]}\n"
                 ),
                 lead=getattr(client, "lead", None),
             )

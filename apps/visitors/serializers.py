@@ -25,10 +25,14 @@ class VisitorSessionCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VisitorSession
-        fields = ["client_id", "visitor_type", "referrer", "landing_path"]
+        fields = ["client_id", "visitor_type", "referrer", "landing_path", "source_channel", "campaign_content", "referral_or_intro", "problem_topic"]
         extra_kwargs = {
             "referrer": {"required": False, "allow_blank": True},
             "landing_path": {"required": False, "allow_blank": True},
+            "source_channel": {"required": False, "allow_blank": True},
+            "campaign_content": {"required": False, "allow_blank": True},
+            "referral_or_intro": {"required": False, "allow_blank": True},
+            "problem_topic": {"required": False, "allow_blank": True},
         }
 
     def validate_visitor_type(self, value):

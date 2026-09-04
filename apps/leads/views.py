@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsDashboardUser, IsNotViewer
-from apps.leads.models import Lead, LeadActivity, LeadStatus
+from apps.leads.models import ASTOPEngagement, CommercialStage, Lead, LeadActivity, LeadStatus
 from apps.leads.serializers import (
     AssignSerializer,
     EscalateSerializer,
@@ -42,6 +42,10 @@ from apps.leads.serializers import (
     MeetingSerializer,
     NoteSerializer,
     StatusSerializer,
+    AcquisitionSerializer,
+    TrustScreeningSerializer,
+    ASTOPProgressSerializer,
+    AlphaAssessmentSerializer,
 )
 from apps.leads.services.exclusive_flag_handler import approval_checklist
 from apps.leads.services.handoff_memo_generator import generate_handoff_memo
@@ -334,6 +338,68 @@ class LeadViewSet(
         except Exception:  # noqa: BLE001
             pass
         return self._detail_response(lead)
+
+
+    @action(detail=True, methods=["post"], url_path="acquisition", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def acquisition(self, request, pk=None):
+        lead = self.get_object()
+        ser = AcquisitionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        lead.acquisition_context = {**(lead.acquisition_context or {}), **ser.validated_data}
+        lead.current_marketing_stage = CommercialStage.SALES_PLATFORM
+        lead.save(update_fields=["acquisition_context", "current_marketing_stage", "updated_at"])
+        return self._detail_response(lead)
+
+    @action(detail=True, methods=["post"], url_path="trust-screening", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def trust_screening(self, request, pk=None):
+        lead = self.get_object()
+        ser = TrustScreeningSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = dict(ser.validated_data)
+        lead.trust_screening = data
+        lead.trust_status = data["status"]
+        lead.escalated = data["status"] in {"review", "reject"}
+        if lead.escalated:
+            from django.utils import timezone
+            lead.escalated_at = lead.escalated_at or timezone.now()
+        lead.save(update_fields=["trust_screening", "trust_status", "escalated", "escalated_at", "updated_at"])
+        return self._detail_response(lead)
+
+    @action(detail=True, methods=["post"], url_path="astop", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def astop(self, request, pk=None):
+        lead = self.get_object()
+        ser = ASTOPProgressSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        values = dict(ser.validated_data)
+        stage = values.pop("stage")
+        record, _ = ASTOPEngagement.objects.get_or_create(lead=lead)
+        for field, value in values.items():
+            setattr(record, field, value)
+        record.stage = stage
+        # Production entitlement is impossible without an executed License-Out.
+        production_requested = stage == "verify_expand" or bool(str(values.get("entitlement_status") or "").strip())
+        if production_requested and not record.lo_executed_at:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"stage": "An executed License-Out is required before production entitlement or Verify & Expand."})
+        record.save()
+        lead.current_marketing_stage = CommercialStage.ASTOP
+        lead.commercial_progress = {**(lead.commercial_progress or {}), "astop_stage": stage, "astop_verified_value_gate": record.has_verified_value}
+        lead.save(update_fields=["current_marketing_stage", "commercial_progress", "updated_at"])
+        return self._detail_response(lead)
+
+    @action(detail=True, methods=["post"], url_path="alpha-assessment", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
+    def alpha_assessment(self, request, pk=None):
+        from apps.evaluations.serializers import EvaluationSerializer
+        from apps.leads.services.commercial_progression import create_alpha_compute_assessment
+        from rest_framework.exceptions import ValidationError
+        lead = self.get_object()
+        ser = AlphaAssessmentSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ev = create_alpha_compute_assessment(lead, **ser.validated_data)
+        except ValueError as exc:
+            raise ValidationError({"gate": str(exc)}) from exc
+        return Response(EvaluationSerializer(ev).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get"])
     def summary(self, request, pk=None):

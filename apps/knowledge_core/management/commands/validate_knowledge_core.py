@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from apps.knowledge_core.models import IngestionStatus, KnowledgeChunk, KnowledgeDocument
@@ -111,6 +111,33 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.ERROR("  ! Current ALPHA Compute/Core v2.4 source is not COMPLETE + public."))
             problems += 1
+
+        # ── September 2026 ASTOP / Sales Platform authority ─────────────────
+        self.stdout.write(self.style.MIGRATE_HEADING("September 2026 governing sources"))
+        required_sources = (
+            ("ASTOP_Productization_GTM_Plan_v2.3", "internal_only", "authoritative"),
+            ("itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5", "internal_only", "authoritative"),
+            ("itriX_White_Paper_v3.5", "internal_only", "authoritative"),
+            ("prism-paper-current_v2", "controlled_public", "authoritative"),
+            ("astop_prism_public_safe_v2_3", "public", "governing"),
+            ("itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel", "internal_only", "governing"),
+        )
+        for filename, level, authority in required_sources:
+            row = KnowledgeDocument.objects.filter(
+                file_path__icontains=filename, is_current=True, disclosure_level=level, source_authority=authority
+            ).first()
+            if row is None:
+                problems += 1
+                self.stdout.write(self.style.ERROR(f"  ! missing/currentness-tier mismatch: {filename}"))
+            else:
+                self.stdout.write(self.style.SUCCESS(f"  current: {filename} [{level}/{authority}]"))
+
+        stale_astop = KnowledgeDocument.objects.filter(is_current=True).filter(
+            Q(title__icontains="ASTOP Team") | Q(title__icontains="ASTOP Pro")
+        )
+        if stale_astop.exists():
+            problems += stale_astop.count()
+            self.stdout.write(self.style.ERROR("  ! superseded ASTOP tier source is still current"))
 
         # Folder placement is itself an authorization decision. Validate exact policy
         # parity instead of incorrectly requiring controlled/agreement-gated sources to

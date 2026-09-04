@@ -1,0 +1,9 @@
+# ASTOP and PRISM — public-safe current overview
+
+ASTOP — A System Trans-Observation Projector — is itriX's observation product for computational systems and agentic AI workflows. It establishes what is happening across relevant host, accelerator, process and experiment state and exposes evidence to people, software and AI agents. A measured zero is treated as evidence; unavailable information remains unavailable rather than being invented.
+
+PRISM — Projection and Representation for Intelligent Semantic Monitoring — is the observation technology behind ASTOP. It places a logically independent Observation Layer before an expensive AI controller so raw system history can be projected, selected and structured into decision-relevant information before reasoning is invoked. PRISM is a technology, not a separately purchasable product.
+
+In the supplied PRISM research, the primary study ran 720 system episodes across nine controllers and eight workloads. All system episodes succeeded. Controller decision fidelity was 350/360 with polling and 360/360 with PRISM. Among pairs that were fidelity-matched in both arms, aggregate reductions were 51.9–84.5% in tokens, 28.0–54.0% in controller calls and 76.0–89.5% in delivered bytes. These are scoped experimental results, not a universal savings guarantee: fewer events need not always mean fewer bytes, and shorter input need not always mean less reasoning.
+
+ASTOP is technically standalone. Public visitors may learn about the observation problem and public-safe evidence without creating an account. Controlled evaluation is attributable to an identified organization and account; ASTOP is not a public self-service download or fixed-price SaaS purchase. Production rights are granted only through an executed License-Out within an agreed scope.

@@ -57,6 +57,30 @@ class TechnologyFamily(models.TextChoices):
     ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
     ALPHA_CORE = "alpha_core", "ALPHA Core"
     CROSS_CUTTING = "cross_cutting", "Boundary-aware / cross-cutting"
+    ASTOP = "astop", "ASTOP"
+    PRISM = "prism", "PRISM"
+    AXIOM_TENSOR = "axiom_tensor", "AXIOM-TENSOR"
+    QNTA = "qnta", "QNTA"
+
+
+class KnowledgeEntityType(models.TextChoices):
+    PRODUCT = "product", "Product"
+    TECHNOLOGY = "technology", "Technology"
+    PLATFORM = "platform", "Commercialization platform"
+    RESEARCH = "research", "Research"
+    GOVERNANCE = "governance", "Governance"
+    MIXED = "mixed", "Mixed"
+
+
+class EvidenceStatus(models.TextChoices):
+    MATHEMATICAL = "mathematical", "Mathematical"
+    EXPERIMENTAL = "experimental", "Experimental"
+    IMPLEMENTED = "implemented", "Implemented"
+    VALIDATED = "validated", "Validated"
+    VALUE_VERIFIED = "value_verified", "Value-Verified"
+    LICENSABLE = "licensable", "Licensable"
+    GOVERNANCE = "governance", "Governance / policy"
+    MIXED = "mixed", "Mixed"
 
 
 class IngestionStatus(models.TextChoices):
@@ -113,6 +137,8 @@ class KnowledgeDocument(BaseModel):
     # Claim level ceiling used by orchestration.  0 means metadata has not assigned a
     # special ceiling; the normal journey/disclosure ceiling still applies.
     claim_ceiling = models.PositiveSmallIntegerField(default=0)
+    entity_type = models.CharField(max_length=20, choices=KnowledgeEntityType.choices, default=KnowledgeEntityType.MIXED, db_index=True)
+    evidence_status = models.CharField(max_length=24, choices=EvidenceStatus.choices, default=EvidenceStatus.MIXED, db_index=True)
 
     ingestion_status = models.CharField(
         max_length=12,

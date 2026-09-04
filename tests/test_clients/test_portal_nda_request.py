@@ -80,3 +80,35 @@ def test_a_signed_client_is_told_the_agreement_is_already_in_place_without_promi
 
 def test_the_endpoint_requires_a_client():
     assert APIClient().post(URL, {}, format="json").status_code in (401, 403)
+
+
+def test_missing_problem_and_workload_returns_context_required_without_authorizing_anything():
+    row = ClientFactory(nda_signed=False)
+    row.lead.compute_bottleneck = ""
+    row.lead.workload_type = ""
+    row.lead.save(update_fields=["compute_bottleneck", "workload_type", "updated_at"])
+
+    res = _authed(row).post(URL, {}, format="json")
+
+    assert res.status_code == 400
+    body = res.json()
+    assert body["code"] == "nda_context_required"
+    assert body["contextRequired"] is True
+    row.refresh_from_db()
+    assert row.nda_signed is False
+    assert row.nda_requested_at is None
+
+
+def test_existing_problem_context_is_reused_for_the_nda_request():
+    row = ClientFactory(nda_signed=False)
+    row.lead.compute_bottleneck = "Agent polling repeats unchanged accelerator state."
+    row.lead.workload_type = "Long-running agent-supervised training"
+    row.lead.save(update_fields=["compute_bottleneck", "workload_type", "updated_at"])
+
+    res = _authed(row).post(URL, {}, format="json")
+
+    assert res.status_code == 202
+    nda = row.lead.nda
+    nda.refresh_from_db()
+    assert nda.problem_context == "Agent polling repeats unchanged accelerator state."
+    assert nda.workload_context == "Long-running agent-supervised training"

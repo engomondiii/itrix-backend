@@ -38,6 +38,7 @@ SUPERSEDED_FILENAMES = {
     "alpha_core_problemology_public.md",
     "Brand Story of itriX.docx",
     "WP_Alpha Compute Core.docx",
+    "README_Astop.txt",
 }
 
 # Folder name -> exact disclosure level.  The folder is the decision: registration
@@ -76,6 +77,8 @@ def namespace_for(filename: str) -> str:
     """Infer a canonical namespace from the filename (case-insensitive)."""
     n = filename.lower()
 
+    if "astop" in n or "prism" in n:
+        return "astop"
     # Proof / research materials.
     if "arxiv" in n or "thesis" in n or "comparison" in n or "turboquant" in n:
         return "proofs"
@@ -130,6 +133,18 @@ def source_authority_for(filename: str) -> tuple[str, bool, str]:
     n = filename.lower()
     if filename in SUPERSEDED_FILENAMES or any(x in n for x in ("legacy", "superseded", "archive")):
         return "legacy", False, ""
+    if "productization_gtm_plan_v2.3" in n or "sales_platform_mvp_guide_for_fidel_v3.5" in n:
+        return "authoritative", True, "September 2026 governing commercialization / implementation source"
+    if "white_paper_v3.5" in n:
+        return "authoritative", True, "Current canonical product/technology taxonomy and evidence boundaries"
+    if "prism-paper-current_v2" in n:
+        return "authoritative", True, "Current PRISM primary research evidence"
+    if "astop_prism_public_safe_v2_3" in n:
+        return "governing", True, "Approved public-safe synthesis bounded by GTM v2.3 and PRISM evidence"
+    if "astop_technical_capabilities_current" in n or "axiom_tensor_qnta_current_controlled" in n:
+        return "governing", True, "Current controlled technical synthesis"
+    if "mvp_acceptance_rerun_feedback" in n:
+        return "governing", True, "Latest targeted MVP acceptance corrections"
     if any(x in n for x in ("canonical", "register", "executed")):
         return "authoritative", True, "Explicit canonical/register source"
     if "itrix_company_overview_public" in n:
@@ -141,6 +156,14 @@ def source_authority_for(filename: str) -> tuple[str, bool, str]:
 
 def technology_family_for(filename: str) -> str:
     n = filename.lower()
+    if "astop" in n and "prism" not in n:
+        return "astop"
+    if "prism" in n:
+        return "prism"
+    if "axiom_tensor" in n or "axiom-tensor" in n:
+        return "axiom_tensor"
+    if "qnta" in n:
+        return "qnta"
     if "axiom" in n and not any(x in n for x in ("alpha", "unified")):
         return "axiom"
     if ("cre" in n or "conjugation" in n) and not any(x in n for x in ("alpha", "unified")):
@@ -156,6 +179,35 @@ def technology_family_for(filename: str) -> str:
     if any(x in n for x in ("boundary-aware", "boundary aware", "unified mathematical")):
         return "cross_cutting"
     return "general"
+
+
+def governance_metadata_for(filename: str, disclosure: str) -> dict:
+    """Explicit September-2026 metadata for authority, audience, evidence and claim ceilings."""
+    n = filename.lower()
+    meta = {
+        "approved_audience": ["internal"] if disclosure == "internal_only" else ["public", "visitor", "customer"],
+        "allowed_journey_stages": ["PUBLIC-SAFE", "QUALIFIED", "NDA", "EVALUATION", "LICENSED"],
+        "claim_ceiling": 2 if disclosure in {"public", "controlled_public"} else 3,
+        "entity_type": "mixed",
+        "evidence_status": "mixed",
+    }
+    if "productization_gtm_plan_v2.3" in n:
+        meta.update(approved_audience=["internal", "commercial"], allowed_journey_stages=["QUALIFIED", "NDA", "EVALUATION", "LICENSED"], claim_ceiling=3, entity_type="governance", evidence_status="governance")
+    elif "sales_platform_mvp_guide_for_fidel_v3.5" in n:
+        meta.update(approved_audience=["internal", "implementation"], claim_ceiling=3, entity_type="platform", evidence_status="governance")
+    elif "white_paper_v3.5" in n:
+        meta.update(approved_audience=["internal"], claim_ceiling=3, entity_type="mixed", evidence_status="mixed")
+    elif "prism-paper-current_v2" in n:
+        meta.update(claim_ceiling=2, entity_type="research", evidence_status="experimental")
+    elif "prism_and_astop_explained" in n or "astop_prism_public_safe" in n:
+        meta.update(claim_ceiling=2, entity_type="mixed", evidence_status="experimental")
+    elif "astop_technical_capabilities_current" in n:
+        meta.update(approved_audience=["internal", "technical"], claim_ceiling=3, entity_type="product", evidence_status="implemented")
+    elif "axiom_tensor_qnta_current_controlled" in n:
+        meta.update(approved_audience=["internal", "technical"], claim_ceiling=2, entity_type="technology", evidence_status="experimental")
+    elif "mvp_acceptance_rerun_feedback" in n:
+        meta.update(approved_audience=["internal", "implementation"], claim_ceiling=3, entity_type="governance", evidence_status="governance")
+    return meta
 
 
 def paraphrase_for(disclosure: str) -> str:
@@ -212,6 +264,7 @@ class Command(BaseCommand):
                 authority, is_current, canonical_rule = source_authority_for(f.name)
                 family = technology_family_for(f.name)
                 paraphrase = paraphrase_for(disclosure)
+                governance = governance_metadata_for(f.name, disclosure)
 
                 # POSIX FORM, ALWAYS. The active-path set is also the reconciliation
                 # source: anything previously registered under knowledge_docs/ that is no
@@ -248,6 +301,7 @@ class Command(BaseCommand):
                         "canonical_rule": canonical_rule,
                         "permitted_paraphrase": paraphrase,
                         "technology_family": family,
+                        **governance,
                     },
                 )
                 if made:
@@ -272,6 +326,7 @@ class Command(BaseCommand):
                         ("canonical_rule", canonical_rule),
                         ("permitted_paraphrase", paraphrase),
                         ("technology_family", family),
+                        *((field, value) for field, value in governance.items()),
                     ):
                         if getattr(obj, field) != value:
                             setattr(obj, field, value)

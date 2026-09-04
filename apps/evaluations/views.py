@@ -21,7 +21,7 @@ from apps.core.permissions import IsAdminRole, IsDashboardUser, IsNotViewer
 from apps.evaluations.models import Evaluation
 from apps.evaluations.serializers import AIFeeDecisionSerializer, CreateEvaluationSerializer, EvaluationSerializer, IWLOverrideSerializer
 from apps.evaluations.services.evaluation_creator import create_evaluation_for_lead
-from apps.leads.models import Lead
+from apps.leads.models import Lead, LeadActivity
 
 
 class EvaluationViewSet(
@@ -52,7 +52,6 @@ class EvaluationViewSet(
         ev = create_evaluation_for_lead(lead)
         return Response(EvaluationSerializer(ev).data, status=201)
 
-
     @action(detail=True, methods=["post"], url_path="ai-fee-decision", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])
     def ai_fee_decision(self, request, pk=None):
         from apps.leads.services.commercial_progression import record_ai_fee_decision
@@ -65,12 +64,30 @@ class EvaluationViewSet(
     def iwl_override(self, request, pk=None):
         from rest_framework.exceptions import ValidationError
         from apps.leads.services.commercial_progression import record_iwl_override
+
         ser = IWLOverrideSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
             ev = record_iwl_override(self.get_object(), **ser.validated_data)
         except ValueError as exc:
             raise ValidationError({"fee": str(exc)}) from exc
+
+        # The override payload remains on the internal Evaluation record. The generic
+        # timeline receives only bounded audit facts, not protected deliberation/rationale.
+        LeadActivity.objects.create(
+            lead=ev.lead,
+            type=LeadActivity.ActivityType.STATUS_CHANGE,
+            label=f"IWL assessment fee override recorded: {ev.iwl_override_status}.",
+            by=request.user,
+            by_name=request.user.display_name,
+            meta={
+                "domain": "iwl_fee_override",
+                "evaluation_id": str(ev.id),
+                "waiver_type": ev.iwl_override_status,
+                "final_fee_recorded": ev.final_assessment_fee is not None,
+                "finalized": ev.fee_finalized_at is not None,
+            },
+        )
         return Response(EvaluationSerializer(ev).data)
 
     @action(detail=True, methods=["post"], url_path="finalize-fee", permission_classes=[IsAuthenticated, IsDashboardUser, IsAdminRole])

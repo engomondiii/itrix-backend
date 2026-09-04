@@ -13,6 +13,7 @@ from apps.leads.views import LeadViewSet
 from apps.leads.views_entitlement import ASTOPEntitlementLifecycleView
 from apps.leads.views_lo import GovernedLOTermsView
 from apps.leads.views_readiness import ASTOPReadinessView
+from apps.leads.views_review import TrustReviewView
 
 app_name = "leads"
 
@@ -20,6 +21,11 @@ router = DefaultRouter(trailing_slash=True)
 router.register(r"", LeadViewSet, basename="lead")
 
 urlpatterns = [
+    path(
+        "<uuid:lead_id>/trust-review/",
+        TrustReviewView.as_view(),
+        name="trust-review",
+    ),
     path(
         "<uuid:lead_id>/astop-entitlement/",
         ASTOPEntitlementLifecycleView.as_view(),

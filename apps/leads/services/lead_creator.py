@@ -80,6 +80,13 @@ _TIMELINE_LABEL = {
     "year": "Within a year",
     "exploring": "Just exploring",
 }
+_ACQUISITION_FIELDS = (
+    "source_channel",
+    "campaign_content",
+    "referral_or_intro",
+    "problem_topic",
+    "referrer",
+)
 
 
 def _primary_pain(answers: dict) -> str:
@@ -93,6 +100,41 @@ def _primary_pain(answers: dict) -> str:
 def _stack(answers: dict) -> list[str]:
     env = single(answers.get("Q1"))
     return [_STACK_LABEL.get(env, env)] if env else []
+
+
+def _has_acquisition_value(value) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    return value is not None and bool(value)
+
+
+def _visitor_acquisition_context(session) -> dict:
+    """Copy bounded anonymous acquisition context into the Lead record.
+
+    This is attribution/persona context only. It never changes persona, trust,
+    verification, authorization, entitlement, relationship state, or product gates.
+    """
+    visitor_session = getattr(session, "visitor_session", None)
+    if visitor_session is None:
+        return {}
+
+    context = {}
+    for field in _ACQUISITION_FIELDS:
+        value = getattr(visitor_session, field, "")
+        if _has_acquisition_value(value):
+            context[field] = value
+    if getattr(visitor_session, "id", None) is not None:
+        context["visitor_session_id"] = str(visitor_session.id)
+    return context
+
+
+def _merge_acquisition_context(existing, incoming: dict) -> dict:
+    """Fill attribution gaps without replacing curated nonblank Lead values."""
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    for key, value in incoming.items():
+        if not _has_acquisition_value(merged.get(key)):
+            merged[key] = value
+    return merged
 
 
 class LeadCreator:
@@ -122,6 +164,7 @@ class LeadCreator:
 
         sla_hours = TIER_RESPONSE_HOURS.get(tier)
         sla_due = timezone.now() + timedelta(hours=sla_hours) if sla_hours else None
+        visitor_acquisition = _visitor_acquisition_context(session)
 
         fields = dict(
             client_id=getattr(session, "client_id", "") or "",
@@ -151,12 +194,17 @@ class LeadCreator:
 
         existing = Lead.objects.filter(review_session=session).first()
         if existing:
+            fields["acquisition_context"] = _merge_acquisition_context(
+                existing.acquisition_context,
+                visitor_acquisition,
+            )
             for k, v in fields.items():
                 setattr(existing, k, v)
             existing.save()
             lead = existing
             created = False
         else:
+            fields["acquisition_context"] = visitor_acquisition
             lead = Lead.objects.create(review_session=session, **fields)
             created = True
 

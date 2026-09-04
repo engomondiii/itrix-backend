@@ -308,7 +308,12 @@ class ASTOPProgressSerializer(serializers.Serializer):
     attribution_id = serializers.CharField(required=False, allow_blank=True)
     lo_scope = serializers.JSONField(required=False)
     lo_executed_at = serializers.DateTimeField(required=False, allow_null=True)
-    entitlement_status = serializers.CharField(required=False, allow_blank=True)
+    # The progression endpoint may activate an entitlement when all production gates
+    # pass, but terminal expiry/revocation is owned by astop-entitlement/ so those states
+    # cannot bypass its lifecycle and audit semantics.
+    entitlement_status = serializers.ChoiceField(
+        choices=["active", "authorized", "enabled"], required=False
+    )
     authorized_install_at = serializers.DateTimeField(required=False, allow_null=True)
     reproducible_value_at = serializers.DateTimeField(required=False, allow_null=True)
     verified_value = serializers.JSONField(required=False)

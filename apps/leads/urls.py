@@ -6,13 +6,22 @@ apps.leads.views.LeadEmailCaptureView (there is no separate lead-capture app).
 
 from __future__ import annotations
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from apps.leads.views import LeadViewSet
+from apps.leads.views_entitlement import ASTOPEntitlementLifecycleView
 
 app_name = "leads"
 
 router = DefaultRouter(trailing_slash=True)
 router.register(r"", LeadViewSet, basename="lead")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path(
+        "<uuid:lead_id>/astop-entitlement/",
+        ASTOPEntitlementLifecycleView.as_view(),
+        name="astop-entitlement-lifecycle",
+    ),
+    *router.urls,
+]

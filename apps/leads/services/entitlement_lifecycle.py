@@ -1,0 +1,181 @@
+"""Governed ASTOP License-Out entitlement lifecycle.
+
+The ASTOP engagement remains the single entitlement record. This service does not create
+another licensing database; it gives the existing execution/expiry/revocation fields one
+writer for terminal lifecycle changes while preserving commercial_progression as the
+authority for progression and production-entitlement prerequisites.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from django.db import transaction
+from django.utils import timezone
+
+from apps.leads.models import ASTOPEngagement, ASTOPStage, Lead, LeadActivity
+from apps.leads.services.commercial_progression import (
+    _production_entitlement_reasons,
+    _stage_gate_reasons,
+    _unique_reasons,
+)
+
+
+ACTIVE_STATUSES = {"active", "authorized", "enabled"}
+BLOCKING_REVOCATION_STATUSES = {"revoked", "revoking", "suspended", "blocked"}
+TERMINAL_STATES = {"expired", "revoked"}
+ENTITLEMENT_STAGES = {ASTOPStage.LO_DEPLOYMENT, ASTOPStage.VERIFY_EXPAND}
+
+
+@dataclass(frozen=True)
+class EntitlementLifecycleResult:
+    record: ASTOPEngagement
+    previous_state: str
+    current_state: str
+    changed: bool
+
+
+def _normal(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def entitlement_lifecycle_state(record: ASTOPEngagement, *, now=None) -> str:
+    """Derive the truthful entitlement state without turning missing data into active."""
+    now = now or timezone.now()
+    status = _normal(record.entitlement_status)
+    revocation = _normal(record.revocation_status)
+
+    if status == "revoked" or revocation == "revoked":
+        return "revoked"
+    if revocation in {"revoking", "suspended", "blocked"}:
+        return revocation
+    if status in {"revoking", "suspended", "blocked"}:
+        return status
+    if revocation not in {"", "none", "cleared"}:
+        # Unknown revocation state fails closed rather than being reported active.
+        return "blocked"
+    if status == "expired":
+        return "expired"
+    if record.entitlement_expires_at is not None and record.entitlement_expires_at <= now:
+        return "expired"
+    if status in ACTIVE_STATUSES:
+        return "active"
+    if status in {"", "pending"}:
+        return "pending"
+    return "unknown"
+
+
+def _actor_name(by) -> str:
+    return getattr(by, "display_name", "") or getattr(by, "email", "") or "system"
+
+
+def _audit(
+    lead: Lead,
+    *,
+    action: str,
+    previous_state: str,
+    current_state: str,
+    reason: str,
+    by=None,
+) -> None:
+    LeadActivity.objects.create(
+        lead=lead,
+        type=LeadActivity.ActivityType.STATUS_CHANGE,
+        label=f"ASTOP entitlement {action}: {previous_state} → {current_state}.",
+        by=by,
+        by_name=_actor_name(by),
+        meta={
+            "domain": "astop_entitlement",
+            "action": action,
+            "from": previous_state,
+            "to": current_state,
+            "reason": str(reason or "").strip(),
+        },
+    )
+
+
+@transaction.atomic
+def update_astop_entitlement(
+    lead: Lead,
+    *,
+    action: str,
+    expires_at=None,
+    reason: str = "",
+    by=None,
+) -> EntitlementLifecycleResult:
+    """Activate, expire or revoke the existing ASTOP License-Out entitlement.
+
+    Activation reuses the complete governed production gate. Expiry and revocation are
+    terminal changes and intentionally do not call the normal ASTOP stage writer: doing
+    so at VERIFY_EXPAND would reject the very revocation we need to record because that
+    stage correctly requires an active entitlement.
+    """
+    record = ASTOPEngagement.objects.select_for_update().filter(lead=lead).first()
+    if record is None:
+        raise ValueError("astop_entitlement_gate:astop_engagement_required")
+    if record.stage not in ENTITLEMENT_STAGES:
+        raise ValueError("astop_entitlement_gate:license_out_stage_required")
+
+    action = _normal(action)
+    if action not in {"activate", "expire", "revoke"}:
+        raise ValueError("astop_entitlement_gate:invalid_entitlement_action")
+
+    now = timezone.now()
+    before = entitlement_lifecycle_state(record, now=now)
+    previous_expiry = record.entitlement_expires_at
+
+    if action == "activate":
+        if before in TERMINAL_STATES or before in {"revoking", "suspended", "blocked", "unknown"}:
+            raise ValueError(f"astop_entitlement_gate:{before}_entitlement_cannot_activate")
+        if expires_at is not None and expires_at <= now:
+            raise ValueError("astop_entitlement_gate:future_entitlement_expiry_required")
+        if before == "active" and (expires_at is None or expires_at == previous_expiry):
+            return EntitlementLifecycleResult(record, before, before, False)
+
+        record.entitlement_status = "active"
+        if expires_at is not None:
+            record.entitlement_expires_at = expires_at
+
+        reasons = list(_stage_gate_reasons(lead, record, record.stage))
+        reasons.extend(_production_entitlement_reasons(record))
+        reasons = list(_unique_reasons(reasons))
+        if reasons:
+            raise ValueError("astop_entitlement_gate:" + ",".join(reasons))
+
+    elif action == "expire":
+        if before == "expired":
+            return EntitlementLifecycleResult(record, before, before, False)
+        if before != "active":
+            raise ValueError("astop_entitlement_gate:active_entitlement_required_for_expiry")
+        record.entitlement_status = "expired"
+        if record.entitlement_expires_at is None or record.entitlement_expires_at > now:
+            record.entitlement_expires_at = now
+
+    else:  # revoke
+        if before == "revoked":
+            return EntitlementLifecycleResult(record, before, before, False)
+        if before == "expired":
+            raise ValueError("astop_entitlement_gate:expired_entitlement_cannot_revoke")
+        record.entitlement_status = "revoked"
+        record.revocation_status = "revoked"
+
+    record.save(
+        update_fields=[
+            "entitlement_status",
+            "entitlement_expires_at",
+            "revocation_status",
+            "updated_at",
+        ]
+    )
+    after = entitlement_lifecycle_state(record)
+    changed = before != after or previous_expiry != record.entitlement_expires_at
+    if changed:
+        _audit(
+            lead,
+            action=action,
+            previous_state=before,
+            current_state=after,
+            reason=reason,
+            by=by,
+        )
+    return EntitlementLifecycleResult(record, before, after, changed)

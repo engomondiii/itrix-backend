@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsDashboardUser, IsNotViewer
-from apps.leads.models import ASTOPEngagement, CommercialStage, Lead, LeadActivity, LeadStatus
+from apps.leads.models import ASTOPEngagement, Lead, LeadActivity, LeadStatus
 from apps.leads.serializers import (
     AssignSerializer,
     EscalateSerializer,
@@ -53,6 +53,7 @@ from apps.leads.services.lead_escalator import escalate_lead
 from apps.leads.services.lead_summary_generator import generate_lead_summary
 from apps.leads.services.lead_updater import (
     add_note,
+    apply_acquisition_context,
     apply_email_capture,
     assign_owner,
     book_meeting,
@@ -345,9 +346,11 @@ class LeadViewSet(
         lead = self.get_object()
         ser = AcquisitionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        lead.acquisition_context = {**(lead.acquisition_context or {}), **ser.validated_data}
-        lead.current_marketing_stage = CommercialStage.SALES_PLATFORM
-        lead.save(update_fields=["acquisition_context", "current_marketing_stage", "updated_at"])
+        apply_acquisition_context(
+            lead,
+            context=dict(ser.validated_data),
+            by=self._actor(),
+        )
         return self._detail_response(lead)
 
     @action(detail=True, methods=["post"], url_path="trust-screening", permission_classes=[IsAuthenticated, IsDashboardUser, IsNotViewer])

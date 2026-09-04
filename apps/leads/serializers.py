@@ -269,12 +269,16 @@ class LeadEmailCaptureSerializer(serializers.Serializer):
     company = serializers.CharField(required=False, allow_blank=True, default="")
     source = serializers.CharField(required=False, allow_blank=True, default="web")
 
+
 class AcquisitionSerializer(serializers.Serializer):
-    source_channel = serializers.CharField(required=False, allow_blank=True, default="")
-    campaign_content = serializers.CharField(required=False, allow_blank=True, default="")
-    referral_or_intro = serializers.CharField(required=False, allow_blank=True, default="")
-    problem_topic = serializers.CharField(required=False, allow_blank=True, default="")
-    anonymous_session_id = serializers.CharField(required=False, allow_blank=True, default="")
+    source_channel = serializers.CharField(required=False, allow_blank=True)
+    campaign_content = serializers.CharField(required=False, allow_blank=True)
+    referral_or_intro = serializers.CharField(required=False, allow_blank=True)
+    problem_topic = serializers.CharField(required=False, allow_blank=True)
+    anonymous_session_id = serializers.CharField(required=False, allow_blank=True)
+    # Internal/dashboard confirmation only. Public VisitorSession capture does not
+    # accept this field, so referral free text can never self-promote to trusted.
+    trusted_introduction_confirmed = serializers.BooleanField(required=False)
 
 
 class TrustScreeningSerializer(serializers.Serializer):

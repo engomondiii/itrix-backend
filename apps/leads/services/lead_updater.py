@@ -203,3 +203,37 @@ def apply_email_capture(
             meta={"fields": changed, "source": source},
         )
     return lead
+
+
+def apply_acquisition_context(lead: Lead, *, context: dict, by=None) -> Lead:
+    """Update internal acquisition context and apply a bounded introduction accelerator.
+
+    Free-text referral/introduction data is attribution only. A trusted introduction
+    accelerates human follow-up only when an authenticated operator explicitly supplies
+    ``trusted_introduction_confirmed=true``. Even then this function does not alter
+    persona, trust, verification, authorization, entitlement, relationship/journey
+    state, marketing stage, or ASTOP/ALPHA eligibility.
+    """
+    incoming = dict(context or {})
+    confirmation_supplied = "trusted_introduction_confirmed" in incoming
+    trusted_confirmed = incoming.get("trusted_introduction_confirmed") is True
+    was_confirmed = bool(
+        isinstance(lead.acquisition_context, dict)
+        and lead.acquisition_context.get("trusted_introduction_confirmed") is True
+    )
+
+    lead.acquisition_context = {**(lead.acquisition_context or {}), **incoming}
+    lead.save(update_fields=["acquisition_context", "updated_at"])
+
+    if confirmation_supplied and trusted_confirmed and not was_confirmed:
+        # Reuse the existing human-review accelerator. It changes attention/priority,
+        # not trust or commercial authorization, and records the operator decision.
+        from apps.leads.services.lead_escalator import escalate_lead
+
+        escalate_lead(
+            lead,
+            reason="Trusted introduction confirmed for priority human follow-up.",
+            priority="high",
+            by=by,
+        )
+    return lead

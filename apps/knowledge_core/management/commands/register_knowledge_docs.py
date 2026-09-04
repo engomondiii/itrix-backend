@@ -139,6 +139,8 @@ def source_authority_for(filename: str) -> tuple[str, bool, str]:
         return "authoritative", True, "Current canonical product/technology taxonomy and evidence boundaries"
     if "prism-paper-current_v2" in n:
         return "authoritative", True, "Current PRISM primary research evidence"
+    if "prism_and_astop_explained" in n:
+        return "governing", True, "Current controlled explanation of the PRISM-to-ASTOP relationship"
     if "astop_prism_public_safe_v2_3" in n:
         return "governing", True, "Approved public-safe synthesis bounded by GTM v2.3 and PRISM evidence"
     if "astop_technical_capabilities_current" in n or "axiom_tensor_qnta_current_controlled" in n:
@@ -156,6 +158,10 @@ def source_authority_for(filename: str) -> tuple[str, bool, str]:
 
 def technology_family_for(filename: str) -> str:
     n = filename.lower()
+    # The compatibility field cannot express a combined source. Mark it explicitly
+    # cross-cutting and carry the exact families in technology_families metadata.
+    if "axiom_tensor_qnta_current_controlled" in n:
+        return "cross_cutting"
     if "astop" in n and "prism" not in n:
         return "astop"
     if "prism" in n:
@@ -181,6 +187,64 @@ def technology_family_for(filename: str) -> str:
     return "general"
 
 
+def entity_relationship_metadata_for(filename: str) -> dict:
+    """Explicit entity/family/product relations for the current September sources."""
+    n = filename.lower()
+    if "axiom_tensor_qnta_current_controlled" in n:
+        return {
+            "canonical_entities": ["AXIOM-TENSOR", "QNTA"],
+            "technology_families": ["axiom_tensor", "qnta"],
+            "related_products": ["ALPHA Compute"],
+        }
+    if "prism_and_astop_explained" in n:
+        return {
+            "canonical_entities": ["PRISM", "ASTOP"],
+            "technology_families": ["prism", "astop"],
+            "related_products": ["ASTOP"],
+        }
+    if "prism-paper-current_v2" in n:
+        return {
+            "canonical_entities": ["PRISM"],
+            "technology_families": ["prism"],
+            "related_products": ["ASTOP"],
+        }
+    if "astop_prism_public_safe_v2_3" in n:
+        return {
+            "canonical_entities": ["ASTOP", "PRISM"],
+            "technology_families": ["astop", "prism"],
+            "related_products": ["ASTOP"],
+        }
+    if "astop_technical_capabilities_current" in n:
+        return {
+            "canonical_entities": ["ASTOP"],
+            "technology_families": ["astop"],
+            "related_products": ["ASTOP"],
+        }
+    if "productization_gtm_plan_v2.3" in n:
+        return {
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "technology_families": ["astop", "alpha_compute", "alpha_core"],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    if "sales_platform_mvp_guide_for_fidel_v3.5" in n:
+        return {
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "technology_families": [],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    if "white_paper_v3.5" in n:
+        return {
+            "canonical_entities": ["ASTOP", "PRISM", "AXIOM-TENSOR", "QNTA", "ALPHA Compute", "ALPHA Core"],
+            "technology_families": ["astop", "prism", "axiom_tensor", "qnta", "alpha_compute", "alpha_core"],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    return {
+        "canonical_entities": [],
+        "technology_families": [],
+        "related_products": [],
+    }
+
+
 def governance_metadata_for(filename: str, disclosure: str) -> dict:
     """Explicit September-2026 metadata for authority, audience, evidence and claim ceilings."""
     n = filename.lower()
@@ -190,6 +254,7 @@ def governance_metadata_for(filename: str, disclosure: str) -> dict:
         "claim_ceiling": 2 if disclosure in {"public", "controlled_public"} else 3,
         "entity_type": "mixed",
         "evidence_status": "mixed",
+        **entity_relationship_metadata_for(filename),
     }
     if "productization_gtm_plan_v2.3" in n:
         meta.update(approved_audience=["internal", "commercial"], allowed_journey_stages=["QUALIFIED", "NDA", "EVALUATION", "LICENSED"], claim_ceiling=3, entity_type="governance", evidence_status="governance")

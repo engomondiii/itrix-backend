@@ -13,6 +13,9 @@ import pathlib
 from apps.knowledge_core.management.commands.register_knowledge_docs import (
     FOLDER_DISCLOSURE,
     SUPERSEDED_FILENAMES,
+    entity_relationship_metadata_for,
+    source_authority_for,
+    technology_family_for,
 )
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -105,3 +108,54 @@ def test_journey_states_map_to_knowledge_disclosure_stages():
 
     assert not _stage_allowed(["NDA"], "ARRIVED")
     assert not _stage_allowed(["LICENSED"], "INTEGRATION")
+
+
+def test_current_prism_astop_explanation_has_explicit_governing_authority():
+    authority, current, rule = source_authority_for("PRISM_and_ASTOP_Explained.docx")
+    assert authority == "governing"
+    assert current is True
+    assert "PRISM-to-ASTOP" in rule
+
+
+def test_combined_axiom_tensor_qnta_source_is_not_collapsed_to_one_family():
+    filename = "AXIOM_TENSOR_QNTA_Current_Controlled.md"
+    assert technology_family_for(filename) == "cross_cutting"
+    metadata = entity_relationship_metadata_for(filename)
+    assert metadata["technology_families"] == ["axiom_tensor", "qnta"]
+    assert metadata["canonical_entities"] == ["AXIOM-TENSOR", "QNTA"]
+    assert metadata["related_products"] == ["ALPHA Compute"]
+
+
+def test_prism_to_astop_relationship_is_explicit_metadata():
+    metadata = entity_relationship_metadata_for("PRISM_and_ASTOP_Explained.docx")
+    assert metadata["canonical_entities"] == ["PRISM", "ASTOP"]
+    assert metadata["technology_families"] == ["prism", "astop"]
+    assert metadata["related_products"] == ["ASTOP"]
+
+
+def test_vector_metadata_carries_entities_products_and_multiple_families(db):
+    from apps.knowledge_core.models import KnowledgeChunk, KnowledgeDocument
+    from apps.knowledge_core.services.metadata_tagger import build_chunk_metadata
+
+    document = KnowledgeDocument.objects.create(
+        title="AXIOM TENSOR QNTA Current Controlled",
+        file_path="knowledge_docs/internal_only/AXIOM_TENSOR_QNTA_Current_Controlled.md",
+        namespace="technology",
+        disclosure_level="internal_only",
+        technology_family="cross_cutting",
+        technology_families=["axiom_tensor", "qnta"],
+        canonical_entities=["AXIOM-TENSOR", "QNTA"],
+        related_products=["ALPHA Compute"],
+    )
+    chunk = KnowledgeChunk(
+        document=document,
+        namespace="technology",
+        disclosure_level="internal_only",
+        chunk_index=0,
+        heading="Relationship",
+        text="Controlled relationship metadata.",
+    )
+    metadata = build_chunk_metadata(document=document, chunk=chunk)
+    assert metadata["technology_families"] == ["axiom_tensor", "qnta"]
+    assert metadata["canonical_entities"] == ["AXIOM-TENSOR", "QNTA"]
+    assert metadata["related_products"] == ["ALPHA Compute"]

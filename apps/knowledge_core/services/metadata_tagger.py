@@ -39,6 +39,9 @@ def build_chunk_metadata(*, document, chunk) -> dict:
         "allowed_journey_stages": list(getattr(document, "allowed_journey_stages", None) or []),
         "permitted_paraphrase": getattr(document, "permitted_paraphrase", "approved") or "approved",
         "technology_family": getattr(document, "technology_family", "general") or "general",
+        "technology_families": list(getattr(document, "technology_families", None) or []),
+        "canonical_entities": list(getattr(document, "canonical_entities", None) or []),
+        "related_products": list(getattr(document, "related_products", None) or []),
         "claim_ceiling": int(getattr(document, "claim_ceiling", 0) or 0),
         **tag_with_customer_scope({}, document),
     }

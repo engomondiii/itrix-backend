@@ -134,6 +134,12 @@ class KnowledgeDocument(BaseModel):
     technology_family = models.CharField(
         max_length=20, choices=TechnologyFamily.choices, default=TechnologyFamily.GENERAL, db_index=True
     )
+    # The singular legacy family remains for backwards compatibility. These lists are
+    # the canonical representation for combined sources and explicit entity→product
+    # relationships used by retrieval/governance.
+    technology_families = models.JSONField(default=list, blank=True)
+    canonical_entities = models.JSONField(default=list, blank=True)
+    related_products = models.JSONField(default=list, blank=True)
     # Claim level ceiling used by orchestration.  0 means metadata has not assigned a
     # special ceiling; the normal journey/disclosure ceiling still applies.
     claim_ceiling = models.PositiveSmallIntegerField(default=0)

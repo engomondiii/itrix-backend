@@ -8,6 +8,7 @@ from apps.analytics.views_v6 import (
     AttachmentAnalyticsView,
     ConversationAnalyticsView,
     CustomerHealthAnalyticsView,
+    ManagementAnalyticsView,
     OutcomeProgressAnalyticsView,
     StreamingAnalyticsView,
     SupportLoadAnalyticsView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("conversations/", ConversationAnalyticsView.as_view(), name="analytics-conversations"),
     path("attachments/", AttachmentAnalyticsView.as_view(), name="analytics-attachments"),
     path("streaming/", StreamingAnalyticsView.as_view(), name="analytics-streaming"),
+    path("management/", ManagementAnalyticsView.as_view(), name="analytics-management"),
 ]

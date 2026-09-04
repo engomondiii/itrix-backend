@@ -1,11 +1,12 @@
 """Keep denormalized cross-product state aligned when governed records change."""
 from __future__ import annotations
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
+from apps.core.exceptions import ResourceConflict
 from apps.evaluations.models import Evaluation, EvaluationPackage
-from apps.leads.models import ASTOPEngagement, Lead
+from apps.leads.models import ASTOPEngagement, Lead, TrustStatus
 
 # Fee deliberation/finalization is intentionally orthogonal to product progression.
 _FEE_ONLY_FIELDS = {
@@ -35,6 +36,37 @@ def _sync(lead) -> None:
         # A denormalized synchronization failure must never make the authoritative
         # ASTOP/Evaluation write disappear. Read consumers still derive state directly.
         return
+
+
+@receiver(pre_save, sender=Lead)
+def _protect_governed_trust_resolution(sender, instance, update_fields=None, **kwargs):
+    """Prevent legacy/direct writers from bypassing an established REVIEW/REJECT state."""
+    if instance._state.adding:
+        return
+    if update_fields is not None and not {
+        "trust_status",
+        "trust_screening",
+    }.intersection(set(update_fields)):
+        return
+
+    previous = Lead.objects.filter(pk=instance.pk).values("trust_status", "trust_screening").first()
+    if previous is None or previous["trust_status"] not in {TrustStatus.REVIEW, TrustStatus.REJECT}:
+        return
+
+    changed = (
+        previous["trust_status"] != instance.trust_status
+        or previous["trust_screening"] != instance.trust_screening
+    )
+    if not changed:
+        return
+
+    from apps.leads.services.human_review import is_governed_trust_review_write
+
+    if is_governed_trust_review_write(instance.pk):
+        return
+    raise ResourceConflict(
+        "Existing REVIEW/REJECT trust state must be handled through the governed trust-review workflow."
+    )
 
 
 @receiver(post_save, sender=ASTOPEngagement)

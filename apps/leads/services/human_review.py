@@ -6,6 +6,7 @@ License-Out and entitlement services remain their authoritative writers.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -14,6 +15,9 @@ from django.utils import timezone
 from apps.leads.models import ASTOPEngagement, Lead, LeadActivity, TrustStatus
 
 _ALLOWED_REVIEWER_ROLES = {"ADMIN", "ASSESSMENT", "SPECIALIST"}
+_TRUST_REVIEW_WRITES: ContextVar[frozenset[str]] = ContextVar(
+    "itrix_governed_trust_review_writes", default=frozenset()
+)
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,11 @@ def _authorized_reviewer(by) -> bool:
         and getattr(by, "is_active", False)
         and getattr(by, "role", "") in _ALLOWED_REVIEWER_ROLES
     )
+
+
+def is_governed_trust_review_write(lead_id) -> bool:
+    """True only while ``resolve_trust_review`` owns the Lead trust-state write."""
+    return str(lead_id) in _TRUST_REVIEW_WRITES.get()
 
 
 def human_review_snapshot(lead: Lead) -> dict:
@@ -136,15 +145,21 @@ def resolve_trust_review(
     if decision in {TrustStatus.REVIEW, TrustStatus.REJECT}:
         locked.escalated = True
         locked.escalated_at = locked.escalated_at or reviewed_at
-    locked.save(
-        update_fields=[
-            "trust_screening",
-            "trust_status",
-            "escalated",
-            "escalated_at",
-            "updated_at",
-        ]
-    )
+
+    current = _TRUST_REVIEW_WRITES.get()
+    token = _TRUST_REVIEW_WRITES.set(current | {str(locked.pk)})
+    try:
+        locked.save(
+            update_fields=[
+                "trust_screening",
+                "trust_status",
+                "escalated",
+                "escalated_at",
+                "updated_at",
+            ]
+        )
+    finally:
+        _TRUST_REVIEW_WRITES.reset(token)
 
     LeadActivity.objects.create(
         lead=locked,

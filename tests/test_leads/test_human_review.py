@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 
 from apps.clients.tokens import build_tokens_for_client
 from apps.evaluations.models import Evaluation, EvaluationPackage
-from apps.leads.models import LeadActivity, TrustStatus
+from apps.leads.models import Lead, LeadActivity, TrustStatus
 from apps.leads.services.commercial_progression import verified_counterparty_gate
 from apps.leads.services.human_review import human_review_snapshot, resolve_trust_review
 from tests.factories.client_factory import ClientFactory
@@ -77,8 +77,10 @@ def test_review_and_reject_remain_fail_closed_for_sensitive_progression():
     assert verified_counterparty_gate(review).allowed is False
     assert "trust_review_required" in verified_counterparty_gate(review).reasons
 
-    review.trust_status = TrustStatus.REJECT
-    review.save(update_fields=["trust_status", "updated_at"])
+    # Test setup bypasses model signals deliberately; product gates must still derive
+    # REJECT as fail-closed from the authoritative stored state.
+    Lead.objects.filter(pk=review.pk).update(trust_status=TrustStatus.REJECT)
+    review.refresh_from_db()
     assert verified_counterparty_gate(review).allowed is False
     assert "trust_rejected" in verified_counterparty_gate(review).reasons
 
@@ -101,9 +103,11 @@ def test_pass_resolution_still_requires_unrelated_identity_and_entity_gates():
 
 def test_direct_reject_to_pass_or_review_is_blocked_without_reconsideration_flow():
     lead = _review_lead()
-    lead.trust_status = TrustStatus.REJECT
-    lead.trust_screening = {"status": "reject", "rationale": "Controlled rejection."}
-    lead.save(update_fields=["trust_status", "trust_screening", "updated_at"])
+    Lead.objects.filter(pk=lead.pk).update(
+        trust_status=TrustStatus.REJECT,
+        trust_screening={"status": "reject", "rationale": "Controlled rejection."},
+    )
+    lead.refresh_from_db()
     reviewer = AdminUserFactory()
 
     with pytest.raises(ValueError, match="governed_reconsideration"):
@@ -151,6 +155,52 @@ def test_trust_decision_resynchronizes_stale_substantive_product_gates():
     assert lead.commercial_progress["alpha_compute_gate"] is False
     assert lead.commercial_progress["alpha_core_gate"] is False
     assert lead.commercial_progress["next_best_action"] == "continue_discovery"
+
+
+def test_legacy_trust_screening_endpoint_cannot_bypass_governed_review_or_erase_history(api_client):
+    reviewer = SpecialistUserFactory()
+    api_client.force_authenticate(user=reviewer)
+
+    lead = _review_lead()
+    url = f"/api/v1/leads/{lead.id}/trust-screening/"
+    response = api_client.post(
+        url,
+        {
+            "status": "pass",
+            "rationale": "Attempted direct override.",
+            "identity_confidence": "high",
+            "use_case_coherence": "high",
+            "protection_acceptance": True,
+        },
+        format="json",
+    )
+    assert response.status_code == 409
+    lead.refresh_from_db()
+    assert lead.trust_status == TrustStatus.REVIEW
+    assert lead.trust_screening["rationale"] == "Identity evidence requires human confirmation."
+
+    # After a governed rejection, the legacy endpoint also cannot erase the reviewer/time.
+    resolve_trust_review(
+        lead,
+        decision=TrustStatus.REJECT,
+        rationale="Governed rejection.",
+        by=AdminUserFactory(),
+    )
+    lead.refresh_from_db()
+    original_human = dict(lead.trust_screening["human_review"])
+    response = api_client.post(
+        url,
+        {
+            "status": "pass",
+            "rationale": "Attempted rejection reversal.",
+            "protection_acceptance": True,
+        },
+        format="json",
+    )
+    assert response.status_code == 409
+    lead.refresh_from_db()
+    assert lead.trust_status == TrustStatus.REJECT
+    assert lead.trust_screening["human_review"] == original_human
 
 
 def test_internal_review_endpoint_permissions_and_customer_separation(api_client):

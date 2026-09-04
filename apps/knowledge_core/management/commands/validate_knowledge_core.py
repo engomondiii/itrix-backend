@@ -133,7 +133,10 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"  current: {filename} [{level}/{authority}]"))
 
         stale_astop = KnowledgeDocument.objects.filter(is_current=True).filter(
-            Q(title__icontains="ASTOP Team") | Q(title__icontains="ASTOP Pro")
+            Q(title__iexact="ASTOP Team")
+            | Q(title__icontains="ASTOP Team ")
+            | Q(title__iexact="ASTOP Pro")
+            | Q(title__icontains="ASTOP Pro ")
         )
         if stale_astop.exists():
             problems += stale_astop.count()

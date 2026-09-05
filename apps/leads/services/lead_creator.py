@@ -173,7 +173,7 @@ class LeadCreator:
             email="",
             industry=_ORG_LABEL.get(single(answers.get("Q6")), ""),
             role=_ROLE_LABEL.get(single(answers.get("Q7")), ""),
-            product_route=product_route if product_route in dict(Lead._meta.get_field("product_route").choices) else "general",
+            product_route=product_route if product_route in dict(Lead._meta.get_field("product_route").choices) else "undetermined",
             commercial_path=(license_pathway or "none"),
             special_rights=exclusivity.special_rights,
             compute_bottleneck=summary,

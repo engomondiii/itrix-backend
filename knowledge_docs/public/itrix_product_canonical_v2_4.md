@@ -1,6 +1,8 @@
-# itriX Product Canonical — ALPHA Compute & ALPHA Core v2.4
+# itriX Product Canonical — ALPHA Compute & ALPHA Core v2.4 (HISTORICAL)
 
-**Status: current canonical product doctrine for visitor-facing AI answers.**
+**Status: SUPERSEDED / NONCURRENT. Retained only for historical source traceability.**
+**Superseded by:** `itrix_product_canonical_v3_5.md` and the September 2026 White Paper v3.5 taxonomy.
+**Retrieval rule:** this source must not govern current visitor answers.
 **Source:** ALPHA Compute & ALPHA Core — Computational Infrastructure for the Age of AI, White Paper v2.4, August 2026.
 
 ## Core thesis

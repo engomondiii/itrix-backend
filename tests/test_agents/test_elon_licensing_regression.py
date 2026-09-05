@@ -256,7 +256,11 @@ def test_governed_conversation_prompt_contains_cross_cutting_licensing_controls(
         "controlled evaluation remains controlled evaluation",
         "alpha compute",
         "alpha core",
-        "axiom, cre and fqnm are distinct method families",
+        "astop",
+        "prism",
+        "axiom-tensor",
+        "qnta",
+        "technologies — these are not separately sold products",
         "binary labels, rankings, scores, thresholds",
         "do not request identity/contact on your own",
     ):

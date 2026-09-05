@@ -35,16 +35,20 @@ class Command(BaseCommand):
 
         if opts["document_id"]:
             try:
-                docs = [KnowledgeDocument.objects.get(pk=opts["document_id"])]
+                doc = KnowledgeDocument.objects.get(pk=opts["document_id"])
+                if not doc.is_current:
+                    raise CommandError("Refusing to ingest a non-current/superseded document")
+                docs = [doc]
             except KnowledgeDocument.DoesNotExist as exc:
                 raise CommandError(f"No document with id {opts['document_id']}") from exc
         elif opts["all_pending"]:
-            docs = list(KnowledgeDocument.objects.filter(ingestion_status=IngestionStatus.PENDING))
+            docs = list(KnowledgeDocument.objects.filter(is_current=True, ingestion_status=IngestionStatus.PENDING))
         elif opts["all_failed"]:
-            docs = list(KnowledgeDocument.objects.filter(ingestion_status=IngestionStatus.FAILED))
+            docs = list(KnowledgeDocument.objects.filter(is_current=True, ingestion_status=IngestionStatus.FAILED))
         else:
             docs = list(
                 KnowledgeDocument.objects.filter(
+                    is_current=True,
                     ingestion_status__in=[IngestionStatus.PENDING, IngestionStatus.FAILED]
                 )
             )

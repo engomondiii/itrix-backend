@@ -33,7 +33,7 @@ class Command(BaseCommand):
 
         ctx = AgentContext(
             prompt=question,
-            product_route="general",
+            product_route="undetermined",
             tier=4,
             plane=PLANE_PUBLIC,
             context_label="rag_verification",
@@ -68,22 +68,20 @@ class Command(BaseCommand):
         for chunk_id in ids:
             row = rows[chunk_id]
             blob = f"{row.document.title} {row.document.file_path}".lower()
-            is_current = (
-                "wp_alpha_compute_core_v2.4" in blob
-                or "wp alpha compute core v2.4" in blob
-                or "itrix_product_canonical_v2_4" in blob
-                or "itrix product canonical v2 4" in blob
+            is_current = bool(row.document.is_current) and (
+                "itrix_product_canonical_v3_5" in blob
+                or "itrix product canonical v3 5" in blob
             )
             if is_current:
                 current += 1
-            marker = " CURRENT" if is_current else ""
+            marker = " CURRENT-CANONICAL" if is_current else ""
             self.stdout.write(
                 f"  ->{marker} {row.document.title} | {row.namespace} | "
                 f"{row.disclosure_level} | {row.heading} | {row.vector_id}"
             )
 
         if current == 0:
-            raise CommandError("AI answer had citations, but none came from a current canonical product source.")
+            raise CommandError("AI answer had citations, but none came from the current v3.5 canonical product source.")
 
         self.stdout.write(
             self.style.SUCCESS(

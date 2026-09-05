@@ -28,6 +28,7 @@ from apps.knowledge_core.models import (
     KnowledgeChunk,
     KnowledgeConflict,
 )
+from apps.knowledge_core.source_manifest import ClaimDomain
 from apps.knowledge_core.services.embedder import Embedder
 from apps.knowledge_core.services.namespace_router import normalize_namespace
 
@@ -37,6 +38,12 @@ VISITOR_KNOWLEDGE_NAMESPACES: tuple[str, ...] = (
     "company", "astop", "technology", "alpha-compute", "alpha-core", "proofs", "licensing",
 )
 _AUTHORITY_RANK = {"authoritative": 4, "governing": 3, "working": 2, "legacy": 1}
+_TAXONOMY_QUERY = re.compile(
+    r"(?:\b(products?|sell|sells|sold|offer|offers|offering|catalog(?:ue)?|portfolio|"
+    r"technology|technologies|ASTOP|ALPHA(?:\s+(?:Compute|Core))?|PRISM|AXIOM(?:-TENSOR)?|CRE|FQNM|QNTA)\b|"
+    r"what\s+does\s+itrix\s+do)",
+    re.I,
+)
 _HARD_FACT_QUERY = re.compile(
     r"\b(patent|patents|filing|application number|grant(?:ed)?|prosecution|ownership|"
     r"incorporat|company registered|commercial policy|revenue shar|value shar|royalt|"
@@ -44,6 +51,37 @@ _HARD_FACT_QUERY = re.compile(
     re.I,
 )
 _PATENT_QUERY = re.compile(r"\b(patent|filing|application|grant|prosecution)\b", re.I)
+_COMMERCIAL_QUERY = re.compile(r"\b(buy|purchase|price|pricing|license|licence|self[- ]service|download|installer|deployment|production rights|commercial)\b", re.I)
+_RESEARCH_QUERY = re.compile(r"\b(evidence|benchmark|paper|study|experiment|result|fidelity|reduction|validated|validation)\b", re.I)
+_LEGAL_QUERY = re.compile(r"\b(nda|contract|agreement|rights|entitlement|license-out|legal)\b", re.I)
+_TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|compute|computation|observation|representation|execution|hardware|software)\b", re.I)
+
+
+def _query_claim_domains(query: str) -> set[str]:
+    text = query or ""
+    out: set[str] = set()
+    if _TAXONOMY_QUERY.search(text):
+        out.update({ClaimDomain.TAXONOMY, ClaimDomain.PUBLIC_EXPLANATION})
+    if _COMMERCIAL_QUERY.search(text):
+        out.add(ClaimDomain.COMMERCIALIZATION)
+    if _RESEARCH_QUERY.search(text):
+        out.add(ClaimDomain.RESEARCH)
+    if _LEGAL_QUERY.search(text):
+        out.add(ClaimDomain.LEGAL)
+    if _TECHNICAL_QUERY.search(text):
+        out.add(ClaimDomain.TECHNICAL)
+    return out
+
+
+def _domain_rank(chunk: dict, query_domains: set[str]) -> int:
+    source_domains = {str(x) for x in (chunk.get("claim_domains") or []) if str(x)}
+    if not query_domains:
+        return 1
+    if source_domains & query_domains:
+        return 2
+    # Unclassified sources are retained as supporting material but never outrank an
+    # explicit source that governs the claim domain.
+    return 1 if not source_domains else 0
 
 
 def _canonical_priority_for_row(row: KnowledgeChunk) -> int:
@@ -80,6 +118,10 @@ def _row_to_dict(row: KnowledgeChunk, *, score=None, retrieval_backend: str = "d
         "claim_ceiling": int(getattr(doc, "claim_ceiling", 0) or 0),
         "entity_type": getattr(doc, "entity_type", "mixed"),
         "evidence_status": getattr(doc, "evidence_status", "mixed"),
+        "claim_domains": list(getattr(doc, "claim_domains", None) or []),
+        "supersedes": list(getattr(doc, "supersedes", None) or []),
+        "superseded_by": getattr(doc, "superseded_by", ""),
+        "prohibited_messages": list(getattr(doc, "prohibited_messages", None) or []),
         "score": score,
         "retrieval_backend": retrieval_backend,
     }
@@ -98,7 +140,19 @@ def _audience_allowed(values: list[str], audience: str) -> bool:
     values = [str(v).strip().lower() for v in (values or []) if str(v).strip()]
     if not values:
         return True
-    return "all" in values or "general" in values or (audience or "general").lower() in values
+    requested = (audience or "general").strip().lower() or "general"
+    if "all" in values or requested in values:
+        return True
+    # ``AgentContext`` deliberately defaults an unidentified ordinary visitor to
+    # ``general``.  Current public sources are tagged ``public``/``visitor`` rather
+    # than redundantly adding ``general`` to every row.  Treating ``general`` as an
+    # exact label therefore filtered the very canonical public sources intended for
+    # anonymous visitors, leaving only hard facts in context.  General means the
+    # non-specialised public visitor audience; it must NOT widen to customer/internal
+    # audiences.
+    if requested == "general":
+        return bool({"general", "public", "visitor"} & set(values))
+    return "general" in values
 
 
 _JOURNEY_TO_KNOWLEDGE_STAGE = {
@@ -194,7 +248,15 @@ def _keyword_fallback(
         blob = f"{row.document.title}\n{row.heading}\n{row.text}".lower()
         return sum(blob.count(t) for t in terms)
 
-    ranked.sort(key=lambda row: (_canonical_priority_for_row(row), overlap(row)), reverse=True)
+    query_domains = _query_claim_domains(query)
+    ranked.sort(
+        key=lambda row: (
+            _domain_rank(_row_to_dict(row), query_domains),
+            _canonical_priority_for_row(row),
+            overlap(row),
+        ),
+        reverse=True,
+    )
     out = [_row_to_dict(row, retrieval_backend="keyword_fallback") for row in ranked]
     out = [c for c in out if _metadata_applicable(c, audience=audience, journey_stage=journey_stage, claim_ceiling=claim_ceiling)]
     return out[: max(top_k * 3, top_k)]
@@ -248,14 +310,23 @@ def _apply_source_precedence(query: str, chunks: list[dict], *, top_k: int) -> l
     if not chunks:
         return []
     _record_same_authority_conflict(query, chunks)
+    query_domains = _query_claim_domains(query)
     hard = bool(_HARD_FACT_QUERY.search(query or ""))
     if hard:
-        highest = max(_AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) for c in chunks)
-        chunks = [c for c in chunks if _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) == highest]
-    # Authority is a primary ordering key, not a fractional semantic bonus. For ordinary
-    # multi-topic questions it orders applicable evidence without discarding other topics.
+        # Highest authority is meaningful only among sources applicable to the same claim
+        # domain.  This prevents an unrelated authoritative register from suppressing a
+        # current governing product/technical source.
+        best_domain = max(_domain_rank(c, query_domains) for c in chunks)
+        applicable = [c for c in chunks if _domain_rank(c, query_domains) == best_domain]
+        highest = max(_AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) for c in applicable)
+        chunks = [
+            c for c in chunks
+            if _domain_rank(c, query_domains) == best_domain
+            and _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) == highest
+        ]
     chunks.sort(
         key=lambda c: (
+            _domain_rank(c, query_domains),
             _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0),
             int(c.get("canonical_priority") or 0),
             float(c.get("score") or 0.0),
@@ -268,10 +339,17 @@ def _apply_source_precedence(query: str, chunks: list[dict], *, top_k: int) -> l
 def _structured_hard_facts(
     query: str, *, context: str, audience: str, claim_ceiling: int,
 ) -> list[dict]:
-    if not _HARD_FACT_QUERY.search(query or ""):
+    taxonomy_query = bool(_TAXONOMY_QUERY.search(query or ""))
+    if not (_HARD_FACT_QUERY.search(query or "") or taxonomy_query):
         return []
     qs = HardFact.objects.filter(is_current=True)
-    if _PATENT_QUERY.search(query or ""):
+    if taxonomy_query:
+        qs = qs.filter(key__in=[
+            "itrix-current-product-catalogue",
+            "itrix-current-technology-taxonomy",
+            "astop-prism-entity-types",
+        ])
+    elif _PATENT_QUERY.search(query or ""):
         qs = qs.filter(category=HardFact.Category.PATENT)
     if context != "internal":
         qs = qs.filter(disclosure_level__in=["public", "controlled_public"])
@@ -312,6 +390,7 @@ def _structured_hard_facts(
             "permitted_paraphrase": "approved",
             "technology_family": "general",
             "claim_ceiling": fact.claim_ceiling,
+            "claim_domains": [ClaimDomain.TAXONOMY, ClaimDomain.PUBLIC_EXPLANATION] if taxonomy_query else [],
             "score": 1.0,
             "retrieval_backend": "hard_fact_registry",
         })

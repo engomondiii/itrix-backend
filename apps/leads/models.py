@@ -77,10 +77,14 @@ class SpecialRights(models.TextChoices):
 
 
 class ProductRouteCode(models.TextChoices):
+    UNDETERMINED = "undetermined", "Not yet assessed"
+    ASTOP = "astop", "ASTOP"
     ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
     ALPHA_CORE = "alpha_core", "ALPHA Core"
-    BOTH = "both", "Both"
-    GENERAL = "general", "General"
+    # Historical compatibility codes. New discovery-stage records must not use these as
+    # a shortcut for qualification.
+    BOTH = "both", "Multiple products (legacy)"
+    GENERAL = "general", "General / legacy"
 
 
 class CommercialStage(models.TextChoices):
@@ -107,17 +111,22 @@ class CommercialPathCode(models.TextChoices):
 
 # Display-label maps used by serializers (code -> dashboard display string).
 PRODUCT_ROUTE_DISPLAY = {
+    "undetermined": "Not yet assessed",
+    "astop": "ASTOP",
     "alpha_compute": "ALPHA Compute",
     "alpha_core": "ALPHA Core",
-    "both": "Both",
-    "general": "ALPHA Compute",  # general surfaces as Compute-leaning in the dashboard
+    "both": "Multiple products",
+    # Historical neutral/general rows are deliberately presented as unassessed; they
+    # must never masquerade as an ALPHA Compute qualification.
+    "general": "Not yet assessed",
+    "": "Not yet assessed",
 }
 COMMERCIAL_PATH_DISPLAY = {
     "non_exclusive": "Non-Exclusive",
     "exclusive": "Exclusive",
     "strategic": "Strategic",
-    "none": "Non-Exclusive",
-    "": "Non-Exclusive",
+    "none": "Not yet determined",
+    "": "Not yet determined",
 }
 
 TERMINAL_STATUSES = {LeadStatus.LICENSED, LeadStatus.CLOSED, LeadStatus.LOST}
@@ -163,7 +172,7 @@ class Lead(BaseModel):
 
     # ── Routing ──────────────────────────────────────────────────────────────
     product_route = models.CharField(
-        max_length=20, choices=ProductRouteCode.choices, default=ProductRouteCode.GENERAL
+        max_length=20, choices=ProductRouteCode.choices, default=ProductRouteCode.UNDETERMINED
     )
     commercial_path = models.CharField(
         max_length=20, choices=CommercialPathCode.choices, default=CommercialPathCode.NONE
@@ -288,11 +297,11 @@ class Lead(BaseModel):
 
     @property
     def product_route_display(self) -> str:
-        return PRODUCT_ROUTE_DISPLAY.get(self.product_route, "ALPHA Compute")
+        return PRODUCT_ROUTE_DISPLAY.get(self.product_route, "Not yet assessed")
 
     @property
     def commercial_path_display(self) -> str:
-        return COMMERCIAL_PATH_DISPLAY.get(self.commercial_path, "Non-Exclusive")
+        return COMMERCIAL_PATH_DISPLAY.get(self.commercial_path, "Not yet determined")
 
 
 class ASTOPStage(models.TextChoices):

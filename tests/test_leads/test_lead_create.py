@@ -29,12 +29,14 @@ def _create(session, answers):
     )
 
 
-def test_creates_lead_with_scoring_and_routing():
+def test_creates_lead_with_scoring_without_premature_product_qualification():
     session = ReviewSessionFactory()
     lead = _create(session, EXECUTION_ANSWERS)
     assert isinstance(lead, Lead)
     assert lead.tier == 1
-    assert lead.product_route == "alpha_core"
+    assert lead.product_route == "undetermined"
+    # The legacy questionnaire can still capture a commercial-interest hypothesis, but
+    # it cannot manufacture a governed product opportunity.
     assert lead.commercial_path == "strategic"
     assert lead.score >= 80
 
@@ -76,7 +78,7 @@ def test_maps_human_readable_industry_and_role():
 def test_display_properties():
     session = ReviewSessionFactory()
     lead = _create(session, EXECUTION_ANSWERS)
-    assert lead.product_route_display == "ALPHA Core"
+    assert lead.product_route_display == "Not yet assessed"
     assert lead.commercial_path_display == "Strategic"
 
 

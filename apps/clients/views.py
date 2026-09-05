@@ -323,11 +323,11 @@ class PortalBriefingView(APIView):
             Thread.objects.filter(client=client).order_by("-updated_at").first()
             or Thread.objects.filter(lead=client.lead).order_by("-updated_at").first()
         )
-        route = getattr(client.lead, "product_route", "general") or "general"
+        route = getattr(client.lead, "product_route", "undetermined") or "undetermined"
         if thread is not None and not recommendation_allowed(thread):
-            route = "general"
-        if route not in {"alpha_compute", "alpha_core", "both", "general"}:
-            route = "general"
+            route = "undetermined"
+        if route not in {"undetermined", "astop", "alpha_compute", "alpha_core", "both", "general"}:
+            route = "undetermined"
 
         sections: list[dict] = []
         mirror = result.problem_mirror_structured or {}

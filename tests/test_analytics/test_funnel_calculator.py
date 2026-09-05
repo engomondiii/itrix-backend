@@ -46,11 +46,17 @@ def test_overview_shape_matches_dashboard():
 
 
 def test_route_distribution_keys_are_display_strings():
+    LeadFactory(product_route="undetermined")
+    LeadFactory(product_route="astop")
     LeadFactory(product_route="alpha_compute")
     LeadFactory(product_route="alpha_core")
     LeadFactory(product_route="both")
     dist = route_distribution()
-    assert set(dist.keys()) == {"ALPHA Compute", "ALPHA Core", "Both"}
+    assert set(dist.keys()) == {
+        "Not yet assessed", "ASTOP", "ALPHA Compute", "ALPHA Core", "Multiple products"
+    }
+    assert dist["Not yet assessed"] >= 1
+    assert dist["ASTOP"] >= 1
     assert dist["ALPHA Compute"] >= 1
 
 

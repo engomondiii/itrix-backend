@@ -9,10 +9,41 @@ from __future__ import annotations
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.knowledge_core.models import DisclosureLevel, HardFact, SourceAuthority
+from apps.knowledge_core.canonical_taxonomy import PRODUCT_NAMES, TECHNOLOGIES
+from apps.knowledge_core.models import DisclosureLevel, HardFact, KnowledgeDocument, SourceAuthority
 
 
 FACTS = (
+    {
+        "key": "itrix-current-product-catalogue",
+        "category": HardFact.Category.CORPORATE,
+        "public_statement": f"itriX currently has three products: {', '.join(PRODUCT_NAMES[:-1])} and {PRODUCT_NAMES[-1]}.",
+        "publication_status": "current September 2026 product taxonomy",
+        "source_reference": "knowledge_docs/public/itrix_product_canonical_v3_5.md",
+        "disclosure_level": DisclosureLevel.PUBLIC,
+        "approved_audience": ["public", "visitor", "customer", "general"],
+        "claim_ceiling": 1,
+    },
+    {
+        "key": "itrix-current-technology-taxonomy",
+        "category": HardFact.Category.CORPORATE,
+        "public_statement": f"PRISM, AXIOM, AXIOM-TENSOR, CRE, FQNM and QNTA are itriX technologies rather than separately sold products.",
+        "publication_status": "current September 2026 technology taxonomy",
+        "source_reference": "knowledge_docs/public/itrix_product_canonical_v3_5.md",
+        "disclosure_level": DisclosureLevel.PUBLIC,
+        "approved_audience": ["public", "visitor", "customer", "general"],
+        "claim_ceiling": 1,
+    },
+    {
+        "key": "astop-prism-entity-types",
+        "category": HardFact.Category.CORPORATE,
+        "public_statement": "ASTOP is itriX's observation product and PRISM is the observation technology/architecture behind it; PRISM is not a separately sold product.",
+        "publication_status": "current September 2026 product/technology taxonomy",
+        "source_reference": "knowledge_docs/public/itrix_product_canonical_v3_5.md",
+        "disclosure_level": DisclosureLevel.PUBLIC,
+        "approved_audience": ["public", "visitor", "customer", "general"],
+        "claim_ceiling": 1,
+    },
     {
         "key": "kr-patent-applications-public-summary",
         "category": HardFact.Category.PATENT,
@@ -69,6 +100,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         now = timezone.now()
         for fact in FACTS:
+            source_reference = str(fact.get("source_reference") or "")
+            source_document = None
+            if source_reference.startswith("knowledge_docs/"):
+                source_document = KnowledgeDocument.objects.filter(
+                    file_path=source_reference, is_current=True
+                ).first()
             values = {
                 **fact,
                 "source_authority": SourceAuthority.AUTHORITATIVE,
@@ -76,6 +113,7 @@ class Command(BaseCommand):
                 "official_application_number": "",
                 "verified_grant_number": "",
                 "last_verified_at": now,
+                "source_document": source_document,
             }
             key = values.pop("key")
             if options["dry_run"]:

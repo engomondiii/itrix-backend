@@ -311,7 +311,7 @@ class ResultGenerator:
         defaults = {
             "tier": lead.tier,
             "score_breakdown": lead.score_breakdown,
-            "product_route": PRODUCT_ROUTE_DISPLAY.get(lead.product_route, "ALPHA Compute"),
+            "product_route": PRODUCT_ROUTE_DISPLAY.get(lead.product_route, "Not yet assessed"),
             "license_pathway": "",  # commercial pathway is not a My Review display field
             "primary_technologies": primary_technologies(lead.product_route),
             "problem_mirror": problem_text,

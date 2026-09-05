@@ -25,6 +25,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from apps.knowledge_core.models import KnowledgeDocument
+from apps.knowledge_core.source_manifest import policy_for
 
 INGESTIBLE_EXTS = {".docx", ".pdf", ".txt", ".md", ".markdown"}
 
@@ -129,30 +130,21 @@ def namespace_for(filename: str) -> str:
 
 
 def source_authority_for(filename: str) -> tuple[str, bool, str]:
-    """Conservative source-precedence metadata inferred only from explicit version/status cues."""
+    """Return governed source precedence without deriving authority from filename adjectives.
+
+    Significant sources are exact entries in ``source_manifest``.  The fallback is
+    intentionally conservative: explicit historical/archive cues may make a source legacy,
+    while unlisted material remains a current *working* source until an owner assigns a
+    stronger domain-scoped policy.  Words such as ``canonical``, ``register`` and
+    ``executed`` never grant authority by themselves.
+    """
+    policy = policy_for(filename)
+    if policy is not None:
+        return policy.authority, policy.current, policy.canonical_rule
+
     n = filename.lower()
     if filename in SUPERSEDED_FILENAMES or any(x in n for x in ("legacy", "superseded", "archive")):
         return "legacy", False, ""
-    if "productization_gtm_plan_v2.3" in n or "sales_platform_mvp_guide_for_fidel_v3.5" in n:
-        return "authoritative", True, "September 2026 governing commercialization / implementation source"
-    if "white_paper_v3.5" in n:
-        return "authoritative", True, "Current canonical product/technology taxonomy and evidence boundaries"
-    if "prism-paper-current_v2" in n:
-        return "authoritative", True, "Current PRISM primary research evidence"
-    if "prism_and_astop_explained" in n:
-        return "governing", True, "Current controlled explanation of the PRISM-to-ASTOP relationship"
-    if "astop_prism_public_safe_v2_3" in n:
-        return "governing", True, "Approved public-safe synthesis bounded by GTM v2.3 and PRISM evidence"
-    if "astop_technical_capabilities_current" in n or "axiom_tensor_qnta_current_controlled" in n:
-        return "governing", True, "Current controlled technical synthesis"
-    if "mvp_acceptance_rerun_feedback" in n:
-        return "governing", True, "Latest targeted MVP acceptance corrections"
-    if any(x in n for x in ("canonical", "register", "executed")):
-        return "authoritative", True, "Explicit canonical/register source"
-    if "itrix_company_overview_public" in n:
-        return "governing", True, "Current public company/technology synthesis"
-    if any(x in n for x in ("master technical architecture", "complete backend structure", "complete surface", "legal instruments", "content and flow playbook", "_overview_v2.0", "overview v2.0", "unified mathematical", "v2_4", "v2.4")):
-        return "governing", True, "Current approved governing source"
     return "working", True, ""
 
 
@@ -232,10 +224,16 @@ def entity_relationship_metadata_for(filename: str) -> dict:
             "technology_families": [],
             "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
         }
-    if "white_paper_v3.5" in n:
+    if "white_paper_v3.5" in n or "itrix_product_canonical_v3_5" in n or "itrix_company_overview_public" in n:
         return {
-            "canonical_entities": ["ASTOP", "PRISM", "AXIOM-TENSOR", "QNTA", "ALPHA Compute", "ALPHA Core"],
-            "technology_families": ["astop", "prism", "axiom_tensor", "qnta", "alpha_compute", "alpha_core"],
+            "canonical_entities": [
+                "ASTOP", "ALPHA Compute", "ALPHA Core",
+                "PRISM", "AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "QNTA",
+            ],
+            "technology_families": [
+                "astop", "alpha_compute", "alpha_core", "prism", "axiom",
+                "axiom_tensor", "cre", "fqnm", "qnta",
+            ],
             "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
         }
     return {
@@ -248,12 +246,17 @@ def entity_relationship_metadata_for(filename: str) -> dict:
 def governance_metadata_for(filename: str, disclosure: str) -> dict:
     """Explicit September-2026 metadata for authority, audience, evidence and claim ceilings."""
     n = filename.lower()
+    policy = policy_for(filename)
     meta = {
         "approved_audience": ["internal"] if disclosure == "internal_only" else ["public", "visitor", "customer"],
         "allowed_journey_stages": ["PUBLIC-SAFE", "QUALIFIED", "NDA", "EVALUATION", "LICENSED"],
         "claim_ceiling": 2 if disclosure in {"public", "controlled_public"} else 3,
         "entity_type": "mixed",
         "evidence_status": "mixed",
+        "claim_domains": list(policy.claim_domains) if policy else [],
+        "supersedes": list(policy.supersedes) if policy else [],
+        "superseded_by": policy.superseded_by if policy else "",
+        "prohibited_messages": list(policy.prohibited_messages) if policy else [],
         **entity_relationship_metadata_for(filename),
     }
     if "productization_gtm_plan_v2.3" in n:
@@ -264,6 +267,8 @@ def governance_metadata_for(filename: str, disclosure: str) -> dict:
         meta.update(approved_audience=["internal"], claim_ceiling=3, entity_type="mixed", evidence_status="mixed")
     elif "prism-paper-current_v2" in n:
         meta.update(claim_ceiling=2, entity_type="research", evidence_status="experimental")
+    elif "itrix_product_canonical_v3_5" in n or "itrix_company_overview_public" in n:
+        meta.update(claim_ceiling=2, entity_type="mixed", evidence_status="governance")
     elif "prism_and_astop_explained" in n or "astop_prism_public_safe" in n:
         meta.update(claim_ceiling=2, entity_type="mixed", evidence_status="experimental")
     elif "astop_technical_capabilities_current" in n:
@@ -364,8 +369,14 @@ class Command(BaseCommand):
                         "source_authority": authority,
                         "is_current": is_current,
                         "canonical_rule": canonical_rule,
-                        "permitted_paraphrase": paraphrase,
+                        "permitted_paraphrase": paraphrase if is_current else "none",
                         "technology_family": family,
+                        # A newly registered historical source must be inert immediately.
+                        # Leaving it PENDING lets the default ingestion command create
+                        # local/remote chunks before currentness filtering gets a chance
+                        # to fail closed.
+                        "ingestion_status": "PENDING" if is_current else "COMPLETE",
+                        "chunk_count": 0,
                         **governance,
                     },
                 )
@@ -397,7 +408,17 @@ class Command(BaseCommand):
                             setattr(obj, field, value)
                             updates.append(field)
                     if updates:
-                        obj.ingestion_status = "PENDING"
+                        if is_current:
+                            obj.ingestion_status = "PENDING"
+                        else:
+                            # Historical rows remain auditable but must have no local chunks
+                            # capable of entering retrieval. Remote stale ids then fail closed
+                            # because vector results are resolved through current DB chunks.
+                            obj.chunks.all().delete()
+                            obj.chunk_count = 0
+                            obj.ingestion_status = "COMPLETE"
+                            if "chunk_count" not in updates:
+                                updates.append("chunk_count")
                         updates.append("ingestion_status")
                         obj.save(update_fields=updates + ["updated_at"])
                         self.stdout.write(self.style.WARNING(f"  ~ reconciled [{disclosure:17}] [{ns:13}] {title}"))

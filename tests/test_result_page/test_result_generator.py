@@ -67,7 +67,9 @@ def test_internal_route_fields_are_retained_server_side_but_not_serialized():
     lead = _lead_from(REPRESENTATION_ANSWERS)
     result_obj, _ = ResultGenerator().generate_for_lead(lead)
     assert all(t in {"axiom", "cre", "fqnm"} for t in result_obj.primary_technologies)
-    assert result_obj.product_route in {"ALPHA Compute", "ALPHA Core", "Both", "General"}
+    from apps.leads.models import PRODUCT_ROUTE_DISPLAY
+    assert result_obj.product_route in set(PRODUCT_ROUTE_DISPLAY.values())
+    assert result_obj.product_route == "Not yet assessed"
     data = ResultPageSerializer(result_obj).data
     for forbidden in ("leadId", "primaryTechnologies", "productRoute", "licensePathway", "tier", "score"):  # noqa: E501
         assert forbidden not in data

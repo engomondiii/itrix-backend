@@ -18,10 +18,59 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Count, Q
 from django.utils import timezone
+import re
 
 from apps.knowledge_core.models import IngestionStatus, KnowledgeChunk, KnowledgeDocument
 from apps.knowledge_core.services.namespace_router import CANONICAL_NAMESPACES
 from apps.knowledge_core.management.commands.register_knowledge_docs import FOLDER_DISCLOSURE
+
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_NEGATION = re.compile(r"\b(?:not|never|no|does\s+not|do\s+not|is\s+not|isn't|cannot|can't|without)\b", re.I)
+_TECH_ENTITY = r"(?:PRISM|AXIOM(?:-TENSOR)?|CRE|FQNM|QNTA)"
+
+
+def current_public_conflicts(text: str) -> list[str]:
+    """Return positive, current-doctrine conflicts from one public-safe text chunk.
+
+    This deliberately reasons at sentence level for commercialization claims so negative
+    governance such as ``ASTOP is not self-service`` does not fail merely because it
+    contains the prohibited phrase. Historical sources are filtered by the caller via
+    ``document.is_current`` and never reach this function during validation.
+    """
+    value = str(text or "")
+    problems: list[str] = []
+
+    if re.search(r"what does itrix actually sell\??\s*two complementary but independent infrastructure products", value, re.I | re.S):
+        problems.append("two-product public catalogue")
+    if re.search(r"\bitrix\s+(?:currently\s+)?has\s+(?:only\s+)?two\s+products\b", value, re.I):
+        problems.append("two-product public catalogue")
+    if re.search(rf"\bproducts?\s+(?:are|include|consist of|comprise)\b.{{0,120}}\b{_TECH_ENTITY}\b", value, re.I | re.S):
+        problems.append("technology classified as sold product")
+
+    if re.search(r"(?:complete|current|all)\s+(?:itrix\s+)?products?|what does itrix actually sell", value, re.I | re.S):
+        if "ALPHA Compute" in value and "ALPHA Core" in value and "ASTOP" not in value:
+            problems.append("complete product catalogue omits ASTOP")
+
+    for sentence in _SENTENCE_SPLIT.split(value):
+        sentence = sentence.strip()
+        if not sentence or _NEGATION.search(sentence):
+            continue
+        if re.search(r"\bASTOP\b.{0,80}\bself[- ]service\b|\bself[- ]service\b.{0,80}\bASTOP\b", sentence, re.I):
+            problems.append("ASTOP self-service claim")
+        if re.search(r"\bASTOP\s+(?:Team|Pro|Business|Enterprise)\b", sentence, re.I):
+            problems.append("obsolete ASTOP tier model")
+        if re.search(r"\$(?:99|499|12(?:,?000)|100(?:,?000))\b", sentence) and re.search(r"\b(?:ASTOP|Team|Pro|Business|Enterprise|price|pricing|plan|tier)\b", sentence, re.I):
+            problems.append("obsolete public ASTOP pricing")
+        if re.search(r"\b(?:buy|purchase|checkout)\b.{0,100}\bASTOP\b|\bASTOP\b.{0,100}\b(?:buy|purchase|checkout)\b", sentence, re.I):
+            problems.append("ASTOP public checkout")
+        if re.search(r"\b(?:public|anonymous|anyone|visitor)\b.{0,120}\b(?:executable|binary|download|installer)\b", sentence, re.I):
+            problems.append("public unrestricted executable access")
+        if re.search(r"\b(?:money[- ]back|refund)\s+guarantee\b", sentence, re.I):
+            problems.append("obsolete money-back guarantee")
+
+    # Stable order and no duplicate labels when one chunk repeats the same doctrine.
+    return list(dict.fromkeys(problems))
 
 
 class Command(BaseCommand):
@@ -93,24 +142,41 @@ class Command(BaseCommand):
         # ── Current product doctrine ─────────────────────────────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("Canonical product source"))
         canonical = KnowledgeDocument.objects.filter(
-            title__icontains="WP ALPHA Compute Core v2.4",
+            file_path__icontains="itrix_product_canonical_v3_5.md",
+            is_current=True,
+            source_authority="authoritative",
             ingestion_status=IngestionStatus.COMPLETE,
             disclosure_level="public",
         )
-        if not canonical.exists():
-            # title_for preserves punctuation slightly differently across export names;
-            # fall back to the file path, which is deterministic in this repo.
-            canonical = KnowledgeDocument.objects.filter(
-                file_path__icontains="WP_ALPHA_Compute_Core_v2.4",
-                ingestion_status=IngestionStatus.COMPLETE,
-                disclosure_level="public",
-            )
         if canonical.exists():
             doc = canonical.first()
             self.stdout.write(self.style.SUCCESS(f"  current: {doc.title} ({doc.chunk_count} chunks)"))
         else:
-            self.stdout.write(self.style.ERROR("  ! Current ALPHA Compute/Core v2.4 source is not COMPLETE + public."))
+            self.stdout.write(self.style.ERROR("  ! Current September v3.5 product canonical is not authoritative/current/COMPLETE + public."))
             problems += 1
+
+        old_current = KnowledgeDocument.objects.filter(is_current=True).filter(
+            Q(file_path__icontains="itrix_product_canonical_v2_4.md")
+            | Q(file_path__icontains="WP_ALPHA_Compute_Core_v2.4.docx")
+        )
+        if old_current.exists():
+            problems += old_current.count()
+            self.stdout.write(self.style.ERROR("  ! superseded ALPHA-only product source is still current"))
+
+        # Content-level regression: current public chunks may explain historical claims,
+        # but they may not assert the superseded catalogue as current doctrine.
+        public_chunks = list(
+            KnowledgeChunk.objects.select_related("document").filter(
+                document__is_current=True,
+                document__disclosure_level__in=["public", "controlled_public"],
+            )
+        )
+        for chunk in public_chunks:
+            for label in current_public_conflicts(chunk.text or ""):
+                problems += 1
+                self.stdout.write(self.style.ERROR(
+                    f"  ! current public conflict ({label}): {chunk.document.file_path} chunk {chunk.chunk_index}"
+                ))
 
         # ── September 2026 ASTOP / Sales Platform authority ─────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("September 2026 governing sources"))

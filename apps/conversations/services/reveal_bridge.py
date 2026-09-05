@@ -327,7 +327,7 @@ def _create_conversation_lead(thread, contact: dict):
             visitor_name=contact.get("name", "") or "",
             company=contact.get("company", "") or "",
             email=contact["email"],
-            product_route="general",
+            product_route="undetermined",
             tier=4,
             score=0,
             journey_state="DIAGNOSED",

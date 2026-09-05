@@ -1,18 +1,21 @@
 """Auditable system-prompt construction for governed, source-grounded responses."""
 from __future__ import annotations
 
+from apps.knowledge_core.canonical_taxonomy import prompt_block as taxonomy_prompt_block
+
 _BRAND_CORE = (
     "You are the itriX knowledge-grounded advisor. For factual statements about itriX, "
-    "its products, methods, evidence, corporate/IP facts, engagement model, or commercial position, "
-    "use only the supplied KNOWLEDGE CONTEXT and verified conversation state. Model-readable material "
-    "is not automatically user-disclosable. Prefer current higher-authority sources; if current sources "
-    "conflict and source authority does not resolve the conflict, say the point is unresolved rather than "
-    "synthesising a new rule. Never mention the internal name 'Knowledge Core' to a visitor.\n"
-    "CANONICAL PRODUCT/METHOD BOUNDARIES: AXIOM, CRE and FQNM are distinct method families; never "
-    "borrow one family's eligibility/claim language for another and never imply they always apply together. "
-    "ALPHA Compute defines/tests a representation hypothesis and is independently useful on existing "
-    "software/hardware paths. ALPHA Core is a separate optional execution-validation path used only when "
-    "evidence and the selected engagement state justify it; never make it a forced upgrade or automatic next step."
+    "its products, technologies, evidence, corporate/IP facts, engagement model, or commercial position, "
+    "use only the supplied KNOWLEDGE CONTEXT, the canonical taxonomy below, and verified conversation state. "
+    "Model-readable material is not automatically user-disclosable. Prefer current higher-authority sources "
+    "within the claim domain they govern; if current applicable sources conflict and source authority does not "
+    "resolve the conflict, say the point is unresolved rather than synthesising a new rule. Never mention the "
+    "internal name 'Knowledge Core' to a visitor.\n"
+    + taxonomy_prompt_block()
+    + "\nTECHNOLOGY APPLICABILITY: no technology is universally applicable and they do not all apply together. "
+    "For a general technology overview, cover both intervention domains when relevant: observation before reasoning "
+    "(PRISM / ASTOP) and representation before execution (ALPHA Compute with eligible AXIOM / AXIOM-TENSOR / CRE / "
+    "FQNM / QNTA routes, plus ALPHA Core only where hardware evidence justifies it)."
 )
 
 _CLAIMS_DISCIPLINE = (
@@ -79,11 +82,18 @@ def _format_context(chunks: list[dict]) -> str:
         family = c.get("technology_family") or "general"
         paraphrase = c.get("permitted_paraphrase") or "approved"
         current = "current" if c.get("source_current", True) else "superseded"
+        rule = str(c.get("canonical_rule") or "").strip()
+        prohibited = [str(x).strip() for x in (c.get("prohibited_messages") or []) if str(x).strip()]
+        governance_note = ""
+        if rule:
+            governance_note += f" | source-rule={rule}"
+        if prohibited:
+            governance_note += f" | DO-NOT-ASSERT={'; '.join(prohibited)}"
         text = (c.get("text") or "").strip()
         if text:
             lines.append(
                 f"[{i}]{canonical} SOURCE: {title} | {heading} | authority={authority} | {current} | "
-                f"disclosure={disclosure} | family={family} | paraphrase={paraphrase} | via {backend}\n{text}"
+                f"disclosure={disclosure} | family={family} | paraphrase={paraphrase} | via {backend}{governance_note}\n{text}"
             )
     return "\n\n".join(lines) if lines else "(no usable authorized knowledge text)"
 

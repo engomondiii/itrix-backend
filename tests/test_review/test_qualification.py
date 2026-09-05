@@ -49,22 +49,22 @@ def test_low_score_answers_land_tier_4():
     assert tier == 4
 
 
-def test_product_router_representation_to_compute():
+def test_product_router_representation_stays_unassessed_until_governed_gate():
     answers = {"Q3": "linear_algebra", "Q1": "python_scipy", "Q2": []}
-    assert route_product(answers) == "alpha_compute"
+    assert route_product(answers) == "undetermined"
 
 
-def test_product_router_execution_to_core():
+def test_product_router_execution_stays_unassessed_until_governed_gate():
     answers = {"Q3": "conservation", "Q1": "hardware", "Q2": ["hardware_utilization"]}
-    assert route_product(answers) == "alpha_core"
+    assert route_product(answers) == "undetermined"
 
 
-def test_product_router_mixed_to_both():
-    assert route_product({"Q3": "mixed"}) == "both"
+def test_product_router_mixed_does_not_create_multi_product_route():
+    assert route_product({"Q3": "mixed"}) == "undetermined"
 
 
-def test_product_router_unsure_to_general():
-    assert route_product({"Q3": "unsure"}) == "general"
+def test_product_router_unsure_is_undetermined():
+    assert route_product({"Q3": "unsure"}) == "undetermined"
 
 
 def test_license_router_exclusive_hardware_to_strategic():

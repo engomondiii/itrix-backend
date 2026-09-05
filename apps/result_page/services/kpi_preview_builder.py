@@ -11,10 +11,12 @@ from __future__ import annotations
 _BASE_KPIS = [
     {"label": "Representation efficiency", "metric": "Assessed during diagnosis"},
     {"label": "Execution / runtime fit", "metric": "Evaluated against an eligible workload"},
-    {"label": "Validated outcome", "metric": "Quantified only via a proof-of-concept"},
+    {"label": "Validated outcome", "metric": "Measured only in an explicitly selected controlled proof/evaluation"},
 ]
 
 _ROUTE_KPI = {
+    "undetermined": {"label": "Product relevance", "metric": "Not yet assessed"},
+    "astop": {"label": "Observation relevance", "metric": "Qualified separately before controlled proof"},
     "alpha_compute": {"label": "Where work is avoidable", "metric": "Identified in the Compute review"},
     "alpha_core": {"label": "Data-movement overhead", "metric": "Profiled in the Core review"},
     "both": {"label": "Representation + execution", "metric": "Assessed end-to-end"},
@@ -23,6 +25,6 @@ _ROUTE_KPI = {
 
 
 def build_kpi_preview(*, product_route: str) -> list[dict]:
-    route_kpi = _ROUTE_KPI.get(product_route, _ROUTE_KPI["general"])
+    route_kpi = _ROUTE_KPI.get(product_route, _ROUTE_KPI["undetermined"])
     # Route-specific KPI first, then the qualitative base set.
     return [route_kpi, *_BASE_KPIS]

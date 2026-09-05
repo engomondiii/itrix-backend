@@ -25,6 +25,7 @@ import hashlib
 import json
 import logging
 import secrets
+from dataclasses import dataclass
 
 from django.conf import settings
 from rest_framework import status
@@ -48,6 +49,24 @@ logger = logging.getLogger("itrix")
 
 VISITOR_SESSION_COOKIE = "itrix_visitor_session"
 VISITOR_SESSION_HEADER = "HTTP_X_ITRIX_SESSION"
+
+
+def _request_id(request) -> str:
+    """Correlation id assigned by RequestLoggingMiddleware, when available."""
+    return str(getattr(request, "correlation_id", "") or "")[:128]
+
+
+def _safe_error_response(request, *, code: str, detail: str, status_code: int, headers=None, **extra):
+    """One public-safe conversation error shape.
+
+    The browser receives a stable category and correlation id, never backend internals.
+    Existing callers that only read ``detail`` remain compatible.
+    """
+    payload = {"detail": detail, "code": code, **extra}
+    request_id = _request_id(request)
+    if request_id:
+        payload["requestId"] = request_id
+    return Response(payload, status=status_code, headers=headers or {})
 
 
 def visitor_session_from(request) -> str:
@@ -123,10 +142,13 @@ def _rate_limited(request, session_id: str, kind: str):
     ip = ip.split(",")[0].strip()
     decision = limits.check_turn(session_id=session_id, ip=ip) if kind == "turn" else None
     if decision is not None and decision.blocked:
-        return Response(
-            {"detail": decision.message, "reason": decision.reason},
-            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        return _safe_error_response(
+            request,
+            code="RATE_LIMITED",
+            detail=decision.message,
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": str(decision.retry_after_seconds or 60)},
+            reason=decision.reason,
         )
     return None
 
@@ -286,6 +308,21 @@ class ThreadListCreateView(APIView):
             issued_session = True
 
         body = data.get("body", "") or ""
+        # The first sentence is a turn too. It must consume the same abuse budget as a
+        # subsequent POST /turns/ so opening a fresh chat can never be used to step around
+        # the turn limiter. Idempotency replay happens above this point and therefore does
+        # not spend the budget a second time.
+        if body.strip():
+            rate_key = session_id or (f"client:{client.id}" if client is not None else "")
+            limited = _rate_limited(request, rate_key, "turn")
+            if limited is not None:
+                logger.info(
+                    "conversation.rate_limited request_id=%s phase=thread_create actor=%s",
+                    _request_id(request),
+                    hashlib.sha256(rate_key.encode("utf-8")).hexdigest()[:12] if rate_key else "none",
+                )
+                return limited
+
         # A signed-in customer's new chat is CLIENT-OWNED from birth — created on
         # the session plane it would vanish from their workspace the way claimed
         # threads used to.
@@ -324,10 +361,19 @@ class ThreadListCreateView(APIView):
             # The first sentence deserves an answer in the same response. Waiting
             # for a socket that may never connect is how a visitor concludes the
             # surface is broken.
-            _generate_assistant_turn(thread, body)
+            attempt = _attempt_assistant_generation(thread, body, request_id=_request_id(request))
             thread.refresh_from_db()
+        else:
+            attempt = GenerationAttempt(state="ready", turn=None)
 
         payload = ThreadDetailSerializer(thread).data
+        payload["generationStatus"] = attempt.state
+        if attempt.state == "failed":
+            payload["generationError"] = {
+                "code": "MODEL_GENERATION_FAILED",
+                "detail": "Your message was saved, but we could not generate a response just now.",
+                "retryable": True,
+            }
         response = Response(payload, status=status.HTTP_201_CREATED)
         if issued_session:
             _set_session_cookie(response, session_id)
@@ -358,13 +404,27 @@ class ThreadDetailView(APIView):
     def get(self, request, thread_id):
         thread = self._load(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            logger.info(
+                "conversation.thread_inaccessible request_id=%s thread_id=%s method=GET",
+                _request_id(request), thread_id,
+            )
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         return Response(ThreadDetailSerializer(thread).data, status=status.HTTP_200_OK)
 
     def patch(self, request, thread_id):
         thread = self._load(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         ser = ThreadRenameSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         thread = thread_svc.rename(thread, ser.validated_data["title"])
@@ -380,7 +440,12 @@ class ThreadDetailView(APIView):
         """
         thread = self._load(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         conversation_id = thread.conversation_id
         thread.delete()
         if conversation_id:
@@ -400,7 +465,12 @@ class ThreadMessagesView(APIView):
     def get(self, request, thread_id):
         thread = _resolve_thread(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         try:
             after = int(request.query_params.get("after_seq", 0))
@@ -442,7 +512,16 @@ class ThreadTurnsView(APIView):
         session_id = visitor_session_from(request)
         thread = _resolve_thread(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            logger.info(
+                "conversation.turn_inaccessible request_id=%s thread_id=%s",
+                _request_id(request), thread_id,
+            )
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         # A signed-in customer may have no visitor session at all; the rate key
         # must still be THEIRS, not one shared empty bucket for every client.
@@ -450,6 +529,12 @@ class ThreadTurnsView(APIView):
         rate_key = session_id or (f"client:{client.id}" if client is not None else "")
         limited = _rate_limited(request, rate_key, "turn")
         if limited is not None:
+            logger.info(
+                "conversation.rate_limited request_id=%s phase=thread_turn thread_id=%s actor=%s",
+                _request_id(request),
+                thread_id,
+                hashlib.sha256(rate_key.encode("utf-8")).hexdigest()[:12] if rate_key else "none",
+            )
             return limited
 
         ser = TurnSubmitSerializer(data=request.data)
@@ -481,19 +566,23 @@ class ThreadTurnsView(APIView):
 
         # Generate the reply here too. The socket streams it when connected; this
         # guarantees an answer when it is not. See _generate_assistant_turn.
-        assistant = _generate_assistant_turn(thread, ser.validated_data["body"])
-
-        return Response(
-            {
-                "threadId": str(thread.id),
-                "turn": ThreadTurnSerializer(message).data,
-                # Null ONLY when generation was genuinely unavailable. The client
-                # then shows its honest degraded state rather than a fabricated
-                # answer.
-                "assistantTurn": assistant,
-            },
-            status=status.HTTP_201_CREATED,
+        attempt = _attempt_assistant_generation(
+            thread, ser.validated_data["body"], request_id=_request_id(request)
         )
+
+        payload = {
+            "threadId": str(thread.id),
+            "turn": ThreadTurnSerializer(message).data,
+            "assistantTurn": attempt.turn,
+            "generationStatus": attempt.state,
+        }
+        if attempt.state == "failed":
+            payload["generationError"] = {
+                "code": "MODEL_GENERATION_FAILED",
+                "detail": "Your message was saved, but we could not generate a response just now.",
+                "retryable": True,
+            }
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class ThreadRetryView(APIView):
@@ -505,7 +594,12 @@ class ThreadRetryView(APIView):
     def post(self, request, thread_id):
         thread = _resolve_thread(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         visitor = (
             Message.objects.filter(thread=thread, sender_kind__in=["visitor", "client"])
             .order_by("-seq", "-created_at")
@@ -520,13 +614,21 @@ class ThreadRetryView(APIView):
         )
         if existing is not None:
             return Response({"assistantTurn": ThreadTurnSerializer(existing).data, "reused": True}, status=status.HTTP_200_OK)
-        assistant = _generate_assistant_turn(thread, visitor.body)
-        if assistant is None:
-            # Either the original request is still producing the turn or the provider is
-            # temporarily unavailable. The client refreshes the transcript; it must not
-            # submit the visitor message again.
-            return Response({"pending": True}, status=status.HTTP_202_ACCEPTED)
-        return Response({"assistantTurn": assistant, "reused": False}, status=status.HTTP_200_OK)
+        attempt = _attempt_assistant_generation(thread, visitor.body, request_id=_request_id(request))
+        if attempt.state == "pending":
+            return Response(
+                {"pending": True, "code": "GENERATION_ALREADY_IN_PROGRESS"},
+                status=status.HTTP_202_ACCEPTED,
+            )
+        if attempt.state == "failed":
+            return _safe_error_response(
+                request,
+                code="MODEL_GENERATION_FAILED",
+                detail="Your message is saved, but response generation failed. Please try again.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                retryable=True,
+            )
+        return Response({"assistantTurn": attempt.turn, "reused": False}, status=status.HTTP_200_OK)
 
 
 class ThreadShellView(APIView):
@@ -539,7 +641,12 @@ class ThreadShellView(APIView):
     def get(self, request, thread_id):
         thread = _resolve_thread(request, thread_id)
         if thread is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return _safe_error_response(
+                request,
+                code="THREAD_NOT_FOUND_OR_INACCESSIBLE",
+                detail="Conversation not found or unavailable.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         from apps.journey.services import shell
 
         contract = (
@@ -640,11 +747,23 @@ class ThreadPaneView(APIView):
 # standards of review.
 
 
-def _generate_assistant_turn(thread, body: str):
-    """Idempotent transport-independent generation for the latest visitor turn.
+@dataclass(frozen=True)
+class GenerationAttempt:
+    """Outcome of one idempotent attempt to produce the assistant turn."""
+
+    # ``ready`` means ``turn`` is the settled assistant turn; ``pending`` means another
+    # request owns the generation lock; ``failed`` means this attempt acquired the lock
+    # but generation did not produce a deliverable response.
+    state: str
+    turn: dict | None = None
+
+
+def _attempt_assistant_generation(thread, body: str, *, request_id: str = "") -> GenerationAttempt:
+    """Idempotent transport-independent generation with an explicit outcome.
 
     HTTP and retry paths share this lock. A retry while the original generation is
-    still running therefore cannot create a second assistant/business action.
+    still running therefore cannot create a second assistant/business action, while a
+    genuine provider/governance failure is no longer confused with that in-progress case.
     """
     from django.core.cache import cache
 
@@ -657,7 +776,7 @@ def _generate_assistant_turn(thread, body: str):
     seq = getattr(latest, "seq", 0) or 0
     key = f"itrix:turn-generation:{thread.id}:{seq}"
     if not cache.add(key, "1", timeout=180):
-        return None
+        return GenerationAttempt(state="pending")
     try:
         # Recheck after taking the lock: another request may have completed between
         # the caller's read and this acquisition.
@@ -667,13 +786,22 @@ def _generate_assistant_turn(thread, body: str):
             .first()
         )
         if existing is not None:
-            return ThreadTurnSerializer(existing).data
-        return _generate_assistant_turn_impl(thread, body)
+            return GenerationAttempt(state="ready", turn=ThreadTurnSerializer(existing).data)
+        generated = _generate_assistant_turn_impl(thread, body, request_id=request_id)
+        if generated is None:
+            return GenerationAttempt(state="failed")
+        return GenerationAttempt(state="ready", turn=generated)
     finally:
         cache.delete(key)
 
 
-def _generate_assistant_turn_impl(thread, body: str):
+def _generate_assistant_turn(thread, body: str):
+    """Compatibility wrapper for call sites that only need the turn-or-None contract."""
+    attempt = _attempt_assistant_generation(thread, body)
+    return attempt.turn if attempt.state == "ready" else None
+
+
+def _generate_assistant_turn_impl(thread, body: str, *, request_id: str = ""):
     """
     Produce the assistant reply for a turn, governed.
 
@@ -713,7 +841,7 @@ def _generate_assistant_turn_impl(thread, body: str):
         lead_id=str(lead.id) if lead else None,
         prompt=getattr(session, "prompt", "") or body,
         pressures=list(getattr(session, "pressure_areas", []) or []),
-        product_route=getattr(lead, "product_route", "general") if lead else "general",
+        product_route=getattr(lead, "product_route", "undetermined") if lead else "undetermined",
         tier=getattr(lead, "tier", 4) if lead else 4,
         # ALWAYS the public plane on this route. An anonymous visitor is
         # anonymous regardless of what their thread has reached.
@@ -743,7 +871,11 @@ def _generate_assistant_turn_impl(thread, body: str):
             can_continue = bool(payload.get("canContinue", False))
             cited_chunk_ids = [c for c in (out.chunk_ids or []) if c]
         except Exception:  # noqa: BLE001
-            logger.exception("assistant generation failed for thread %s", thread.id)
+            logger.exception(
+                "assistant.generation_failed request_id=%s thread_id=%s",
+                request_id or "none",
+                thread.id,
+            )
             degraded = True
     else:
         text = envelope.replacement_body

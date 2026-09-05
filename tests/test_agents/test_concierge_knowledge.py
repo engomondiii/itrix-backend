@@ -231,14 +231,17 @@ def test_valid_concierge_json_keeps_the_contract():
     assert reply == "Complete answer."
     assert suggest_nda is True
 
-# ── current document doctrine / no hardcoded product facts ──────────────────
+# ── current document doctrine / canonical taxonomy anchor ──────────────────
 
-def test_brand_core_does_not_hardcode_the_retired_product_split():
+def test_brand_core_rejects_retired_split_and_anchors_current_taxonomy():
     from apps.ai_engine.services.system_prompt_builder import _BRAND_CORE
 
     assert "representation diagnosis — the adoption wedge" not in _BRAND_CORE
     assert "ALPHA Core (runtime/execution)" not in _BRAND_CORE
-    assert "use only the supplied KNOWLEDGE CONTEXT and verified conversation state" in _BRAND_CORE
+    assert "use only the supplied KNOWLEDGE CONTEXT, the canonical taxonomy below" in _BRAND_CORE
+    assert "PRODUCTS — the complete currently sold product catalogue" in _BRAND_CORE
+    assert "ASTOP" in _BRAND_CORE and "ALPHA Compute" in _BRAND_CORE and "ALPHA Core" in _BRAND_CORE
+    assert "TECHNOLOGIES — these are NOT separately sold products" in _BRAND_CORE
     assert "Prefer current higher-authority sources" in _BRAND_CORE
 
 
@@ -247,16 +250,16 @@ def test_context_labels_current_canonical_sources_for_the_model():
         "What are the two products?",
         chunks=[
             {
-                "document_title": "WP ALPHA Compute Core v2.4",
-                "heading": "Canonical Definitions",
-                "text": "ALPHA Compute is an independent software computational infrastructure product.",
+                "document_title": "itriX Product Canonical v3.5",
+                "heading": "Canonical Product Taxonomy",
+                "text": "itriX currently has three products: ASTOP, ALPHA Compute and ALPHA Core.",
                 "canonical_priority": 100,
                 "retrieval_backend": "pinecone",
             }
         ],
     )
     assert "CANONICAL/CURRENT" in prompt
-    assert "WP ALPHA Compute Core v2.4" in prompt
+    assert "itriX Product Canonical v3.5" in prompt
     assert "via pinecone" in prompt
 
 

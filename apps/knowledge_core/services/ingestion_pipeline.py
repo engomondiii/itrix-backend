@@ -49,8 +49,41 @@ class IngestionResult:
 
 
 def ingest_document(document: KnowledgeDocument, *, dry_run: bool = False) -> IngestionResult:
-    """Run the full ingestion pipeline for one document."""
+    """Run the full ingestion pipeline for one current document.
+
+    Currentness is a load-bearing ingestion boundary, not merely a command-level
+    convenience.  Commands, admin actions and internal views all call this service, so a
+    superseded source must fail closed here as well.  Historical rows remain auditable
+    but are kept chunkless and cannot be reintroduced into local or remote retrieval by
+    a direct service caller.
+    """
     namespace = normalize_namespace(document.namespace)
+
+    if not document.is_current:
+        if dry_run:
+            logger.info("[dry-run] skipped non-current knowledge document '%s'", document.title)
+            return IngestionResult(document=document, ok=True, chunk_count=0)
+
+        old_vector_ids = list(
+            document.chunks.exclude(vector_id="").values_list("vector_id", flat=True)
+        )
+        if old_vector_ids:
+            PineconeUpserter().delete_ids(namespace=namespace, ids=old_vector_ids)
+        with transaction.atomic():
+            document.chunks.all().delete()
+            document.ingestion_status = IngestionStatus.COMPLETE
+            document.ingestion_error = ""
+            document.chunk_count = 0
+            document.save(
+                update_fields=[
+                    "ingestion_status",
+                    "ingestion_error",
+                    "chunk_count",
+                    "updated_at",
+                ]
+            )
+        logger.info("Skipped non-current knowledge document '%s'", document.title)
+        return IngestionResult(document=document, ok=True, chunk_count=0)
 
     if not dry_run:
         document.ingestion_status = IngestionStatus.PROCESSING

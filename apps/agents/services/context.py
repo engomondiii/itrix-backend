@@ -58,7 +58,7 @@ class AgentContext:
     # Problem framing
     prompt: str = ""
     pressures: list[str] = field(default_factory=list)
-    product_route: str = "general"
+    product_route: str = "undetermined"
     license_pathway: str | None = None
     tier: int = 4
 
@@ -141,7 +141,7 @@ class AgentContext:
             client_id=str(getattr(lead, "client_id", "") or ""),
             prompt=getattr(session, "prompt", "") or "",
             pressures=list(getattr(session, "pressure_areas", []) or []),
-            product_route=getattr(lead, "product_route", "general"),
+            product_route=getattr(lead, "product_route", "undetermined"),
             license_pathway=(
                 lead.commercial_path if getattr(lead, "commercial_path", "none") != "none" else None
             ),

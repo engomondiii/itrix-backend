@@ -382,7 +382,7 @@ def _build_agent_context(thread, body: str):
         lead_id=str(lead.id) if lead else None,
         prompt=getattr(session, "prompt", "") or body,
         pressures=list(getattr(session, "pressure_areas", []) or []),
-        product_route=getattr(lead, "product_route", "general") if lead else "general",
+        product_route=getattr(lead, "product_route", "undetermined") if lead else "undetermined",
         tier=getattr(lead, "tier", 4) if lead else 4,
         # ALWAYS the public plane on this socket. An anonymous visitor is anonymous
         # regardless of what their thread has reached.

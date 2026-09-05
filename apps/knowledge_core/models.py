@@ -83,6 +83,16 @@ class EvidenceStatus(models.TextChoices):
     MIXED = "mixed", "Mixed"
 
 
+class ClaimDomain(models.TextChoices):
+    TAXONOMY = "taxonomy_product_identity", "Taxonomy / product identity"
+    COMMERCIALIZATION = "commercialization_gtm", "Commercialization / GTM"
+    PUBLIC_EXPLANATION = "public_product_explanation", "Public product explanation"
+    TECHNICAL = "technical_capability", "Technical capability"
+    RESEARCH = "research_evidence", "Research / evidence"
+    LEGAL = "legal_contract", "Legal / contract"
+    INTERNAL_POLICY = "internal_policy", "Internal policy"
+
+
 class IngestionStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     PROCESSING = "PROCESSING", "Processing"
@@ -145,6 +155,13 @@ class KnowledgeDocument(BaseModel):
     claim_ceiling = models.PositiveSmallIntegerField(default=0)
     entity_type = models.CharField(max_length=20, choices=KnowledgeEntityType.choices, default=KnowledgeEntityType.MIXED, db_index=True)
     evidence_status = models.CharField(max_length=24, choices=EvidenceStatus.choices, default=EvidenceStatus.MIXED, db_index=True)
+    # Domain-scoped source precedence. Authority is meaningful only for the claims a
+    # source governs; a legal register must not outrank a current taxonomy source merely
+    # because both happen to be authoritative.
+    claim_domains = models.JSONField(default=list, blank=True)
+    supersedes = models.JSONField(default=list, blank=True)
+    superseded_by = models.CharField(max_length=255, blank=True, default="")
+    prohibited_messages = models.JSONField(default=list, blank=True)
 
     ingestion_status = models.CharField(
         max_length=12,

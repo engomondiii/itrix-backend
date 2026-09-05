@@ -6,7 +6,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from apps.clients.tokens import build_tokens_for_client
-from apps.evaluations.models import Evaluation, EvaluationPackage
+from apps.evaluations.models import Evaluation, EvaluationPackage, EvaluationStatus
 from apps.leads.models import ASTOPEngagement, ASTOPStage
 from tests.factories.client_factory import ClientFactory
 
@@ -65,3 +65,27 @@ def test_astop_customer_response_exposes_stage_and_verified_value_only():
     assert body["astopStage"] == "lo_deployment"
     assert "securityResult" not in body
     assert "evaluationResult" not in body
+
+
+@pytest.mark.parametrize(
+    ("internal_status", "customer_stage"),
+    [
+        (EvaluationStatus.PROPOSED, "requested"),
+        (EvaluationStatus.IN_PROGRESS, "in_progress"),
+        (EvaluationStatus.DELIVERED, "report_ready"),
+        (EvaluationStatus.WON, "report_ready"),
+        (EvaluationStatus.LOST, "report_ready"),
+    ],
+)
+def test_alpha_customer_stage_uses_frontend_tracker_vocabulary(internal_status, customer_stage):
+    client = ClientFactory()
+    Evaluation.objects.create(
+        lead=client.lead,
+        lead_name="Buyer",
+        pkg=EvaluationPackage.COMPUTE,
+        status=internal_status,
+    )
+
+    res = _authed(client).get(URL)
+    assert res.status_code == 200
+    assert res.json()["stage"] == customer_stage

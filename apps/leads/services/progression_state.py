@@ -74,9 +74,9 @@ def derive_progression_state(lead: Lead) -> ProgressionState:
     active_compute = compute is not None and compute.status in _NON_TERMINAL_PRODUCT_STATUSES
     active_astop = astop is not None and astop.stage != ASTOPStage.CLOSED
 
-    if active_core:
+    if active_core and core_gate_allowed:
         stage = CommercialStage.ALPHA_CORE
-    elif active_compute:
+    elif active_compute and compute_gate_allowed:
         stage = CommercialStage.ALPHA_COMPUTE
     elif active_astop:
         stage = CommercialStage.ASTOP

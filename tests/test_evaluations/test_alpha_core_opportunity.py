@@ -1,9 +1,11 @@
 """Focused ALPHA Core opportunity-opening regressions."""
 import pytest
+from django.utils import timezone
 
 from apps.evaluations.models import Evaluation, EvaluationPackage
 from apps.evaluations.services.alpha_core_opportunity import open_alpha_core_opportunity
-from apps.leads.models import CommercialStage, LeadActivity
+from apps.leads.models import ASTOPEngagement, ASTOPStage, CommercialStage, LeadActivity, TrustStatus
+from tests.factories.client_factory import ClientFactory
 from tests.factories.lead_factory import LeadFactory
 from tests.factories.user_factory import AdminUserFactory, ViewerUserFactory
 
@@ -11,12 +13,60 @@ pytestmark = pytest.mark.django_db
 
 
 def _eligible_compute():
-    lead = LeadFactory()
+    now = timezone.now()
+    lead = LeadFactory(
+        sponsor="Executive sponsor",
+        trust_status=TrustStatus.PASS,
+        trust_screening={"protection_acceptance": True},
+        commercial_progress={"economic_relevance": "material", "seriousness": "qualified"},
+    )
+    ClientFactory(
+        lead=lead,
+        identity_verified_at=now,
+        organization_verified_at=now,
+        nda_signed=True,
+        nda_signed_at=now,
+    )
+    ASTOPEngagement.objects.create(
+        lead=lead,
+        stage=ASTOPStage.VERIFY_EXPAND,
+        qualification_context={
+            "business_unit": "Observation platform",
+            "observation_problem": "Decision-time observation cost",
+            "candidate_workflow": "Agent observation workflow",
+            "economic_relevance": "material",
+            "sponsor": "Executive sponsor",
+            "seriousness": "qualified",
+            "protection_fit": True,
+        },
+        evaluation_agreement="Controlled evaluation agreement",
+        evaluation_scope={
+            "workload": "Representative agent workload",
+            "observation_behavior": "Observe decision-time token/tool usage",
+            "model_or_controller": "Controlled controller A",
+            "workflow": "Agent observation workflow",
+        },
+        baseline={"measurement_window": "versioned controlled baseline window"},
+        decision_fidelity={"status": "passed"},
+        measured_savings={"value": 0, "provenance": "controlled measurement"},
+        estimated_savings={"value": None, "provenance": "not estimated"},
+        evaluation_result={"status": "passed", "reproducible": True},
+        security_result={"status": "passed"},
+        integration_feasibility={"status": "passed"},
+        lo_scope={"field_of_use": "agent observation"},
+        lo_executed_at=now,
+        entitlement_status="active",
+        controlled_build_id="build-verified",
+        attribution_id="attr-verified",
+        verified_value={"status": "verified", "basis": "controlled proof"},
+    )
     return Evaluation.objects.create(
         lead=lead,
         lead_name="Buyer",
         company=lead.company,
         pkg=EvaluationPackage.COMPUTE,
+        separate_workload="Separate tensor workload",
+        technical_route="axiom_tensor",
         proof_status="validated",
         hardware_value_case=True,
         hardware_target="Target accelerator platform",
@@ -39,6 +89,17 @@ def test_core_opportunity_opens_only_after_existing_gate_passes():
     assert source.lead.commercial_progress["alpha_core_gate"] is True
     assert source.lead.commercial_progress["alpha_core_opportunity_id"] == str(result.opportunity.id)
 
+
+
+def test_core_opportunity_fails_closed_when_compute_substantive_gate_is_not_satisfied():
+    source = _eligible_compute()
+    source.separate_workload = ""
+    source.save(update_fields=["separate_workload", "updated_at"])
+
+    with pytest.raises(ValueError, match="alpha_compute_gate:.*separate_workload_required"):
+        open_alpha_core_opportunity(source)
+
+    assert Evaluation.objects.filter(lead=source.lead, pkg=EvaluationPackage.CORE).count() == 0
 
 def test_core_opportunity_fails_closed_without_required_hardware_case():
     source = _eligible_compute()

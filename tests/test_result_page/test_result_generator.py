@@ -106,9 +106,15 @@ def _qualify(api_client, answers):
         {"prompt": "Slow solver", "pressure_areas": ["speed"], "environment": "cae"},
         format="json",
     )
-    response = api_client.post(
-        f"/api/v1/review/sessions/{sid}/qualify/", {"answers": answers}, format="json"
-    )
+    # These access/retirement tests do not exercise background review generation.
+    # Prevent a daemon DB worker from escaping the pytest-django transaction and
+    # reporting a thread exception after the test has already finished.
+    from unittest.mock import patch
+
+    with patch("apps.review.services.qualification_processor.kick_off_result_page"):
+        response = api_client.post(
+            f"/api/v1/review/sessions/{sid}/qualify/", {"answers": answers}, format="json"
+        )
     assert response.status_code == 200
     session = ReviewSession.objects.get(pk=sid)
     return sid, str(session.placeholder_lead_id)

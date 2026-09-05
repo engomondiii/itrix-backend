@@ -195,5 +195,6 @@ def test_orchestration_records_safe_gate_state_without_exposing_policy_criteria(
     serialized_meta = str(activity.meta)
     assert "secret commercial rubric" not in serialized_meta
     assert "protected_criteria" not in serialized_meta
+    ev.lead.refresh_from_db()
     assert ev.lead.commercial_progress["alpha_fee_policy_recorded"] is True
     assert ev.lead.commercial_progress["alpha_fee_policy_decision"] == WaiverType.FULL

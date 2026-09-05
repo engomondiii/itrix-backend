@@ -566,6 +566,18 @@ class PortalDocumentsView(APIView):
         )
 
 
+def _portal_evaluation_stage(status_value: str) -> str:
+    """Map internal Evaluation status to the stable customer-facing tracker vocabulary."""
+    value = str(status_value or "").strip().lower()
+    if value == "in_progress":
+        return "in_progress"
+    if value in {"delivered", "won", "lost"}:
+        return "report_ready"
+    # Proposed (and any unknown future internal value) is safest at the first
+    # customer-visible step; never send an enum the frontend tracker cannot render.
+    return "requested"
+
+
 class PortalEvaluationView(APIView):
     """GET portal/evaluation/ — CLIENT. Client-visible evaluation status."""
 
@@ -585,7 +597,7 @@ class PortalEvaluationView(APIView):
                     {
                         "exists": True,
                         "kind": "alpha_compute",
-                        "stage": evaluation.status,
+                        "stage": _portal_evaluation_stage(evaluation.status),
                         "kpis": evaluation.kpis or [],
                         "reportHref": "",
                         # Only final/customer-facing fee state crosses this boundary.

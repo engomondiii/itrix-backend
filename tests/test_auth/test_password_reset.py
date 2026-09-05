@@ -129,7 +129,14 @@ def test_password_reset_email_opts_into_bounded_delivery_retry(settings, monkeyp
 
 
 def test_password_reset_records_a_reset_specific_log_when_delivery_fails(caplog, monkeypatch):
+    import logging
+
     from apps.emails.models import EmailLog
+
+    # The production ``itrix`` logger intentionally does not propagate to root, while
+    # pytest's caplog handler is attached there. Enable propagation only for this test
+    # so the assertion observes the real log record without changing production logging.
+    monkeypatch.setattr(logging.getLogger("itrix"), "propagate", True)
 
     client = ClientFactory(email="failed-reset@example.com")
 

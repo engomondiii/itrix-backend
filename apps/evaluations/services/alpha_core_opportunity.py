@@ -7,7 +7,7 @@ from django.db import transaction
 
 from apps.evaluations.models import Evaluation, EvaluationPackage, EvaluationStatus
 from apps.leads.models import CommercialStage, LeadActivity
-from apps.leads.services.commercial_progression import alpha_core_gate
+from apps.leads.services.commercial_progression import alpha_compute_gate, alpha_core_gate
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,14 @@ def open_alpha_core_opportunity(compute_evaluation: Evaluation, *, by=None) -> A
     decision = alpha_core_gate(source)
     if not decision.allowed:
         raise ValueError("alpha_core_gate:" + ",".join(decision.reasons))
+
+    compute_decision = alpha_compute_gate(
+        source.lead,
+        separate_workload=source.separate_workload,
+        technical_route=source.technical_route,
+    )
+    if not compute_decision.allowed:
+        raise ValueError("alpha_compute_gate:" + ",".join(compute_decision.reasons))
 
     # The separate Core opportunity is represented by the existing Evaluation domain.
     # One lead/account gets one open Core opportunity; retries return it unchanged.

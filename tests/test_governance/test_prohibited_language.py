@@ -51,6 +51,10 @@ def test_scrub_softens_affirmative_guarantee_grammatically():
         "Rather than a blanket guarantee, we evaluate the workload.",
         "Those results do not transfer as guarantees to other workloads.",
         "Guaranteed performance improvements are not something we can provide.",
+        "Guaranteed performance improvements are not a claim itriX makes.",
+        "Guaranteed results aren't claims we make.",
+        "Guaranteed savings are not something itriX promises.",
+        "We don't make guaranteed performance claims.",
         "We cannot guarantee performance improvements.",
         "Performance improvements are not guaranteed.",
         "Rather than making a blanket guarantee, itriX evaluates the workload.",
@@ -73,6 +77,10 @@ def test_safe_guarantee_refusal_and_discussion_remain_natural(text):
         "ALPHA guarantees faster execution.",
         "ASTOP guarantees perfect results.",
         "We guarantee this will work for every workload.",
+        "Guaranteed performance improvements are available.",
+        "Guaranteed savings are part of ALPHA Compute.",
+        "ALPHA Compute provides guaranteed performance.",
+        "We offer guaranteed results.",
     ],
 )
 def test_affirmative_guarantees_remain_governed(text):
@@ -80,6 +88,14 @@ def test_affirmative_guarantees_remain_governed(text):
     out = scrub(text)
     assert out != text
     assert "aims to" not in out
+
+
+def test_live_guarantee_refusal_context_preserves_meaning():
+    text = "Guaranteed performance improvements aren't a claim itriX makes."
+    out = scrub(text)
+    assert contains_prohibited(text) is False
+    assert out == text
+    assert "potential performance improvements aren't a claim" not in out.lower()
 
 
 def test_live_guarantee_discussion_regression_does_not_mangle_grammar():

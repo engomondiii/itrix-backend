@@ -77,8 +77,11 @@ def register_client(
         assent_svc.require_current_rendered_versions(assent_versions)
     except assent_svc.LegalTermsChanged as exc:
         raise RegistrationLegalTermsChanged(str(exc)) from exc
-    except assent_svc.AssentRefused as exc:
-        raise RegistrationError(str(exc)) from exc
+    except assent_svc.AssentRefused:
+        # Missing/misconfigured server legal evidence is an operational hard failure, not
+        # an ordinary registration refusal. Let the view's generic 503 path report it
+        # safely; collapsing it into 202 would falsely imply the request was accepted.
+        raise
 
     # ── 1. ONE ADDRESS, ONE ACCOUNT (R63) ────────────────────────────────────
     existing = Client.objects.filter(email__iexact=address, is_active=True).first()
@@ -125,8 +128,9 @@ def register_client(
         )
     except assent_svc.LegalTermsChanged as exc:
         raise RegistrationLegalTermsChanged(str(exc)) from exc
-    except assent_svc.AssentRefused as exc:
-        raise RegistrationError(str(exc)) from exc
+    except assent_svc.AssentRefused:
+        # Same invariant as the pre-check: account creation must fail with the recorder.
+        raise
 
     # ── 5. THE VISITOR'S ANONYMOUS THREADS FOLLOW THEM IN (R65) ─────────────
     _claim_session_threads(lead, client, visitor_session)

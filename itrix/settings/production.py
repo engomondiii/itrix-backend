@@ -6,8 +6,20 @@ import os
 
 from .base import *  # noqa: F401,F403
 from .base import ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, REDIS_URL, env_bool, env_list
+from .security_validation import validate_production_signing_keys
 
 DEBUG = False
+
+# ─── Cryptographic production contract ───────────────────────────────────────
+# base.py deliberately keeps a repository-known development SECRET_KEY so a fresh local
+# checkout can boot. Production must never inherit that convenience. The client JWT plane
+# also gets an independent mandatory key rather than silently falling back to SECRET_KEY.
+# Values live only in the deployment environment; never commit them.
+CLIENT_JWT_SIGNING_KEY = (os.environ.get("CLIENT_JWT_SIGNING_KEY") or "").strip()
+validate_production_signing_keys(
+    secret_key=SECRET_KEY,
+    client_jwt_signing_key=CLIENT_JWT_SIGNING_KEY,
+)
 
 # Railway provides RAILWAY_PUBLIC_DOMAIN / RAILWAY_STATIC_URL; trust them.
 _railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")

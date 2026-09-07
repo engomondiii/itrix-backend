@@ -29,7 +29,13 @@ def test_high_claim_level_pends(settings):
 
 def test_prohibited_language_is_scrubbed():
     d = check("This guarantees lower power and always works.", claim_level=1)
-    assert "guarantee" not in d.text.lower()
+    lowered = d.text.lower()
+    assert d.status == GOV_AUTO_APPROVED
+    assert "this does not guarantee lower power" in lowered
+    assert "this guarantees lower power" not in lowered
+    assert "aims to" not in lowered
+    assert "always works" not in lowered
+    assert "often works" in lowered
 
 
 def test_product_definitions_are_not_rewritten_to_legacy_alpha_core_wording():

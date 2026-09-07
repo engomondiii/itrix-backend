@@ -57,6 +57,22 @@ def test_a_guarantee_in_a_question_is_rejected():
     assert qg.check_candidate("We guarantee improvement — when could you start?") == "assertion"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Would a guaranteed 50% saving interest you?",
+        "Would guaranteed performance interest you?",
+        "Can we guarantee 30% lower cost for you?",
+        "Would a guaranteed 2x speedup change your decision?",
+        "itriX guarantees better performance — would that help?",
+        "We guarantee lower costs — when could you start?",
+        "Would guaranteed savings make this worth evaluating?",
+    ],
+)
+def test_generated_question_guarantee_language_is_rejected(text):
+    assert qg.check_candidate(text) == "assertion"
+
+
 def test_an_internal_signal_is_rejected():
     assert qg.check_candidate("You look like a tier 1 account — is that right?") == "internal_signal"
 

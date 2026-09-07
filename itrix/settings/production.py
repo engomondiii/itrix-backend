@@ -23,19 +23,55 @@ validate_production_signing_keys(
 )
 
 # ─── Attachment production contract ─────────────────────────────────────────
-# The generic settings deliberately let local development use repository-local blobs and
-# built-in scan checks. Production may expose uploads only when operators have configured
-# durable storage and a real malware scanner. The validation is an import-time invariant,
-# so a bad attachment deployment fails startup instead of accepting bytes unsafely.
+# Production deliberately does NOT inherit the repository-local filesystem convenience
+# from base.py when attachments are enabled. The operator must choose a storage backend;
+# S3-compatible storage is the Railway release path, while filesystem remains supported
+# only for deployments with an explicit durable mount.
+ATTACHMENT_STORAGE_BACKEND = (
+    os.environ.get("ATTACHMENT_STORAGE_BACKEND", "") or ""
+).strip().lower()
+ATTACHMENT_BLOB_ROOT = (os.environ.get("ATTACHMENT_BLOB_ROOT", "") or "").strip()
+ATTACHMENT_S3_BUCKET = (os.environ.get("ATTACHMENT_S3_BUCKET", "") or "").strip()
+ATTACHMENT_S3_ENDPOINT = (os.environ.get("ATTACHMENT_S3_ENDPOINT", "") or "").strip()
+ATTACHMENT_S3_REGION = (os.environ.get("ATTACHMENT_S3_REGION", "") or "").strip()
+ATTACHMENT_S3_ACCESS_KEY_ID = (
+    os.environ.get("ATTACHMENT_S3_ACCESS_KEY_ID", "") or ""
+).strip()
+ATTACHMENT_S3_SECRET_ACCESS_KEY = (
+    os.environ.get("ATTACHMENT_S3_SECRET_ACCESS_KEY", "") or ""
+).strip()
+# Keep attachment objects in an application-owned namespace even when a bucket is shared.
+# An explicitly blank value remains blank and is rejected by validation rather than being
+# silently broadened to the bucket root.
+ATTACHMENT_S3_PREFIX = os.environ.get("ATTACHMENT_S3_PREFIX", "attachments/").strip()
+# Railway exposes an S3-compatible custom endpoint; path style avoids DNS/virtual-host
+# assumptions at that endpoint. Operators may explicitly select auto/virtual when their
+# provider requires it.
+ATTACHMENT_S3_ADDRESSING_STYLE = os.environ.get(
+    "ATTACHMENT_S3_ADDRESSING_STYLE", "path"
+).strip().lower()
+ATTACHMENT_SHARED_STORAGE_CONFIRMED = env_bool(
+    "ATTACHMENT_SHARED_STORAGE_CONFIRMED", False
+)
+
+# The validation is import-time and structural: it verifies local scanner availability
+# but never contacts S3. Provider reachability and write/read/delete integrity are checked
+# by the explicit runtime validator before production enablement.
 validate_production_attachments(
     enabled=ENABLE_ATTACHMENTS,
     base_dir=BASE_DIR,
-    # Pass the raw environment value, not base.py's convenient local default. An enabled
-    # production feature must be explicitly pointed at a mounted durable path.
-    configured_blob_root=os.environ.get("ATTACHMENT_BLOB_ROOT", ""),
+    storage_backend=ATTACHMENT_STORAGE_BACKEND,
+    configured_blob_root=ATTACHMENT_BLOB_ROOT,
+    s3_bucket=ATTACHMENT_S3_BUCKET,
+    s3_endpoint=ATTACHMENT_S3_ENDPOINT,
+    s3_region=ATTACHMENT_S3_REGION,
+    s3_access_key_id=ATTACHMENT_S3_ACCESS_KEY_ID,
+    s3_secret_access_key=ATTACHMENT_S3_SECRET_ACCESS_KEY,
+    s3_prefix=ATTACHMENT_S3_PREFIX,
+    s3_addressing_style=ATTACHMENT_S3_ADDRESSING_STYLE,
     av_command=ATTACHMENT_AV_COMMAND,
     process_inline=ATTACHMENT_PROCESS_INLINE,
-    shared_storage_confirmed=env_bool("ATTACHMENT_SHARED_STORAGE_CONFIRMED", False),
+    shared_storage_confirmed=ATTACHMENT_SHARED_STORAGE_CONFIRMED,
 )
 
 # Railway provides RAILWAY_PUBLIC_DOMAIN / RAILWAY_STATIC_URL; trust them.

@@ -23,8 +23,9 @@ from apps.clients.views_auth import (
     VerifyEmailResendView,
 )
 from apps.clients.views_invite_claim import InviteClaimView
-from apps.clients.views_registration import RegisterView
 from apps.clients.views_logout import ClientLogoutView
+from apps.clients.views_portal_messages import PortalConversationMessagesView
+from apps.clients.views_registration import RegisterView
 from apps.clients.views import (
     PortalNextBestActionView,
     PortalBriefingView,
@@ -34,7 +35,6 @@ from apps.clients.views import (
     ClientSetPasswordView,
     ClientTokenRefreshView,
     PortalConversationListView,
-    PortalConversationMessagesView,
     PortalDocumentsView,
     PortalEvaluationView,
     PortalOverviewView,

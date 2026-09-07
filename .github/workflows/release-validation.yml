@@ -1,0 +1,113 @@
+name: Backend release validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - mvp-release-hardening-20260907
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: '1'
+  DJANGO_SETTINGS_MODULE: itrix.settings.development
+  SECRET_KEY: ci-only-not-a-production-secret-key-20260907-4e96367fd12a4aa2
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/itrix_ci
+  ENABLE_AI_ENGINE: 'false'
+  ENABLE_REALTIME: 'false'
+  ENABLE_EMAIL_DELIVERY: 'false'
+  ENABLE_ATTACHMENTS: 'false'
+  PINECONE_API_KEY: ''
+  OPENAI_API_KEY: ''
+
+jobs:
+  release-validation:
+    name: backend-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: itrix_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d itrix_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12.4
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.4'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Source diff hygiene
+        run: git diff --check
+
+      - name: Compile Python
+        run: python -m compileall -q apps itrix tests manage.py
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Migration drift check
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Clean PostgreSQL migration chain
+        run: python manage.py migrate --noinput
+
+      - name: Focused release regressions
+        run: >-
+          pytest -q
+          tests/test_clients/test_logout_revocation.py
+          tests/test_authentication/test_logout_revocation_failure.py
+          tests/test_production_signing_keys.py
+          tests/test_knowledge_core/test_namespace_reconciliation.py
+          tests/test_agents/test_governance_fail_closed.py
+          tests/test_legal/test_assent_version_race.py
+          tests/test_legal/test_no_client_without_assent.py
+          tests/test_clients/test_portal_message_failures.py
+          tests/test_conversations/test_claim_on_signup.py
+          tests/test_conversations/test_transcript_pagination_hardening.py
+          tests/test_readiness.py
+          tests/test_attachments/test_production_contract.py
+
+      - name: Knowledge regression partition
+        run: pytest -q tests/test_knowledge_core
+
+      - name: Knowledge registration and validator
+        run: |
+          python manage.py register_knowledge_docs
+          python manage.py sync_hard_facts
+          python manage.py sync_evidence_metadata
+          python manage.py validate_knowledge_core
+
+      - name: Full backend pytest suite
+        run: pytest -q

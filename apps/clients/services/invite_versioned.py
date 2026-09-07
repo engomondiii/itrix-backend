@@ -1,4 +1,4 @@
-"""Transactional invite claim wrapper that binds account creation to rendered legal text."""
+"""Transactional invite claim wrapper binding account creation to legal text and history."""
 
 from __future__ import annotations
 
@@ -27,18 +27,9 @@ def claim_invite_with_version_integrity(
     assent_ip: str | None = None,
     assent_user_agent: str = "",
 ):
-    """Claim an invite and write assent in one outer transaction.
-
-    ``claim_invite`` remains the authoritative nonce/gate/account implementation. It is
-    called with its legacy recorder disabled while this outer atomic block is open; the
-    version-aware recorder then verifies the exact surface versions. A mismatch unwinds
-    the nested claim savepoint, including nonce burn and Client creation.
-    """
+    """Claim invite + assent + anonymous history in one outer transaction."""
 
     try:
-        # Validate before the claim as well, so obviously stale terms do not consume any
-        # work. The recorder repeats the check before commit; the server, not the browser,
-        # resolves what is currently acceptable both times.
         assent_svc.require_current_rendered_versions(assent_versions)
     except assent_svc.LegalTermsChanged as exc:
         raise InviteLegalTermsChanged(str(exc)) from exc
@@ -58,8 +49,6 @@ def claim_invite_with_version_integrity(
         assent_user_agent=assent_user_agent,
     )
 
-    # Recovery of an already-created Client must not manufacture a duplicate assent row.
-    # New claims have no row yet and are bound here before the outer transaction commits.
     if not client.assent_records.exists():
         try:
             assent_svc.record_in_transaction(
@@ -74,5 +63,14 @@ def claim_invite_with_version_integrity(
             raise InviteLegalTermsChanged(str(exc)) from exc
         except assent_svc.AssentRefused as exc:
             raise InviteError(f"Could not record legal assent: {exc}") from exc
+
+    # ``claim_invite`` historically invokes a best-effort helper. Repeat the operation at
+    # this transaction boundary as a load-bearing, idempotent assertion. If the first call
+    # already succeeded there are no session-owned rows left; if it failed, this call must
+    # succeed or the outer transaction rolls back nonce burn, Client, and assent together.
+    if visitor_session:
+        from apps.conversations.services.claim import claim_threads
+
+        claim_threads(visitor_session=visitor_session, client=client, lead=client.lead)
 
     return client, requires_password_set

@@ -9,7 +9,6 @@ from __future__ import annotations
 from django.urls import path
 
 from apps.conversations.views_thread import (
-    ThreadDetailView,
     ThreadListCreateView,
     ThreadPaneView,
     ThreadShellView,
@@ -17,6 +16,7 @@ from apps.conversations.views_thread import (
     ThreadRetryView,
 )
 from apps.conversations.views_thread_hardened import ThreadMessagesView
+from apps.conversations.views_thread_management import AuthenticatedThreadDetailView
 
 app_name = "threads"
 
@@ -27,5 +27,5 @@ urlpatterns = [
     path("<uuid:thread_id>/messages/", ThreadMessagesView.as_view(), name="thread-messages"),
     path("<uuid:thread_id>/shell/", ThreadShellView.as_view(), name="thread-shell"),
     path("<uuid:thread_id>/pane/", ThreadPaneView.as_view(), name="thread-pane"),
-    path("<uuid:thread_id>/", ThreadDetailView.as_view(), name="thread-detail"),
+    path("<uuid:thread_id>/", AuthenticatedThreadDetailView.as_view(), name="thread-detail"),
 ]

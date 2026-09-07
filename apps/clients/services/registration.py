@@ -1,10 +1,9 @@
 """
 OPEN REGISTRATION (Architecture v2.9 §27.4, Backend v7.2 §15.5, R60–R64).
 
-Open registration mints a neutral State-1 Lead/Client. Legal assent and account creation
-share one transaction, and the versions reported by the surface are verified against the
-running deployment before any address-dependent branch executes. A legal-version race is
-therefore safe and cannot become an account-enumeration signal.
+Open registration mints a neutral State-1 Lead/Client. Legal assent, anonymous-thread
+continuity, and account creation share one transaction. If any load-bearing part fails,
+no partial workspace is committed.
 """
 
 from __future__ import annotations
@@ -57,7 +56,7 @@ def register_client(
     ip: str | None = None,
     user_agent: str = "",
 ) -> RegistrationOutcome:
-    """Create a neutral workspace while preserving account and assent invariants."""
+    """Create a neutral workspace while preserving account, assent, and history invariants."""
     from apps.clients.services.client_creator import create_client_for_lead
     from apps.clients.services.verification import mint as mint_verification
     from apps.clients.services.verification import send as send_verification
@@ -70,20 +69,13 @@ def register_client(
     if not address or not password:
         raise RegistrationError("An email address and a password are required.")
 
-    # Legal currentness is checked BEFORE the address lookup so stale terms produce the
-    # same response for a new and an existing address. This preserves R64 while ensuring
-    # nobody can be recorded against a version they did not render.
     try:
         assent_svc.require_current_rendered_versions(assent_versions)
     except assent_svc.LegalTermsChanged as exc:
         raise RegistrationLegalTermsChanged(str(exc)) from exc
     except assent_svc.AssentRefused:
-        # Missing/misconfigured server legal evidence is an operational hard failure, not
-        # an ordinary registration refusal. Let the view's generic 503 path report it
-        # safely; collapsing it into 202 would falsely imply the request was accepted.
         raise
 
-    # ── 1. ONE ADDRESS, ONE ACCOUNT (R63) ────────────────────────────────────
     existing = Client.objects.filter(email__iexact=address, is_active=True).first()
     if existing is not None:
         _notify_existing_holder(existing)
@@ -91,7 +83,6 @@ def register_client(
         logger.info("clients.registration_address_in_use")
         return RegistrationOutcome(created=False)
 
-    # ── 2. THE LEAD. `Client.lead` is NOT NULL, so there is always one ───────
     lead = Lead.objects.create(
         email=address,
         visitor_name=(full_name or "").strip(),
@@ -102,7 +93,6 @@ def register_client(
         status=LeadStatus.NEW,
     )
 
-    # ── 3. THE CLIENT — one creator, with journey advance switched off ───────
     client, _created = create_client_for_lead(
         lead,
         email=address,
@@ -115,7 +105,6 @@ def register_client(
     client.account_origin = AccountOrigin.SELF_SERVE
     client.save(update_fields=["account_origin", "updated_at"])
 
-    # ── 4. ASSENT, IN THIS TRANSACTION ───────────────────────────────────────
     try:
         assent_svc.record_in_transaction(
             client=client,
@@ -129,13 +118,13 @@ def register_client(
     except assent_svc.LegalTermsChanged as exc:
         raise RegistrationLegalTermsChanged(str(exc)) from exc
     except assent_svc.AssentRefused:
-        # Same invariant as the pre-check: account creation must fail with the recorder.
         raise
 
-    # ── 5. THE VISITOR'S ANONYMOUS THREADS FOLLOW THEM IN (R65) ─────────────
+    # History continuity is load-bearing. This intentionally propagates failures so the
+    # surrounding transaction rolls back Client + assent instead of stranding anonymous
+    # turns on a session the new account no longer owns.
     _claim_session_threads(lead, client, visitor_session)
 
-    # ── 6. THE VERIFICATION TOKEN, INSIDE THE TRANSACTION ───────────────────
     token = mint_verification(client, address, ip=ip)
     transaction.on_commit(lambda: send_verification(client, token))
 
@@ -154,12 +143,9 @@ def _notify_existing_holder(client) -> None:
 
 
 def _claim_session_threads(lead, client, visitor_session: str) -> None:
-    """Migrate this visitor session's anonymous threads to the new account."""
+    """Migrate this visitor session's anonymous threads inside account creation."""
     if not visitor_session:
         return
-    try:
-        from apps.conversations.services.claim import claim_threads
+    from apps.conversations.services.claim import claim_threads
 
-        claim_threads(visitor_session=visitor_session, client=client, lead=lead)
-    except Exception:  # noqa: BLE001
-        logger.exception("thread claim failed for client %s", getattr(client, "id", "?"))
+    claim_threads(visitor_session=visitor_session, client=client, lead=lead)

@@ -6,6 +6,7 @@ import os
 
 from .base import *  # noqa: F401,F403
 from .base import ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, REDIS_URL, env_bool, env_list
+from .attachment_validation import validate_production_attachments
 from .security_validation import validate_production_signing_keys
 
 DEBUG = False
@@ -19,6 +20,22 @@ CLIENT_JWT_SIGNING_KEY = (os.environ.get("CLIENT_JWT_SIGNING_KEY") or "").strip(
 validate_production_signing_keys(
     secret_key=SECRET_KEY,
     client_jwt_signing_key=CLIENT_JWT_SIGNING_KEY,
+)
+
+# ─── Attachment production contract ─────────────────────────────────────────
+# The generic settings deliberately let local development use repository-local blobs and
+# built-in scan checks. Production may expose uploads only when operators have configured
+# durable storage and a real malware scanner. The validation is an import-time invariant,
+# so a bad attachment deployment fails startup instead of accepting bytes unsafely.
+validate_production_attachments(
+    enabled=ENABLE_ATTACHMENTS,
+    base_dir=BASE_DIR,
+    # Pass the raw environment value, not base.py's convenient local default. An enabled
+    # production feature must be explicitly pointed at a mounted durable path.
+    configured_blob_root=os.environ.get("ATTACHMENT_BLOB_ROOT", ""),
+    av_command=ATTACHMENT_AV_COMMAND,
+    process_inline=ATTACHMENT_PROCESS_INLINE,
+    shared_storage_confirmed=env_bool("ATTACHMENT_SHARED_STORAGE_CONFIRMED", False),
 )
 
 # Railway provides RAILWAY_PUBLIC_DOMAIN / RAILWAY_STATIC_URL; trust them.
@@ -44,13 +61,7 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
 
 # Email: the transport and the provider are both resolved in base.py now, from the
-# environment. This file used to pin EMAIL_BACKEND to SMTP and describe Resend as
-# "preferred", which was true of an earlier deployment and misleading afterwards —
-# `email_sender` reads settings.EMAIL_PROVIDER, and base.py derives it.
-#
-# Real delivery is still gated by ENABLE_EMAIL_DELIVERY, so a production deploy with
-# credentials present but the flag off sends nothing and logs every attempt.
-
+# environment. Real delivery is still gated by ENABLE_EMAIL_DELIVERY.
 
 # ─── Realtime / WebSocket (v4.0 Phase 2) ─────────────────────────────────────
 # The `ws` Procfile process runs Daphne against itrix.asgi:application. In production

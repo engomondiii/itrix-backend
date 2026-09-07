@@ -35,7 +35,7 @@ from apps.emails.models import EmailLog
 from apps.evaluations.models import Evaluation
 from apps.follow_up.models import FollowUpTask
 from apps.journey.models import JourneyTransition
-from apps.leads.models import Lead, LeadActivity, LeadMeeting, LeadNote
+from apps.leads.models import ASTOPEngagement, Lead, LeadActivity, LeadMeeting, LeadNote
 from apps.nda.models import NDARecord
 from apps.pocs.models import PoC
 
@@ -353,3 +353,150 @@ class LeadActivityAdmin(AppendOnlyAdmin):
     @admin.display(description="Meta")
     def meta_pretty(self, obj):
         return pretty_json(obj.meta)
+
+
+@admin.register(ASTOPEngagement)
+class ASTOPEngagementAdmin(ItrixModelAdmin):
+    """ASTOP commercial/proof record.
+
+    Deliberately thin: the Lead and the journey ladder remain authoritative for the
+    relationship, and this page owns only the ASTOP-specific qualification,
+    attributable evaluation, License-Out entitlement and verified-value fields.
+    The six stages mirror the GTM Plan v2.3 ch. 2 journey, so the changelist reads
+    as that journey rather than as a second CRM.
+    """
+
+    list_display = ("lead", "stage_col", "entitlement_col", "lo_executed_at", "ttfv_col", "updated_at")
+    list_filter = ("stage", "entitlement_status", "revocation_status")
+    search_fields = (
+        "lead__company",
+        "lead__email",
+        "evaluation_agreement",
+        "controlled_build_id",
+        "attribution_id",
+    )
+    autocomplete_fields = ("lead",)
+    date_hierarchy = "updated_at"
+    ordering = ("-updated_at",)
+    readonly_fields = (
+        "ttfv_col",
+        "qualification_pretty",
+        "evaluation_scope_pretty",
+        "baseline_pretty",
+        "decision_fidelity_pretty",
+        "measured_savings_pretty",
+        "estimated_savings_pretty",
+        "evaluation_result_pretty",
+        "security_result_pretty",
+        "integration_feasibility_pretty",
+        "lo_scope_pretty",
+        "verified_value_pretty",
+        "expansion_pretty",
+    )
+    fieldsets = (
+        ("Engagement", {"fields": ("lead", "stage", "qualification_pretty")}),
+        ("Controlled evaluation", {
+            "fields": (
+                "evaluation_agreement",
+                "evaluation_scope_pretty",
+                "baseline_pretty",
+                "decision_fidelity_pretty",
+                ("measured_savings_pretty", "estimated_savings_pretty"),
+                "evaluation_result_pretty",
+                "security_result_pretty",
+                "integration_feasibility_pretty",
+            ),
+        }),
+        ("Attributable build", {"fields": (("controlled_build_id", "attribution_id"),)}),
+        ("License-Out", {
+            "fields": (
+                "lo_scope_pretty",
+                "lo_executed_at",
+                ("entitlement_status", "entitlement_expires_at"),
+                "revocation_status",
+            ),
+        }),
+        ("Verified value", {
+            "fields": (
+                ("authorized_install_at", "reproducible_value_at"),
+                "ttfv_col",
+                "verified_value_pretty",
+                "expansion_pretty",
+            ),
+        }),
+        ("Timestamps", {"fields": (("created_at", "updated_at"),)}),
+    )
+
+    @admin.display(description="Stage", ordering="stage")
+    def stage_col(self, obj):
+        return badge(obj.get_stage_display(), "info")
+
+    @admin.display(description="Entitlement", ordering="entitlement_status")
+    def entitlement_col(self, obj):
+        if obj.revocation_status:
+            return badge(obj.revocation_status, "danger")
+        return badge(obj.entitlement_status, "success")
+
+    @admin.display(description="TTFV")
+    def ttfv_col(self, obj):
+        """Time to First Verified Value — the GTM plan's named product KPI.
+
+        ``invalid`` means value was recorded before authorized install, which is a
+        data-entry fault rather than a fast result, so it is shown as a warning
+        instead of being silently formatted as a duration.
+        """
+        status = obj.ttfv_status
+        if status == "valid":
+            seconds = obj.ttfv_seconds
+            if seconds is None:
+                return badge("valid", "success")
+            return badge(f"{seconds / 3600:.1f} h", "success")
+        return badge(status, "warning" if status == "invalid" else None)
+
+    @admin.display(description="Qualification context")
+    def qualification_pretty(self, obj):
+        return pretty_json(obj.qualification_context)
+
+    @admin.display(description="Evaluation scope")
+    def evaluation_scope_pretty(self, obj):
+        return pretty_json(obj.evaluation_scope)
+
+    @admin.display(description="Baseline")
+    def baseline_pretty(self, obj):
+        return pretty_json(obj.baseline)
+
+    @admin.display(description="Decision fidelity")
+    def decision_fidelity_pretty(self, obj):
+        return pretty_json(obj.decision_fidelity)
+
+    @admin.display(description="Measured savings")
+    def measured_savings_pretty(self, obj):
+        return pretty_json(obj.measured_savings)
+
+    @admin.display(description="Estimated savings")
+    def estimated_savings_pretty(self, obj):
+        return pretty_json(obj.estimated_savings)
+
+    @admin.display(description="Evaluation result")
+    def evaluation_result_pretty(self, obj):
+        return pretty_json(obj.evaluation_result)
+
+    @admin.display(description="Security result")
+    def security_result_pretty(self, obj):
+        return pretty_json(obj.security_result)
+
+    @admin.display(description="Integration feasibility")
+    def integration_feasibility_pretty(self, obj):
+        return pretty_json(obj.integration_feasibility)
+
+    @admin.display(description="License-Out scope")
+    def lo_scope_pretty(self, obj):
+        return pretty_json(obj.lo_scope)
+
+    @admin.display(description="Verified value")
+    def verified_value_pretty(self, obj):
+        return pretty_json(obj.verified_value)
+
+    @admin.display(description="Expansion")
+    def expansion_pretty(self, obj):
+        return pretty_json(obj.expansion)

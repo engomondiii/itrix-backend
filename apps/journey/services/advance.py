@@ -156,6 +156,10 @@ def advance(
         event=event,
         reveal=reveal_surface or "",
         actor=actor if getattr(actor, "is_authenticated", False) else None,
+        # Provenance as a column, not only as a JSON key. `meta["thread_id"]` is still
+        # written above and deliberately kept: it survives the thread being deleted,
+        # where the FK is nulled.
+        thread=thread if getattr(thread, "pk", None) else None,
         meta=meta,
     )
 

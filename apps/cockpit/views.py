@@ -86,9 +86,17 @@ class CockpitThreadBoardView(_CockpitView):
     def get(self, request):
         # `count` keeps its existing meaning (rows in THIS response) so a deployed board
         # is unaffected; `total`, `offset` and `hasMore` are additive.
+        # `attribution` lets the board narrow to conversations with no lead page to live
+        # on; `leadId` lets a lead's detail panel list its own. Both default to the
+        # previous behaviour, so an already-deployed board is unaffected.
+        attribution = (request.query_params.get("attribution") or "all").strip().lower()
+        if attribution not in {"all", "unattributed", "attributed"}:
+            attribution = "all"
         payload = threads_svc.page(
             limit=_int_param(request, "limit", threads_svc.DEFAULT_LIMIT),
             offset=_int_param(request, "offset", 0),
+            attribution=attribution,
+            lead_id=request.query_params.get("leadId") or None,
         )
         return Response(
             {

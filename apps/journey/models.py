@@ -266,7 +266,21 @@ class JourneyTransition(BaseModel):
     An append-only record of one state transition, for audit + timeline.
 
     ``lead`` is the subject. We keep the raw from/to/event plus an optional actor and a
-    free-form ``meta`` blob (gate inputs, agent run ids, thread ids, etc.).
+    free-form ``meta`` blob (gate inputs, agent run ids, etc.).
+
+    ── WHY ``thread`` IS A COLUMN AND NOT JUST ``meta["thread_id"]`` ─────────
+    A Lead has MANY Threads (``Thread.lead`` is a FK with ``related_name="threads"``),
+    and every Thread carries its own ``relationship_state``, ``mirror_status`` and
+    ``current_state``. So "which conversation moved this lead?" is a real question with a
+    real answer, and it was already being recorded — ``advance()`` has always written
+    ``meta["thread_id"]`` when a thread drove the transition.
+
+    A JSON key cannot be joined, indexed, or followed to a deleted row. Promoting it to a
+    nullable FK makes the provenance queryable ("show me the conversation that earned
+    this stage") without changing what is recorded. ``SET_NULL`` because a visitor
+    deleting their conversation DELETES it — the audit row must survive that, with the
+    link honestly emptied rather than dangling. ``meta["thread_id"]`` is still written, so
+    the original id remains legible even after the thread is gone.
     """
 
     lead = models.ForeignKey(
@@ -286,6 +300,14 @@ class JourneyTransition(BaseModel):
         null=True,
         blank=True,
         related_name="journey_transitions",
+    )
+    thread = models.ForeignKey(
+        "conversations.Thread",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="journey_transitions",
+        help_text="The conversation that drove this transition, when one did.",
     )
     meta = models.JSONField(default=dict, blank=True)
 

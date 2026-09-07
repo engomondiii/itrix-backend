@@ -66,7 +66,13 @@ def _company_for(thread) -> str:
     return ""
 
 
-def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
+def page(
+    *,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
+    attribution: str = "all",
+    lead_id: str | None = None,
+) -> dict:
     """
     One row per conversation. Newest activity first — the board is a work queue.
 
@@ -79,6 +85,23 @@ def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
 
     So there is no ``includeInactive`` parameter either. A board cannot offer to show
     something the model does not keep.
+
+    ── THE ROW DESCRIBES THE CONVERSATION, NOT THE LEAD ─────────────────────
+    This row used to carry ``journeyState`` read off the LEAD. A Lead has many Threads
+    (``Thread.lead`` is a FK), so that put the same value on every row of a lead's
+    conversations while saying nothing about any of them — and it hid the four fields
+    that do describe a conversation, all of which live on Thread and all of which
+    actually drive behaviour: ``relationship_state`` and ``mirror_status`` gate what the
+    AI may recommend and whether it may ask for contact details, ``current_state`` sets
+    the disclosure ceiling, and ``engagement_stage`` is the visitor-facing label.
+
+    The lead's own state belongs on the lead, and is served by the leads API.
+
+    ── ``attribution`` ──────────────────────────────────────────────────────
+    ``"all"`` (default, unchanged) · ``"unattributed"`` — no lead AND no client, i.e. the
+    conversations that have no lead page to live on and would become unreachable if the
+    board filtered them out · ``"attributed"`` — the complement. ``lead_id`` narrows to
+    one lead's conversations for its detail panel.
 
     Returns ``{results, total, limit, offset, hasMore}``. The ordering carries ``id`` as
     a final tiebreak: two threads touched in the same instant would otherwise be ordered
@@ -94,9 +117,18 @@ def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
     # Counted on its own query rather than off the annotated one: the annotations exist
     # to fill the row, and COUNT(*) over three joins to answer "how many threads" is a
     # cost paid on every board load for a number that does not need them.
-    total = Thread.objects.count()
+    base = Thread.objects.all()
+    if lead_id:
+        base = base.filter(lead_id=lead_id)
+    if attribution == "unattributed":
+        base = base.filter(lead__isnull=True, client__isnull=True)
+    elif attribution == "attributed":
+        base = base.exclude(lead__isnull=True, client__isnull=True)
 
-    qs = Thread.objects.select_related("lead", "client").annotate(
+    # Counted off the same filter as the rows, or paging lies about how much is left.
+    total = base.count()
+
+    qs = base.select_related("lead", "client").annotate(
         turn_count=Count("messages", distinct=True),
         visitor_turns=Count(
             "messages",
@@ -118,7 +150,12 @@ def page(*, limit: int = DEFAULT_LIMIT, offset: int = 0) -> dict:
                 "anonymous": lead is None and getattr(thread, "client_id", None) is None,
                 "leadId": str(lead.id) if lead is not None else None,
                 "company": _company_for(thread),
-                "journeyState": getattr(lead, "journey_state", "") or "ARRIVED",
+                # This conversation's own state. See the note in the docstring on why the
+                # lead's journey state is deliberately not here.
+                "relationshipState": getattr(thread, "relationship_state", "") or "visitor",
+                "mirrorStatus": getattr(thread, "mirror_status", "") or "not_required",
+                "engagementStage": getattr(thread, "engagement_stage", "") or "",
+                "threadState": getattr(thread, "current_state", "") or "",
                 "turnCount": thread.turn_count or 0,
                 "visitorTurns": thread.visitor_turns or 0,
                 # `shell_mode`'s own threshold, restated as data rather than duplicated as
@@ -208,7 +245,15 @@ def detail(thread_id: str, *, may_see_matched_text: bool = False) -> dict | None
         "anonymous": lead is None and getattr(thread, "client_id", None) is None,
         "leadId": str(lead.id) if lead is not None else None,
         "company": _company_for(thread),
-        "journeyState": getattr(lead, "journey_state", "") or "ARRIVED",
+        # This conversation's own state.
+        "relationshipState": getattr(thread, "relationship_state", "") or "visitor",
+        "mirrorStatus": getattr(thread, "mirror_status", "") or "not_required",
+        "engagementStage": getattr(thread, "engagement_stage", "") or "",
+        "threadState": getattr(thread, "current_state", "") or "",
+        # The LEAD's state, named so it can never be read as this conversation's. Kept on
+        # the detail view because an operator reading one thread needs the subject's
+        # standing; omitted from the board row, where it repeated per row and misled.
+        "leadJourneyState": getattr(lead, "journey_state", "") or None,
         # Thread has no soft-delete flag: a visitor deleting a conversation DELETES it,
         # which is the promise made in the Privacy Policy. `ownerKind` is the field that
         # actually says something about the thread's provenance.

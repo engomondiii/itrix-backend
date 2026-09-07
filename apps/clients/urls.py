@@ -22,6 +22,7 @@ from apps.clients.views_auth import (
     VerifyEmailConfirmView,
     VerifyEmailResendView,
 )
+from apps.clients.views_invite_claim import InviteClaimView
 from apps.clients.views_registration import RegisterView
 from apps.clients.views_logout import ClientLogoutView
 from apps.clients.views import (
@@ -32,7 +33,6 @@ from apps.clients.views import (
     ClientMeView,
     ClientSetPasswordView,
     ClientTokenRefreshView,
-    InviteClaimView,
     PortalConversationListView,
     PortalConversationMessagesView,
     PortalDocumentsView,

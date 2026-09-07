@@ -23,12 +23,12 @@ from apps.clients.views_auth import (
     VerifyEmailConfirmView,
     VerifyEmailResendView,
 )
+from apps.clients.views_logout import ClientLogoutView
 from apps.clients.views import (
     PortalNextBestActionView,
     PortalBriefingView,
     PortalWSTicketView,
     ClientLoginView,
-    ClientLogoutView,
     ClientMeView,
     ClientSetPasswordView,
     ClientTokenRefreshView,

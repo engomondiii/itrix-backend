@@ -95,6 +95,8 @@ class Command(BaseCommand):
         self._seed_report()
         self._seed_sla()
         self._seed_governance(leads, admin, team)
+        self._seed_conversation_threads(leads, admin)
+        self._seed_astop(leads)
 
         self._summary(admin)
 
@@ -732,6 +734,322 @@ class Command(BaseCommand):
                 "  note: no second ASSESSMENT approver — L4/L5 drafts cannot be fully approved"))
 
     # ── summary ────────────────────────────────────────────────────────────────
+    # -- conversations (the thread board) -------------------------------------
+    def _seed_conversation_threads(self, leads, admin):
+        """
+        Threads for the cockpit conversation board.
+
+        Nothing else in this seeder creates a Thread - ``_seed_governance`` creates
+        Conversations and Messages, which are different models - so the board rendered
+        empty and the four state fields it now shows had nothing to show.
+
+        Three things are deliberately demonstrated, because each is a real property of
+        the model that one tidy thread per lead would hide:
+
+        1. **One lead, several conversations, in different states.** ``Thread.lead`` is a
+           FK. A lead can be mid-assessment in one chat and an anonymous browser in
+           another, and the board must show that rather than average it away.
+        2. **Anonymous threads.** No lead and no client: the population with no lead page
+           to live on, which is the board's actual job.
+        3. **A confirmed Problem Mirror, and one still pending.** ``mirror_status`` gates
+           what the AI may recommend, so the difference is load-bearing, not cosmetic.
+        """
+        from apps.conversations.models import Thread
+        from apps.conversations.services import threads as thread_svc
+
+        attributed = [
+            (0, "Cholesky throughput on the new part", "customer", "confirmed",
+             "assessment", "ASSESSMENT", [
+                 ("v", "We are taping out a new accelerator and the software stack is the "
+                       "differentiator. Where does itriX fit?"),
+                 ("a", "Before any route, let me restate your situation in six parts."),
+                 ("v", "That reflects it. Part 3 is the one that matters to us."),
+                 ("a", "Understood - recorded. Structural eligibility comes next."),
+             ]),
+            (0, "Follow-up: does this cover the FP8 path", "visitor", "pending",
+             "exploration", "IN_REVIEW", [
+                 ("v", "Separate question from a colleague - does any of this apply to FP8?"),
+                 ("a", "It may. Let me reflect the workload back before answering."),
+             ]),
+            (1, "Energy per token, not per rack", "customer", "confirmed",
+             "assessment", "ASSESSMENT", [
+                 ("v", "Cooling is capping expansion. We measure energy per rack; I think "
+                       "the number we actually need is per token."),
+                 ("a", "That distinction is the reflection's Part 1. Confirming it now."),
+                 ("v", "Confirmed."),
+             ]),
+            (2, "Conservation-law drift over long runs", "technical_evaluator",
+             "not_required", "exploration", "IN_REVIEW", [
+                 ("v", "Our simulation loses accuracy over long time runs. Is that a "
+                       "representation problem or a solver problem?"),
+                 ("a", "Those are different failures with different evidence. Which one "
+                       "shows up first in your runs?"),
+             ]),
+            (3, "Runtime reproducibility before rollout", "visitor", "refine",
+             "exploration", "IN_REVIEW", [
+                 ("v", "Reproducibility is blocking a production rollout."),
+                 ("a", "Restating: the blocker is run-to-run variance, not absolute speed."),
+                 ("v", "Not quite - it is both, but variance is what stops sign-off."),
+             ]),
+        ]
+
+        made = 0
+        for idx, title, relationship, mirror, stage, state, turns in attributed:
+            if idx >= len(leads):
+                continue
+            lead = leads[idx]
+
+            # The board resolves a company from the CLIENT record only - never from
+            # anything the visitor typed, which is why `Lead.company` is deliberately not
+            # used there. So a conversation that has genuinely reached a customer
+            # relationship needs the workspace that relationship implies, or it shows up
+            # correctly attributed and namelessly blank.
+            # A customer relationship implies a workspace, so create one. A mere visitor
+            # does not - but if this lead already has a workspace, their other
+            # conversations belong to it rather than looking unattributed.
+            if relationship in ("customer", "strategic_customer"):
+                client = self._workspace_for(lead)
+            else:
+                from apps.clients.models import Client as _Client
+                client = _Client.objects.filter(lead=lead).first()
+
+            thread = Thread.objects.filter(lead=lead, title=title).first()
+            if thread is None:
+                thread = thread_svc.create_thread(
+                    visitor_session="demo-sess-%s-%s" % (lead.id, title[:12]),
+                    lead=lead,
+                    client=client,
+                    title=title,
+                )
+                made += 1
+            thread.lead = lead
+            if client is not None and thread.client_id != client.id:
+                thread.client = client
+            thread.relationship_state = relationship
+            thread.mirror_status = mirror
+            thread.engagement_stage = stage
+            thread.current_state = state
+            thread.last_activity_at = self.now - _h(idx + 1)
+            thread.save(update_fields=[
+                "lead", "client", "relationship_state", "mirror_status",
+                "engagement_stage", "current_state", "last_activity_at", "updated_at",
+            ])
+            self._turns(thread, turns)
+
+        anonymous = [
+            ("Inference cost rising faster than usage", [
+                ("v", "Our inference costs are rising faster than our usage and I need to "
+                      "know whether that is a hardware problem or a pipeline problem "
+                      "before our budget review next month."),
+                ("a", "That is a decision, not just a symptom - which makes it a good "
+                      "starting point. Let me restate it before suggesting anything."),
+            ]),
+            ("What does itriX actually do", [
+                ("v", "What does itriX do, in plain terms?"),
+                ("a", "We work on the representation of computation - how work is shaped "
+                      "before it runs."),
+            ]),
+            ("Can I read the evidence first", [
+                ("v", "What published or validated evidence can I review without starting "
+                      "a commercial process?"),
+            ]),
+        ]
+        for title, turns in anonymous:
+            thread = Thread.objects.filter(title=title, lead__isnull=True).first()
+            if thread is None:
+                thread = thread_svc.create_thread(
+                    visitor_session="demo-anon-%s" % title[:14], title=title,
+                )
+                made += 1
+            thread.last_activity_at = self.now - _h(1)
+            thread.save(update_fields=["last_activity_at", "updated_at"])
+            self._turns(thread, turns)
+
+        self._link_transition_provenance(leads)
+        self.stdout.write("  conversations: %s new thread(s)" % made)
+
+    def _workspace_for(self, lead):
+        """
+        The Client record for a lead that has reached a customer relationship.
+
+        ``advance_journey=False``: ``ACCEPT_INVITE`` is only legal from ``INVITED``, and
+        these demo leads sit wherever their own spec put them. Creating a workspace here
+        is a seeding convenience, not a journey event, and it must not log a failed
+        advance on every run.
+        """
+        from apps.clients.models import Client
+        from apps.clients.services.client_creator import create_client_for_lead
+
+        existing = Client.objects.filter(lead=lead).first()
+        if existing is not None:
+            return existing
+        try:
+            client, _ = create_client_for_lead(
+                lead,
+                email=lead.email,
+                full_name=getattr(lead, "visitor_name", "") or "",
+                organization=lead.company or "",
+                role=getattr(lead, "role", "") or "",
+                advance_journey=False,
+            )
+            return client
+        except Exception as exc:  # noqa: BLE001 - a demo workspace never fails the seed
+            # Reported, not swallowed. A silent except here hid a plain AttributeError
+            # for a whole run and the board simply showed blank companies.
+            self.stdout.write(self.style.WARNING(
+                "  workspace for %s skipped: %s" % (lead.company, exc)
+            ))
+            return None
+
+    def _turns(self, thread, turns):
+        """Idempotent message fill. Seq is 1-based and stable, so a re-run is a no-op."""
+        from apps.conversations.models import Message, SenderKind
+
+        conversation = thread.conversation
+        if conversation is None:
+            return
+        for i, (who, body) in enumerate(turns, start=1):
+            Message.objects.get_or_create(
+                conversation=conversation,
+                thread=thread,
+                seq=i,
+                defaults=dict(
+                    sender_kind=SenderKind.VISITOR if who == "v" else SenderKind.AGENT,
+                    body=body,
+                ),
+            )
+
+    def _link_transition_provenance(self, leads):
+        """
+        Produce transitions that actually carry their conversation.
+
+        Driven through ``journey.advance(..., thread=...)`` rather than by writing rows,
+        for two reasons. State has exactly one writer (Architecture v2.6 section 11.9),
+        so a seeder that inserts JourneyTransition directly is seeding a shape the app
+        can never produce. And routing it through ``advance`` is what proves the new
+        ``thread`` column is populated by the real path, not only by the migration's
+        backfill.
+
+        Only demo leads are touched. Any pre-existing lead in the database keeps its own
+        history: a seeder that rewrites rows it did not create is not idempotent, it is
+        destructive.
+        """
+        from apps.conversations.models import Thread
+        from apps.journey.models import JourneyEvent, JourneyState
+        from apps.journey.services.advance import InvalidTransition, advance
+
+        made = 0
+        for lead in leads:
+            threads = list(
+                Thread.objects.filter(lead=lead).order_by("-last_activity_at", "-created_at")
+            )
+            if not threads:
+                continue
+            # The conversation that EARNED the stage, not merely the most recent one. A
+            # lead can have a confirmed reflection in one chat and an idle question in
+            # another; attributing the advance to the idle one would be a lie that looks
+            # like data.
+            thread = next(
+                (t for t in threads if t.mirror_status in ("confirmed", "skipped")),
+                threads[0],
+            )
+
+            # Walk only as far as the lead's own conversation justifies. A confirmed
+            # Problem Mirror is what makes a diagnosis truthful, so a thread that has not
+            # confirmed one stops at IN_REVIEW.
+            steps = [JourneyEvent.FIRST_TURN.value]
+            if thread.mirror_status in ("confirmed", "skipped"):
+                steps.append(JourneyEvent.LOOP_CLOSED.value)
+
+            for event in steps:
+                if lead.journey_state == JourneyState.DIAGNOSED.value:
+                    break
+                try:
+                    result = advance(lead, event, thread=thread)
+                except InvalidTransition:
+                    break  # already past this point; nothing to seed
+                if result.transition is not None:
+                    made += 1
+
+        if made:
+            self.stdout.write(
+                "  provenance: %s transition(s) recorded with their conversation" % made
+            )
+
+    # -- ASTOP (arrived with the 7 Sep backend) --------------------------------
+    def _seed_astop(self, leads):
+        """
+        ASTOP engagements across the GTM v2.3 ch. 2 journey.
+
+        Readiness is deliberately NOT all-green. ``signed_build_availability`` and
+        ``deployment_package`` are the two the shipped artefacts genuinely fail - there is
+        no Windows build and nothing is signed - so seeding them READY would demo a
+        control that is lying. A gate that correctly says "not ready" is the stronger
+        thing to show.
+        """
+        from apps.leads.models import ASTOPEngagement, ASTOPStage
+
+        specs = [
+            (0, ASTOPStage.CONTROLLED_EVALUATION, dict(
+                agreement="EVAL-2026-0041",
+                build="astop-0.4.4-helion-a1",
+                attribution="ATTR-HELION-0041",
+                readiness={
+                    "threat_model": "APPROVED",
+                    "data_flow_disclosure": "APPROVED",
+                    "retention_policy": "APPROVED",
+                    "security_review": "IN_REVIEW",
+                    "signed_build_availability": "BLOCKED",
+                    "deployment_package": "PENDING",
+                },
+                measured={"observation_tokens_saved_pct": 31.4, "window_days": 14},
+            )),
+            (1, ASTOPStage.NDA_BRIEFING, dict(
+                agreement="", build="", attribution="",
+                readiness={"threat_model": "IN_REVIEW", "retention_policy": "PENDING"},
+                measured={},
+            )),
+            (4, ASTOPStage.IDENTIFY_QUALIFY, dict(
+                agreement="", build="", attribution="",
+                readiness={"threat_model": "NOT_PROVIDED"},
+                measured={},
+            )),
+        ]
+
+        made = 0
+        for idx, stage, extra in specs:
+            if idx >= len(leads):
+                continue
+            lead = leads[idx]
+            record, created = ASTOPEngagement.objects.get_or_create(
+                lead=lead,
+                defaults=dict(
+                    stage=stage,
+                    evaluation_agreement=extra["agreement"],
+                    controlled_build_id=extra["build"],
+                    attribution_id=extra["attribution"],
+                    qualification_context={
+                        "workload": getattr(lead, "workload_type", "") or "unspecified",
+                        "observation_cost_material": stage != ASTOPStage.IDENTIFY_QUALIFY,
+                    },
+                    evaluation_scope=(
+                        {"reference_workflow": "agentic-longtask"} if extra["measured"] else {}
+                    ),
+                    baseline={"window_days": 14, "captured": bool(extra["measured"])},
+                    measured_savings=extra["measured"],
+                    security_result={"readiness": extra["readiness"]},
+                ),
+            )
+            if created:
+                made += 1
+            if stage == ASTOPStage.CONTROLLED_EVALUATION and record.authorized_install_at is None:
+                record.authorized_install_at = self.now - _d(9)
+                record.reproducible_value_at = self.now - _d(7)
+                record.save(update_fields=[
+                    "authorized_install_at", "reproducible_value_at", "updated_at",
+                ])
+        self.stdout.write("  ASTOP: %s engagement(s)" % made)
+
     def _summary(self, admin):
         self.stdout.write("")
         self.stdout.write(self.style.MIGRATE_HEADING("Demo data seeded."))

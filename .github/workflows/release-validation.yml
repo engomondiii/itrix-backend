@@ -32,7 +32,7 @@ jobs:
   release-validation:
     name: backend-release
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     services:
       postgres:
         image: postgres:16
@@ -98,6 +98,33 @@ jobs:
           tests/test_conversations/test_transcript_pagination_hardening.py
           tests/test_readiness.py
           tests/test_attachments/test_production_contract.py
+
+      - name: Attachment regression partition
+        run: pytest -q tests/test_attachments
+
+      - name: Build production image
+        run: docker build --pull -t itrix-backend-ci .
+
+      - name: ClamAV image smoke
+        run: |
+          docker run --rm itrix-backend-ci clamscan --version
+          docker run --rm itrix-backend-ci sh -lc '
+            set -eu
+            test -n "$(find /var/lib/clamav -maxdepth 1 -type f \( -name "*.cvd" -o -name "*.cld" -o -name "*.ndb" \) -print -quit)"
+            printf "itriX clean CI scanner probe\n" >/tmp/clean.txt
+            clamscan --no-summary /tmp/clean.txt
+          '
+          docker run --rm itrix-backend-ci sh -lc '
+            set -eu
+            printf "itrix-ci-malware-probe" >/tmp/probe.txt
+            sig_hex=$(python -c "print(b\"itrix-ci-malware-probe\".hex())")
+            printf "ITRIX.CI.Probe:0:*:%s\n" "$sig_hex" >/tmp/itrix-ci.ndb
+            set +e
+            clamscan --no-summary --database=/tmp/itrix-ci.ndb /tmp/probe.txt
+            rc=$?
+            set -e
+            test "$rc" -eq 1
+          '
 
       - name: Knowledge regression partition
         run: pytest -q tests/test_knowledge_core

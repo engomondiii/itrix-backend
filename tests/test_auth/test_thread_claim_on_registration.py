@@ -12,13 +12,9 @@ import pytest
 
 from apps.clients.services.registration import register_client
 from apps.conversations.models import Thread, ThreadOwnerKind
+from apps.legal.services import instruments as instruments_svc
 
 pytestmark = pytest.mark.django_db
-
-ASSENT = [
-    {"slug": "terms", "version": "1.2", "effective": "2026-07-30"},
-    {"slug": "privacy", "version": "1.2", "effective": "2026-07-30"},
-]
 
 
 def _register(session=""):
@@ -27,7 +23,7 @@ def _register(session=""):
         password="a-long-enough-password",
         full_name="A Keeper",
         organization="An Organisation",
-        assent_versions=ASSENT,
+        assent_versions=instruments_svc.current_versions(["terms", "privacy"]),
         visitor_session=session,
     )
 

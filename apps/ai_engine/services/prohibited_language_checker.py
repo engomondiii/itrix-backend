@@ -54,9 +54,58 @@ HARD_BLOCK_PATTERNS = [
     r"\d+\s?x (?:cheaper|less energy|lower cost)",
     r"\d+%\s+(?:faster|cheaper|less energy|lower cost)",
 ]
-# Generic risky patterns (guarantees / universals / unbounded superlatives).
+
+# Guarantee handling is intentionally contextual.  A blanket lexical substitution turns
+# harmless refusals/discussion ("a blanket guarantee", "cannot guarantee", "guarantees
+# do not transfer") into malformed prose.  These patterns describe affirmative outcome
+# assertions that must still be governed.
+_AFFIRMATIVE_GUARANTEE_PATTERNS = [
+    r"\b(?:we|i|you|they)\s+(?:will\s+)?guarantee\b",
+    (
+        r"\b(?:it|this|that|itri[xX]|alpha(?:\s+(?:compute|core))?|astop|"
+        r"(?:the|our|this|that)\s+"
+        r"(?:product|system|platform|technology|solution|service|software|hardware))"
+        r"\s+(?:(?:will|does)\s+guarantee|guarantees)\b"
+    ),
+    r"\b(?:is|are|was|were|will be)\s+guaranteed\b",
+    r"\b(?:is|are)\s+(?:a|the)\s+(?:blanket\s+)?guarantee\b",
+    (
+        r"\bguaranteed\s+(?:performance|results?|savings?|costs?|accuracy|outcomes?|"
+        r"improvements?|execution|uptime|returns?|benefits?|figures?)\b"
+    ),
+]
+
+# The adjective form can legitimately appear before the refusal arrives in the sentence,
+# so it needs a small, explicit safe-context exception.  We keep this deliberately narrow:
+# it recognizes refusals, not affirmative claims with a distant negation.
+_SAFE_GUARANTEED_PATTERNS = [
+    (
+        r"\b(?:cannot|can't|can not|won't|will not|not able to|unable to)\s+"
+        r"(?:reasonably\s+|credibly\s+|responsibly\s+)?"
+        r"(?:provide|offer|give|promise|claim)\s+guaranteed\b"
+    ),
+    (
+        r"\bguaranteed\b[^.!?;]{0,100}\b(?:is|are)\s+not\s+"
+        r"(?:something|anything)\b[^.!?;]{0,100}\b"
+        r"(?:provide|offer|give|promise|claim)\b"
+    ),
+    (
+        r"\bguaranteed\b[^.!?;]{0,100}\b(?:cannot|can't|can not|won't|will not)\s+"
+        r"be\s+(?:provided|offered|given|promised|claimed)\b"
+    ),
+]
+
+_AFFIRMATIVE_GUARANTEE_RE = re.compile(
+    "|".join(f"(?:{pattern})" for pattern in _AFFIRMATIVE_GUARANTEE_PATTERNS),
+    re.IGNORECASE,
+)
+_SAFE_GUARANTEED_RES = [
+    re.compile(pattern, re.IGNORECASE) for pattern in _SAFE_GUARANTEED_PATTERNS
+]
+
+# Generic risky patterns (universals / unbounded superlatives). Guarantee assertions are
+# handled separately above so safe negative/discussion uses are not treated as violations.
 _RISKY_PATTERNS = [
-    r"\bguarantee(?:s|d)?\b",
     r"\b100%\b",
     r"\balways\b",
     r"\bnever fails?\b",
@@ -69,12 +118,34 @@ _RISKY_RE = re.compile("|".join(_RISKY_PATTERNS), re.IGNORECASE)
 _HARD_BLOCK_RE = re.compile("|".join(HARD_BLOCK_PATTERNS), re.IGNORECASE)
 
 
+def _is_safe_guaranteed_match(text: str, start: int) -> bool:
+    """Whether an adjective-form guarantee match is part of an explicit refusal."""
+    for safe_re in _SAFE_GUARANTEED_RES:
+        for match in safe_re.finditer(text):
+            if match.start() <= start < match.end():
+                return True
+    return False
+
+
+def _find_affirmative_guarantees(text: str) -> list[str]:
+    """Return affirmative guarantee assertions, excluding explicit refusal contexts."""
+    violations: list[str] = []
+    for match in _AFFIRMATIVE_GUARANTEE_RE.finditer(text):
+        if match.group(0).lower().startswith("guaranteed") and _is_safe_guaranteed_match(
+            text, match.start()
+        ):
+            continue
+        violations.append(match.group(0).lower())
+    return violations
+
+
 def find_violations(text: str) -> list[str]:
     """Return a list of matched prohibited phrases / risky patterns in ``text``."""
     if not text:
         return []
     lowered = text.lower()
     violations = [claim for claim in PROHIBITED_CLAIMS if claim.lower() in lowered]
+    violations += sorted(set(_find_affirmative_guarantees(text)))
     violations += sorted({m.group(0).lower() for m in _RISKY_RE.finditer(text)})
     violations += sorted({m.group(0).lower() for m in _HARD_BLOCK_RE.finditer(text)})
     return violations
@@ -89,21 +160,109 @@ def contains_prohibited(text: str) -> bool:
     return bool(find_violations(text))
 
 
+_PLURAL_SUBJECT_GUARANTEE_RE = re.compile(
+    r"\b(?P<subject>we|i|you|they)\s+(?P<will>will\s+)?guarantee\b",
+    re.IGNORECASE,
+)
+_THIRD_PERSON_GUARANTEE_RE = re.compile(
+    (
+        r"\b(?P<subject>it|this|that|itri[xX]|alpha(?:\s+(?:compute|core))?|astop|"
+        r"(?:the|our|this|that)\s+"
+        r"(?:product|system|platform|technology|solution|service|software|hardware))"
+        r"\s+(?:(?P<aux>will|does)\s+guarantee|guarantees)\b"
+    ),
+    re.IGNORECASE,
+)
+_PASSIVE_GUARANTEE_RE = re.compile(
+    r"\b(?P<aux>is|are|was|were|will be)\s+guaranteed\b",
+    re.IGNORECASE,
+)
+_NOUN_GUARANTEE_RE = re.compile(
+    r"\b(?P<aux>is|are)\s+(?P<article>a|the)\s+(?P<modifier>blanket\s+)?guarantee\b",
+    re.IGNORECASE,
+)
+_GUARANTEED_ADJECTIVE_RE = re.compile(
+    (
+        r"\bguaranteed(?=\s+(?:performance|results?|savings?|costs?|accuracy|outcomes?|"
+        r"improvements?|execution|uptime|returns?|benefits?|figures?)\b)"
+    ),
+    re.IGNORECASE,
+)
+
+
+def _scrub_guaranteed_adjectives(text: str) -> str:
+    """Soften only affirmative adjective-form guarantees; preserve explicit refusals."""
+    safe_spans = [
+        match.span()
+        for safe_re in _SAFE_GUARANTEED_RES
+        for match in safe_re.finditer(text)
+    ]
+
+    def replacement(match: re.Match) -> str:
+        if any(start <= match.start() < end for start, end in safe_spans):
+            return match.group(0)
+        return "potential"
+
+    return _GUARANTEED_ADJECTIVE_RE.sub(replacement, text)
+
+
+def _scrub_affirmative_guarantees(text: str) -> str:
+    """Turn affirmative guarantees into grammatical non-guarantees without touching refusals."""
+    out = _scrub_guaranteed_adjectives(text)
+
+    def plural_replacement(match: re.Match) -> str:
+        subject = match.group("subject")
+        if match.group("will"):
+            return f"{subject} will not guarantee"
+        return f"{subject} do not guarantee"
+
+    def third_person_replacement(match: re.Match) -> str:
+        subject = match.group("subject")
+        aux = match.group("aux")
+        if aux:
+            return f"{subject} {aux.lower()} not guarantee"
+        return f"{subject} does not guarantee"
+
+    out = _PLURAL_SUBJECT_GUARANTEE_RE.sub(plural_replacement, out)
+    out = _THIRD_PERSON_GUARANTEE_RE.sub(third_person_replacement, out)
+    out = _PASSIVE_GUARANTEE_RE.sub(
+        lambda match: f"{match.group('aux')} not guaranteed",
+        out,
+    )
+    out = _NOUN_GUARANTEE_RE.sub(
+        lambda match: (
+            f"{match.group('aux')} not {match.group('article')} "
+            f"{match.group('modifier') or ''}guarantee"
+        ),
+        out,
+    )
+    return out
+
+
 def scrub(text: str) -> str:
     """
     Soften prohibited language in-place so output stays publishable.
 
-    Exact prohibited claims are removed; generic guarantee/superlative words are reworded
-    to hedged equivalents.
+    Exact prohibited claims are removed. Affirmative guarantee assertions are rewritten
+    contextually; negative/refusal/discussion uses of "guarantee" remain untouched.
     """
     if not text:
         return text
-    out = text
+
+    out = _scrub_affirmative_guarantees(text)
+
+    # Exact guarantee claims are normally removed by the contextual pass above. Keeping
+    # the exact-claim pass afterwards preserves the existing fail-safe for fragments that
+    # lack enough grammar to classify safely.
     for claim in PROHIBITED_CLAIMS:
-        out = re.sub(re.escape(claim), "may help with your specific workload", out, flags=re.IGNORECASE)
+        out = re.sub(
+            re.escape(claim),
+            "may help with your specific workload",
+            out,
+            flags=re.IGNORECASE,
+        )
+
     replacements = {
-        r"\bguarantees?\b": "aims to",
-        r"\bguaranteed\b": "targeted",
         r"\b100%\b": "a high degree of",
         r"\balways faster\b": "often faster in eligible cases",
         r"\balways\b": "often",

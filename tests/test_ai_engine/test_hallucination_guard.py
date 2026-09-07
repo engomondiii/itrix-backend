@@ -8,7 +8,8 @@ from apps.ai_engine.services.hallucination_guard import guard, is_safe
 def test_removes_prohibited_language():
     report = guard("We guarantee lower power for every workload.")
     assert report.changed is True
-    assert "guarantee" not in report.text.lower()
+    assert "we do not guarantee lower power" in report.text.lower()
+    assert "aims to" not in report.text.lower()
 
 
 def test_hedges_unsupported_quantitative_claim():

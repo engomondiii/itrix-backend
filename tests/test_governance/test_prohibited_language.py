@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from apps.ai_engine.services.prohibited_language_checker import (
     contains_prohibited,
     find_violations,
@@ -37,5 +39,55 @@ def test_hard_block_only_quantified_benchmark_claims():
     assert not has_hard_block("a qualitative description of fit")
 
 
-def test_scrub_softens_guarantees():
-    assert "guarantee" not in scrub("we guarantee lower power").lower()
+def test_scrub_softens_affirmative_guarantee_grammatically():
+    out = scrub("we guarantee lower power")
+    assert out == "we do not guarantee lower power"
+    assert "aims to" not in out
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Rather than a blanket guarantee, we evaluate the workload.",
+        "Those results do not transfer as guarantees to other workloads.",
+        "Guaranteed performance improvements are not something we can provide.",
+        "We cannot guarantee performance improvements.",
+        "Performance improvements are not guaranteed.",
+        "Rather than making a blanket guarantee, itriX evaluates the workload.",
+        "Those results should not be treated as guarantees for other workloads.",
+        "I can't provide guaranteed performance figures.",
+    ],
+)
+def test_safe_guarantee_refusal_and_discussion_remain_natural(text):
+    assert contains_prohibited(text) is False
+    assert scrub(text) == text
+    assert "aims to" not in scrub(text)
+    assert "targeted performance" not in scrub(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "We guarantee lower costs.",
+        "itriX guarantees better performance.",
+        "ALPHA guarantees faster execution.",
+        "ASTOP guarantees perfect results.",
+        "We guarantee this will work for every workload.",
+    ],
+)
+def test_affirmative_guarantees_remain_governed(text):
+    assert contains_prohibited(text) is True
+    out = scrub(text)
+    assert out != text
+    assert "aims to" not in out
+
+
+def test_live_guarantee_discussion_regression_does_not_mangle_grammar():
+    text = (
+        "Quantitative results do not transfer as guarantees to other workloads. "
+        "So rather than a blanket guarantee, we evaluate the workload."
+    )
+    out = scrub(text)
+    assert out == text
+    assert "aims to to" not in out
+    assert "blanket aims to" not in out

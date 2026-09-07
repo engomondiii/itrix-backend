@@ -1,12 +1,17 @@
 """Deterministic outbound policy for conversation text.
 
 Prompts remain useful for style and reasoning; these are the boundaries a model does not
-get to decide.  The policy is intentionally narrow and auditable rather than a general
-rewriter.
+get to decide. A failure in a deterministic restriction is itself restrictive: the
+original generated text is discarded in favor of fixed approved copy.
 """
 from __future__ import annotations
 
+import logging
 import re
+
+from apps.core.safe_responses import governance_unavailable
+
+logger = logging.getLogger("itrix")
 
 _FALSE_MEMORY = re.compile(
     r"(?:^|(?<=[.!?]\s))(?:as (?:i|we) (?:said|mentioned) (?:earlier|before)|"
@@ -15,8 +20,6 @@ _FALSE_MEMORY = re.compile(
     re.I,
 )
 
-# Known source-authority corrections. These are safe because the current project source
-# explicitly records applications / preprint status; no generated identifier is inserted.
 _HARD_FACT_REPLACEMENTS = (
     (re.compile(r"\bthree granted korean patents\b", re.I), "three Korean patent applications"),
     (re.compile(r"\bgranted korean patents\b", re.I), "Korean patent applications"),
@@ -43,18 +46,43 @@ def enforce(text: str, *, thread=None) -> str:
         try:
             from apps.conversations.services import engagement_state
 
-            # STR-03 / STR-05 hard gate. Factual explanation of a product remains allowed;
-            # only prescriptive route/next-step language is removed before confirmation.
             if engagement_state.is_customer(thread) and not engagement_state.recommendation_allowed(thread):
                 out = _RECOMMENDATION_SENTENCE.sub("", out)
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - restriction failure cannot become permission
+            logger.exception(
+                "conversation recommendation policy failed; substituting approved safe fallback"
+            )
+            return governance_unavailable(locale=getattr(thread, "locale", "en") or "en")
 
         # Before execution, customer-facing legal/commercial outcomes remain conditional.
         if getattr(thread, "contract_stage", "no_discussion") != "executed":
-            out = re.sub(r"\byou are entitled to\b", "the agreement would need to state whether you may receive", out, flags=re.I)
-            out = re.sub(r"\bsublicensing (?:is|defaults to) (?:not permitted|no)\b", "sublicensing would need to be agreed", out, flags=re.I)
-            out = re.sub(r"\bsilence is not permission\b", "the agreement should address that point explicitly", out, flags=re.I)
-            out = re.sub(r"\bpublication (?:is|will be) prohibited\b", "publication treatment would need to be agreed", out, flags=re.I)
+            out = re.sub(
+                r"\byou are entitled to\b",
+                "the agreement would need to state whether you may receive",
+                out,
+                flags=re.I,
+            )
+            out = re.sub(
+                r"\bsublicensing (?:is|defaults to) (?:not permitted|no)\b",
+                "sublicensing would need to be agreed",
+                out,
+                flags=re.I,
+            )
+            out = re.sub(
+                r"\bsilence is not permission\b",
+                "the agreement should address that point explicitly",
+                out,
+                flags=re.I,
+            )
+            out = re.sub(
+                r"\bpublication (?:is|will be) prohibited\b",
+                "publication treatment would need to be agreed",
+                out,
+                flags=re.I,
+            )
 
-    return " ".join(out.split()) if "\n" not in out else "\n".join(line.rstrip() for line in out.splitlines()).strip()
+    return (
+        " ".join(out.split())
+        if "\n" not in out
+        else "\n".join(line.rstrip() for line in out.splitlines()).strip()
+    )

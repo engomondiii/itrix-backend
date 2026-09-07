@@ -16,7 +16,7 @@ import pytest
 from apps.result_page.models import ResultPage
 from tests.factories.lead_factory import LeadFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def test_import_contract_matches_qualification_processor():

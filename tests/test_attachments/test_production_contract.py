@@ -9,11 +9,18 @@ from django.core.exceptions import ImproperlyConfigured
 from itrix.settings.attachment_validation import validate_production_attachments
 
 
+# The production contract intentionally rejects /tmp. pytest's tmp_path normally lives
+# under /tmp on Linux, so use a synthetic absolute durable mount for positive-path tests.
+# The validator does not create or write the directory; existence is an operator/runtime
+# concern, while this unit test is proving the configuration contract deterministically.
+DURABLE_ROOT = "/var/lib/itrix-test-attachments"
+
+
 def _validate(tmp_path, **overrides):
     values = {
         "enabled": True,
         "base_dir": tmp_path / "app",
-        "configured_blob_root": str(tmp_path / "durable"),
+        "configured_blob_root": DURABLE_ROOT,
         "av_command": "scanner --no-summary",
         "process_inline": True,
         "shared_storage_confirmed": False,
@@ -60,7 +67,7 @@ def test_enabled_attachments_require_scanner_executable_in_runtime(tmp_path):
             validate_production_attachments(
                 enabled=True,
                 base_dir=tmp_path / "app",
-                configured_blob_root=str(tmp_path / "durable"),
+                configured_blob_root=DURABLE_ROOT,
                 av_command="missing-scanner --scan",
                 process_inline=True,
             )

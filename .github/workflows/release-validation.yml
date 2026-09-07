@@ -102,11 +102,15 @@ jobs:
       - name: Knowledge regression partition
         run: pytest -q tests/test_knowledge_core
 
-      - name: Knowledge registration and validator
+      - name: Knowledge registration, offline ingestion and validator
         run: |
           python manage.py register_knowledge_docs
           python manage.py sync_hard_facts
           python manage.py sync_evidence_metadata
+          # ENABLE_AI_ENGINE=false deliberately exercises the pipeline's supported
+          # deterministic embedding + no-op remote-upsert mode. This gives a complete
+          # local PostgreSQL corpus for validation without touching production Pinecone.
+          python manage.py ingest_documents
           python manage.py validate_knowledge_core
 
       - name: Full backend pytest suite

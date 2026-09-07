@@ -119,13 +119,33 @@ def test_a_twenty_thousand_character_turn_is_accepted():
     assert response.status_code == 201
 
 
-def test_a_visitor_can_rename_and_delete_their_thread():
+def test_anonymous_owner_can_read_but_cannot_rename_or_delete_their_thread():
     thread = thread_svc.create_thread(visitor_session="sess-owner")
+    original_title = thread.title
     client = _client()
     client.cookies["itrix_visitor_session"] = "sess-owner"
+    url = f"/api/v1/threads/{thread.id}/"
 
-    assert client.patch(
-        f"/api/v1/threads/{thread.id}/", {"title": "Renamed"}, format="json"
-    ).data["title"] == "Renamed"
-    assert client.delete(f"/api/v1/threads/{thread.id}/").status_code == 204
-    assert client.get(f"/api/v1/threads/{thread.id}/").status_code == 404
+    before = client.get(url)
+    assert before.status_code == 200
+    assert before.data["threadId"] == str(thread.id)
+
+    rename = client.patch(url, {"title": "Renamed"}, format="json")
+    assert rename.status_code == 401
+    assert rename.data["code"] == "AUTHENTICATION_REQUIRED"
+    assert rename.data["detail"] == "Sign in to manage conversations."
+    assert set(rename.data).issubset({"detail", "code", "requestId"})
+
+    thread.refresh_from_db()
+    assert thread.title == original_title
+
+    delete = client.delete(url)
+    assert delete.status_code == 401
+    assert delete.data["code"] == "AUTHENTICATION_REQUIRED"
+    assert delete.data["detail"] == "Sign in to manage conversations."
+    assert set(delete.data).issubset({"detail", "code", "requestId"})
+
+    thread.refresh_from_db()
+    after = client.get(url)
+    assert after.status_code == 200
+    assert after.data["threadId"] == str(thread.id)

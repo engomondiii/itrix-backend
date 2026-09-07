@@ -87,11 +87,21 @@ _SAFE_GUARANTEED_PATTERNS = [
     (
         r"\bguaranteed\b[^.!?;]{0,100}\b(?:is|are)\s+not\s+"
         r"(?:something|anything)\b[^.!?;]{0,100}\b"
-        r"(?:provide|offer|give|promise|claim)\b"
+        r"(?:provide|offer|give|promis(?:e|es)|claim(?:s)?)\b"
     ),
     (
         r"\bguaranteed\b[^.!?;]{0,100}\b(?:cannot|can't|can not|won't|will not)\s+"
         r"be\s+(?:provided|offered|given|promised|claimed)\b"
+    ),
+    (
+        r"\bguaranteed\b[^.!?;]{0,100}\b"
+        r"(?:is not|are not|isn['’]t|aren['’]t)\s+(?:a\s+)?claims?\b"
+        r"[^.!?;]{0,80}\b(?:we|i|itri[xX])\s+mak(?:e|es)\b"
+        r"(?=\s*(?:[.!?]|$))"
+    ),
+    (
+        r"\b(?:we|i)\s+(?:do not|don['’]t)\s+make\s+guaranteed\b"
+        r"[^.!?;]{0,80}\bclaims?\b(?=\s*(?:[.!?]|$))"
     ),
 ]
 

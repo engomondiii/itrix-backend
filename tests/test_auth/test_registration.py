@@ -14,14 +14,10 @@ from django.urls import reverse
 from apps.clients.models import AccountOrigin, Client
 from apps.journey.models import JourneyState
 from apps.leads.models import Lead, LeadSource
+from apps.legal.services import instruments as instruments_svc
 from tests.factories.client_factory import ClientFactory
 
 pytestmark = pytest.mark.django_db
-
-ASSENT = [
-    {"slug": "terms", "version": "1.2", "effective": "2026-07-30"},
-    {"slug": "privacy", "version": "1.2", "effective": "2026-07-30"},
-]
 
 
 def _body(email="new.person@example.com", password="a-long-enough-password"):
@@ -31,7 +27,7 @@ def _body(email="new.person@example.com", password="a-long-enough-password"):
         "fullName": "A Person",
         "organization": "An Organisation",
         "role": "Engineer",
-        "assent": ASSENT,
+        "assent": instruments_svc.current_versions(["terms", "privacy"]),
     }
 
 

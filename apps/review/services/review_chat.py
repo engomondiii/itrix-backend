@@ -95,7 +95,7 @@ def handle_review_chat_turn(*, review_session_id: str, lead=None, body: str) -> 
         lead_id=str(lead.id) if lead else None,
         prompt=getattr(getattr(lead, "review_session", None), "prompt", "") or body,
         pressures=list(getattr(getattr(lead, "review_session", None), "pressure_areas", []) or []),
-        product_route=getattr(lead, "product_route", "general"),
+        product_route=getattr(lead, "product_route", "undetermined"),
         license_pathway=(
             lead.commercial_path if lead and getattr(lead, "commercial_path", "none") != "none" else None
         ),

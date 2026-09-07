@@ -17,7 +17,12 @@ class EvaluationSerializer(serializers.ModelSerializer):
         model = Evaluation
         fields = [
             "id", "leadId", "leadName", "company", "pkg", "status",
-            "kpis", "scope", "fee", "timeline", "createdAt", "updatedAt",
+            "kpis", "scope", "fee", "timeline", "separate_workload", "technical_route",
+            "eligibility_status", "proof_status", "standard_assessment_fee", "ai_waiver_decision",
+            "waiver_type", "waiver_percentage_or_amount", "waiver_reason", "waiver_scope",
+            "waiver_expiry", "iwl_override_status", "iwl_override_applied", "iwl_override_reason", "final_assessment_fee",
+            "final_authority", "fee_finalized_at", "customer_fee_status", "hardware_value_case",
+            "hardware_target", "hardware_economics", "hardware_sponsor", "createdAt", "updatedAt",
         ]
         read_only_fields = ["id", "leadId", "createdAt", "updatedAt"]
         extra_kwargs = {
@@ -29,3 +34,16 @@ class EvaluationSerializer(serializers.ModelSerializer):
 
 class CreateEvaluationSerializer(serializers.Serializer):
     lead_id = serializers.CharField()
+
+class AIFeeDecisionSerializer(serializers.Serializer):
+    waiver_type = serializers.ChoiceField(choices=["none", "full", "partial"])
+    reason = serializers.CharField()
+    percentage = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True)
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True)
+    expiry = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class IWLOverrideSerializer(serializers.Serializer):
+    waiver_type = serializers.ChoiceField(choices=["none", "full", "partial"])
+    reason = serializers.CharField()
+    final_fee = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True)

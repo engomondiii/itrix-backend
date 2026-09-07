@@ -35,6 +35,8 @@ def test_title_derives_from_the_visitors_own_words():
     )
     thread.refresh_from_db()
     assert "HBM" in thread.title
+    assert 3 <= len(thread.title.split()) <= 7
+    assert not thread.title.lower().startswith("our ")
     assert len(thread.title) <= 80
 
 

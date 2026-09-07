@@ -638,7 +638,7 @@ def _boundary_waste_map(thread) -> dict:
     is WORTH is what the PoC exists to answer.
     """
     return {
-        "title": "Your Alpha Compute Assessment",
+        "title": "Your ALPHA Compute Assessment",
         "intro": (
             "This holds the whole assessment: what we took in, the baseline we agreed, "
             "the Boundary Waste Map of your workload, technical feasibility, the "

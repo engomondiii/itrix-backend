@@ -235,34 +235,33 @@ def touch(thread: Thread) -> None:
 # Claim-Card level 1.
 
 _TITLE_STOPWORDS = {
-    "our", "the", "a", "an", "we", "i", "is", "are", "and", "to", "of", "in",
-    "on", "for", "it", "that", "this", "with", "as", "at", "by", "be", "been",
+    "our", "the", "a", "an", "we", "i", "me", "my", "is", "are", "and", "to", "of", "in",
+    "on", "for", "it", "that", "this", "with", "as", "at", "by", "be", "been", "can", "could",
+    "would", "should", "please", "help", "need", "want", "how", "what", "why", "do", "does", "about",
 }
 
 
 def derive_title(first_message: str) -> str:
-    """
-    A short, honest title built from the visitor's own words.
+    """Return a concise 3–7 word topic title using only the visitor's own words.
 
-    Deterministic by design: no model call, no inference, nothing to review. Returns
-    ``DEFAULT_TITLE`` when there is nothing meaningful to work with rather than
-    inventing something.
+    This deliberately avoids a model call and any inferred company/persona. Technical
+    identifiers survive because the words are selected, not rewritten.
     """
     text = re.sub(r"\s+", " ", (first_message or "").strip())
     if not text:
         return DEFAULT_TITLE
 
-    # First sentence, capped.
     first = re.split(r"(?<=[.!?])\s", text)[0]
-    words = [w for w in first.split(" ") if w]
-    kept: list[str] = []
-    for word in words:
-        kept.append(word)
-        if len(" ".join(kept)) >= 60:
-            break
-    title = " ".join(kept).strip(" ,;:-")
+    raw_words = re.findall(r"[A-Za-z0-9][A-Za-z0-9_.+/#-]*|[가-힣]+", first)
+    meaningful = [w for w in raw_words if w.lower() not in _TITLE_STOPWORDS]
+    if not meaningful:
+        return DEFAULT_TITLE
 
-    if not title or all(w.lower() in _TITLE_STOPWORDS for w in title.split()):
+    # Prefer meaningful words, but if the message is extremely short keep its own
+    # remaining words rather than inventing filler to force three tokens.
+    selected = meaningful[:7]
+    title = " ".join(selected).strip(" ,;:-")
+    if not title:
         return DEFAULT_TITLE
     if len(title) > 80:
         title = title[:77].rstrip() + "..."

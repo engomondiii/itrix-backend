@@ -24,6 +24,10 @@ _ROUTE_HINT = {
 
 
 def build_next_step(*, tier: int, product_route: str) -> str:
+    if product_route in {"undetermined", "general", ""}:
+        return "Continue discovery without selecting a product route; qualification comes only after enough evidence is available."
+    if product_route == "astop":
+        return "If observation relevance is confirmed, scope a controlled ASTOP qualification/proof without implying later ALPHA progression."
     base = _TIER_NEXT_STEP.get(tier, _TIER_NEXT_STEP[3])
     hint = _ROUTE_HINT.get(product_route, "") if tier in (1, 2, 3) else ""
     return (base + hint).strip()

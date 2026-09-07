@@ -19,6 +19,7 @@ CANONICAL_NAMESPACES = {
     "licensing",
     "company",
     "general",
+    "astop",
 }
 
 

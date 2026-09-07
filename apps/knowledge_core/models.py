@@ -57,6 +57,40 @@ class TechnologyFamily(models.TextChoices):
     ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
     ALPHA_CORE = "alpha_core", "ALPHA Core"
     CROSS_CUTTING = "cross_cutting", "Boundary-aware / cross-cutting"
+    ASTOP = "astop", "ASTOP"
+    PRISM = "prism", "PRISM"
+    AXIOM_TENSOR = "axiom_tensor", "AXIOM-TENSOR"
+    QNTA = "qnta", "QNTA"
+
+
+class KnowledgeEntityType(models.TextChoices):
+    PRODUCT = "product", "Product"
+    TECHNOLOGY = "technology", "Technology"
+    PLATFORM = "platform", "Commercialization platform"
+    RESEARCH = "research", "Research"
+    GOVERNANCE = "governance", "Governance"
+    MIXED = "mixed", "Mixed"
+
+
+class EvidenceStatus(models.TextChoices):
+    MATHEMATICAL = "mathematical", "Mathematical"
+    EXPERIMENTAL = "experimental", "Experimental"
+    IMPLEMENTED = "implemented", "Implemented"
+    VALIDATED = "validated", "Validated"
+    VALUE_VERIFIED = "value_verified", "Value-Verified"
+    LICENSABLE = "licensable", "Licensable"
+    GOVERNANCE = "governance", "Governance / policy"
+    MIXED = "mixed", "Mixed"
+
+
+class ClaimDomain(models.TextChoices):
+    TAXONOMY = "taxonomy_product_identity", "Taxonomy / product identity"
+    COMMERCIALIZATION = "commercialization_gtm", "Commercialization / GTM"
+    PUBLIC_EXPLANATION = "public_product_explanation", "Public product explanation"
+    TECHNICAL = "technical_capability", "Technical capability"
+    RESEARCH = "research_evidence", "Research / evidence"
+    LEGAL = "legal_contract", "Legal / contract"
+    INTERNAL_POLICY = "internal_policy", "Internal policy"
 
 
 class IngestionStatus(models.TextChoices):
@@ -110,9 +144,24 @@ class KnowledgeDocument(BaseModel):
     technology_family = models.CharField(
         max_length=20, choices=TechnologyFamily.choices, default=TechnologyFamily.GENERAL, db_index=True
     )
+    # The singular legacy family remains for backwards compatibility. These lists are
+    # the canonical representation for combined sources and explicit entity→product
+    # relationships used by retrieval/governance.
+    technology_families = models.JSONField(default=list, blank=True)
+    canonical_entities = models.JSONField(default=list, blank=True)
+    related_products = models.JSONField(default=list, blank=True)
     # Claim level ceiling used by orchestration.  0 means metadata has not assigned a
     # special ceiling; the normal journey/disclosure ceiling still applies.
     claim_ceiling = models.PositiveSmallIntegerField(default=0)
+    entity_type = models.CharField(max_length=20, choices=KnowledgeEntityType.choices, default=KnowledgeEntityType.MIXED, db_index=True)
+    evidence_status = models.CharField(max_length=24, choices=EvidenceStatus.choices, default=EvidenceStatus.MIXED, db_index=True)
+    # Domain-scoped source precedence. Authority is meaningful only for the claims a
+    # source governs; a legal register must not outrank a current taxonomy source merely
+    # because both happen to be authoritative.
+    claim_domains = models.JSONField(default=list, blank=True)
+    supersedes = models.JSONField(default=list, blank=True)
+    superseded_by = models.CharField(max_length=255, blank=True, default="")
+    prohibited_messages = models.JSONField(default=list, blank=True)
 
     ingestion_status = models.CharField(
         max_length=12,

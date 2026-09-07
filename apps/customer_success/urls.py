@@ -16,11 +16,13 @@ from apps.customer_success.views import (
     SuccessPlanView,
     SupportView,
 )
+from apps.customer_success.views_astop import ASTOPSuccessView
 
 app_name = "customer_success"
 
 urlpatterns = [
     path("overview/", SuccessOverviewView.as_view(), name="success-overview"),
+    path("astop/", ASTOPSuccessView.as_view(), name="success-astop"),
     path("outcomes/", OutcomesView.as_view(), name="success-outcomes"),
     path("deployments/", DeploymentsView.as_view(), name="success-deployments"),
     path("support/", SupportView.as_view(), name="success-support"),

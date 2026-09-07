@@ -40,6 +40,12 @@ class NDARecord(BaseModel):
         max_length=12, choices=NDADocType.choices, default=NDADocType.MUTUAL
     )
     body = models.TextField(blank=True, default="")
+    # Context supplied/reused before an NDA request. This is problem framing only;
+    # it never grants disclosure, evaluation entitlement, or Data Room access.
+    problem_context = models.TextField(blank=True, default="")
+    workload_context = models.TextField(blank=True, default="")
+    desired_outcome = models.TextField(blank=True, default="")
+    discussion_reason = models.TextField(blank=True, default="")
     signer_name = models.CharField(max_length=255, blank=True, default="")
     signer_email = models.EmailField(blank=True, default="")
     decline_reason = models.TextField(blank=True, default="")

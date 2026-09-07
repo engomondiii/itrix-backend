@@ -79,7 +79,7 @@ class PortalConsumer(AsyncJsonWebsocketConsumer):
             lead_id=str(lead.id) if lead else None,
             client_id=str(self.client.id),
             prompt=getattr(getattr(lead, "review_session", None), "prompt", "") or "",
-            product_route=getattr(lead, "product_route", "general"),
+            product_route=getattr(lead, "product_route", "undetermined"),
             tier=getattr(lead, "tier", 4),
             plane=PLANE_CLIENT,
             nda_signed=self.client.nda_signed,

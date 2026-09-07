@@ -291,3 +291,7 @@ itrix-backend-round2/
 
 # Django collectstatic output (WhiteNoise manifest storage)
 staticfiles/
+
+# overlay archives
+itrix-backend-astop-review-feedback-overlay.zip
+itrix-backend-final-mvp-release-overlay.zip

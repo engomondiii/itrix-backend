@@ -1,17 +1,15 @@
+"""Discovery-stage product relevance without premature commercial routing.
+
+Qualification answers can reveal *signals* about a problem.  They cannot, by themselves,
+open an ASTOP/ALPHA opportunity or assign a governed product route.  Current GTM requires
+ASTOP controlled proof first where legitimately established, a separate ALPHA Compute
+qualification for a deeper workload, and ALPHA Core only after validated software-layer
+evidence supports hardware.
+
+``route_product`` therefore returns the neutral route for this legacy Q1–Q9 surface.
+``product_hypotheses`` preserves the useful bounded signals for diagnostics/analytics
+without turning them into qualification.
 """
-Product router.
-
-Maps qualification answers to an ALPHA product route. Representation-shaped problems
-(state estimation, dense/complex linear algebra) lean **ALPHA Compute**; execution /
-runtime-shaped problems (conservation-law dynamics, custom hardware, data-movement or
-hardware-utilisation pressure) lean **ALPHA Core**; broad or mixed cases map to
-**both**; unclear cases map to **general**.
-
-This is the authoritative server-side version of
-``itrix-web/src/lib/routing/productRouter.ts`` and returns identical results, so the
-client's provisional route and the backend's agree.
-"""
-
 from __future__ import annotations
 
 from apps.routing.services.routing_rules import (
@@ -19,8 +17,8 @@ from apps.routing.services.routing_rules import (
     EXECUTION_PRESSURES,
     PRODUCT_ALPHA_COMPUTE,
     PRODUCT_ALPHA_CORE,
-    PRODUCT_BOTH,
-    PRODUCT_GENERAL,
+    PRODUCT_ASTOP,
+    PRODUCT_UNDETERMINED,
     REPRESENTATION_STRUCTURES,
     multi,
     single,
@@ -28,13 +26,19 @@ from apps.routing.services.routing_rules import (
 
 
 class ProductRouter:
-    """Stateless product-routing logic."""
+    """Stateless discovery-signal classifier; never a commercial gate."""
 
     @staticmethod
-    def route(answers: dict) -> str:
+    def hypotheses(answers: dict) -> list[str]:
         structure = single(answers.get("Q3"))
         env = single(answers.get("Q1"))
         pressures = multi(answers.get("Q2"))
+
+        out: list[str] = []
+        # Observation/state language can be worth exploring in ASTOP/PRISM, but this is
+        # only relevance, not an ASTOP opportunity.
+        if structure == "state_observation":
+            out.append(PRODUCT_ASTOP)
 
         representation_signal = structure in REPRESENTATION_STRUCTURES
         execution_signal = (
@@ -42,20 +46,24 @@ class ProductRouter:
             or env in EXECUTION_ENVIRONMENTS
             or any(p in EXECUTION_PRESSURES for p in pressures)
         )
-
-        if structure == "mixed":
-            return PRODUCT_BOTH
-        if representation_signal and execution_signal:
-            return PRODUCT_BOTH
         if representation_signal:
-            return PRODUCT_ALPHA_COMPUTE
+            out.append(PRODUCT_ALPHA_COMPUTE)
         if execution_signal:
-            return PRODUCT_ALPHA_CORE
-        if not structure or structure == "unsure":
-            return PRODUCT_GENERAL
-        return PRODUCT_ALPHA_COMPUTE
+            out.append(PRODUCT_ALPHA_CORE)
+        return list(dict.fromkeys(out))
+
+    @staticmethod
+    def route(answers: dict) -> str:
+        # Intentionally evaluate the bounded hypotheses so callers/tests can exercise the
+        # same signal logic, but never translate a keyword/answer into a binding route.
+        ProductRouter.hypotheses(answers)
+        return PRODUCT_UNDETERMINED
+
+
+def product_hypotheses(answers: dict) -> list[str]:
+    return ProductRouter.hypotheses(answers)
 
 
 def route_product(answers: dict) -> str:
-    """Module-level convenience wrapper."""
+    """Return the governed discovery-stage route: not yet assessed."""
     return ProductRouter.route(answers)

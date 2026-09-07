@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from apps.leads.models import LeadActivity, LeadNote
+from apps.clients.models import Client
+from apps.leads.models import CommercialStage, LeadActivity, LeadNote, TrustStatus
 from apps.leads.services.lead_updater import add_note, assign_owner, change_status
 from tests.factories.lead_factory import LeadFactory
 from tests.factories.user_factory import AdminUserFactory
@@ -120,3 +121,83 @@ def test_note_action_then_detail_shows_note(api_client):
     detail = api_client.get(f"/api/v1/leads/{lead.id}/").json()
     assert len(detail["notes"]) == 1
     assert detail["notes"][0]["body"] == "A note."
+
+
+def test_referral_text_alone_is_not_a_trusted_introduction(api_client):
+    lead = LeadFactory(
+        trust_status=TrustStatus.UNREVIEWED,
+        current_marketing_stage=CommercialStage.DISCOVERY,
+        journey_state="DIAGNOSED",
+    )
+    _auth(api_client)
+
+    resp = api_client.post(
+        f"/api/v1/leads/{lead.id}/acquisition/",
+        {
+            "source_channel": "partner_referral",
+            "referral_or_intro": "Introduced by a known industry contact",
+        },
+        format="json",
+    )
+
+    assert resp.status_code == 200
+    lead.refresh_from_db()
+    assert lead.acquisition_context["referral_or_intro"] == "Introduced by a known industry contact"
+    assert not lead.escalated
+    assert not lead.human_handoff_trigger
+    assert lead.trust_status == TrustStatus.UNREVIEWED
+    assert lead.current_marketing_stage == CommercialStage.DISCOVERY
+    assert lead.journey_state == "DIAGNOSED"
+
+
+def test_confirmed_trusted_introduction_only_accelerates_human_followup(api_client):
+    lead = LeadFactory(
+        trust_status=TrustStatus.UNREVIEWED,
+        current_marketing_stage=CommercialStage.DISCOVERY,
+        journey_state="DIAGNOSED",
+    )
+    _auth(api_client)
+
+    resp = api_client.post(
+        f"/api/v1/leads/{lead.id}/acquisition/",
+        {
+            "source_channel": "partner_referral",
+            "referral_or_intro": "Operator-verified introduction",
+            "trusted_introduction_confirmed": True,
+        },
+        format="json",
+    )
+
+    assert resp.status_code == 200
+    lead.refresh_from_db()
+    assert lead.acquisition_context["trusted_introduction_confirmed"] is True
+    assert lead.human_handoff_trigger is True
+    assert lead.escalated is True
+    assert lead.trust_status == TrustStatus.UNREVIEWED
+    assert lead.current_marketing_stage == CommercialStage.DISCOVERY
+    assert lead.journey_state == "DIAGNOSED"
+    assert lead.persona_id is None
+    assert not Client.objects.filter(lead=lead).exists()
+    activities = LeadActivity.objects.filter(lead=lead, type=LeadActivity.ActivityType.ESCALATED)
+    assert activities.count() == 1
+    assert activities.first().meta["priority"] == "high"
+    assert "Trusted introduction confirmed" in activities.first().meta["reason"]
+
+
+def test_confirmed_trusted_introduction_acceleration_is_idempotent(api_client):
+    lead = LeadFactory()
+    _auth(api_client)
+    payload = {
+        "referral_or_intro": "Operator-verified introduction",
+        "trusted_introduction_confirmed": True,
+    }
+
+    first = api_client.post(f"/api/v1/leads/{lead.id}/acquisition/", payload, format="json")
+    second = api_client.post(f"/api/v1/leads/{lead.id}/acquisition/", payload, format="json")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert LeadActivity.objects.filter(
+        lead=lead,
+        type=LeadActivity.ActivityType.ESCALATED,
+    ).count() == 1

@@ -7,6 +7,7 @@ v6.0 Phase 3 analytics endpoints — TEAM PLANE ONLY.
     analytics/conversations/ thread depth, turns-to-artifact, loop productivity
     analytics/attachments/   volume, type mix, extraction, quarantine
     analytics/streaming/     envelope downgrades, guard halts, settle replacements
+    analytics/management/    aggregate commercial/acquisition governance report
 
 EVERY ONE IS INTERNAL-ONLY. The aggregates here read fields on the §10.5 list —
 ``customer_health``, ``coverage_map``, ``stop_reason``, ``attachment_risk_flags``,
@@ -87,6 +88,15 @@ class AttachmentAnalyticsView(_TeamAnalyticsView):
         from apps.analytics.services import attachment_metrics
 
         return Response(attachment_metrics.summary())
+
+
+class ManagementAnalyticsView(_TeamAnalyticsView):
+    """GET analytics/management/ — aggregate-safe commercial governance reporting."""
+
+    def get(self, request):
+        from apps.analytics.services import management_reporting
+
+        return Response(management_reporting.summary())
 
 
 class StreamingAnalyticsView(_TeamAnalyticsView):

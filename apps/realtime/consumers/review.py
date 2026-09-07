@@ -241,7 +241,7 @@ class _BaseReviewConsumer(AsyncJsonWebsocketConsumer):
             lead_id=str(lead.id) if lead else None,
             prompt=getattr(session, "prompt", "") or body,
             pressures=list(getattr(session, "pressure_areas", []) or []),
-            product_route=getattr(lead, "product_route", "general") if lead else "general",
+            product_route=getattr(lead, "product_route", "undetermined") if lead else "undetermined",
             license_pathway=(
                 lead.commercial_path if lead and getattr(lead, "commercial_path", "none") != "none" else None
             ),

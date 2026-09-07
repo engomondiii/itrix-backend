@@ -8,15 +8,13 @@ benchmark figures and no performance guarantees.
 
 ## What is itriX?
 
-itriX is a computational infrastructure company. It develops and commercialises computational methods and infrastructure that can change **the form a computation is expressed in before that computation is executed**. The supplied source set identifies Korean patent applications for the core method families; it does not verify granted-patent status.
+itriX is a computational infrastructure company. Its current product architecture works across two distinct intervention domains: **observation before reasoning** and **representation before execution**. The supplied source set identifies Korean patent applications for several computational technology families; it does not verify granted-patent status.
 
-The one-sentence version: **don't scale inefficient computation — make computation
-worth scaling first.**
+The one-sentence version: **reduce avoidable computational work before simply scaling more of it.**
 
-itriX is not a chip company, not a cloud provider, and not a model company. It sits
-one level below all three, at the layer where a workload is *represented*. The same
-arithmetic can be written in more than one form, and the form decides how well it
-fits the hardware it will eventually run on. itriX works on that choice of form.
+In the observation domain, PRISM structures decision-relevant system evidence before expensive reasoning, and ASTOP operationalizes that observation domain as a product. In the computational domain, ALPHA Compute applies eligible computational technologies to suitable workloads before execution, while ALPHA Core is a separate optional hardware product considered only when validated software-layer evidence supports deeper hardware implementation.
+
+itriX is not a chip company, cloud provider or model vendor. Its products can sit alongside those layers while changing what information or computation reaches them.
 
 ---
 
@@ -62,9 +60,14 @@ shortage of it. Both are consequences of the shape of the work.
 
 ---
 
-## The Knowledge Core: three technology families with Korean patent applications
+## The technology architecture
 
 The supplied authoritative source set identifies three Korean patent applications across the AXIOM, CRE and FQNM technology families. Grant status is not represented as verified in the public Knowledge Core. They share one thesis: **representation before execution.**
+
+
+### PRISM — observation before reasoning
+
+PRISM is the observation technology/architecture behind ASTOP. It projects and structures system evidence before an expensive AI controller reasons over it. PRISM is a technology, not a separately sold product.
 
 ### AXIOM — rearranging algebra
 
@@ -110,6 +113,10 @@ more compute. FQNM asks whether the constraint can be viewed one level different
 whether some of what we call rounding accident is a consequence of the chosen
 representation rather than of the machine.
 
+### AXIOM-TENSOR and QNTA
+
+AXIOM-TENSOR and QNTA are additional technologies in the current itriX technical taxonomy. Their applicability is workload-specific. They are not separately sold products, and mentioning them does not establish that they apply to a particular workload or that a performance advantage has been validated.
+
 ### Where the two branches meet
 
 FQNM re-asks a question about the derivative: is floating point something we bear out
@@ -124,19 +131,27 @@ operations are expressed in.
 
 ## The products
 
+itriX currently has three products. Product identity is separate from evidence status: being a product does not imply that a particular workload is eligible, validated, value-verified or licensable.
+
+### ASTOP — observation product
+
+ASTOP (A System Trans-Observation Projector) is the observation product. It operationalizes the PRISM observation domain for computational systems and agentic AI workflows. Public visitors may learn that ASTOP exists and may receive public-safe explanation and approved scoped evidence. ASTOP is not a public self-service download or fixed-price SaaS purchase; controlled evaluation and production rights remain governed separately.
+
 ### ALPHA Compute — independent software computational infrastructure
 
-ALPHA Compute is the independent software product. It diagnoses structural inefficiency, determines mathematical eligibility, selects and applies an appropriate ALPHA route, transforms eligible workloads, executes or routes the transformed structure through the software ecosystem, reconstructs and verifies the result, measures advantage, and can remain deployed in production on existing hardware without ALPHA Core.
+ALPHA Compute is the independent software product. For an eligible workload it can apply appropriate computational technologies to transform representation before execution, with correctness and advantage assessed against an agreed baseline. It can be useful on existing software and hardware paths without ALPHA Core.
 
-Assessment and representation diagnosis are important modules inside ALPHA Compute, but they are not the whole product. ALPHA Compute is not merely a diagnostic pre-stage for hardware.
+### ALPHA Core — separate optional hardware product
 
-### ALPHA Core — optional hardware-layer infrastructure
+ALPHA Core is the separate optional hardware product. It is considered only when validated software-layer evidence justifies deeper implementation or acceleration in hardware. It is not an automatic upgrade, a prerequisite for ALPHA Compute, or a consequence of merely discussing hardware.
 
-ALPHA Core is the separate hardware-layer product. It implements or accelerates validated ALPHA computational structures more deeply in FPGA, ASIC, NPU, accelerator, memory/data-path, SoC or other chip/system architectures when deeper hardware value is justified.
+### Products versus technologies
 
-ALPHA Core is not a required runtime/SDK stage after ALPHA Compute and is not a prerequisite for production software value.
+**Products:** ASTOP, ALPHA Compute, ALPHA Core.
 
-The relationship is therefore: **complementary but independent**. ALPHA Compute can be the complete software production solution. ALPHA Core is an optional hardware extension when validated evidence supports deeper hardware integration.
+**Technologies:** PRISM, AXIOM, AXIOM-TENSOR, CRE, FQNM, QNTA.
+
+The technologies are not separate catalogue products. ASTOP and ALPHA are also technically independent; the current commercial sequence may use ASTOP as a controlled proof point before a separate ALPHA Compute qualification, but that sequencing does not make one product technically dependent on another.
 
 ## How a strategic evaluation can progress
 
@@ -215,10 +230,10 @@ whether we are expressing the thing we need to compute in the right form.
 ## Frequently asked questions
 
 **What does itriX actually sell?**
-Two complementary but independent infrastructure products. ALPHA Compute is the software computational infrastructure product that can diagnose, transform, execute or route, verify, measure and deploy eligible workloads on existing hardware. ALPHA Core is the optional hardware-layer product for implementing or accelerating validated ALPHA structures more deeply in hardware.
+itriX currently has three products: ASTOP, ALPHA Compute and ALPHA Core. ASTOP is the observation product. ALPHA Compute is the independent software computational infrastructure product. ALPHA Core is the separate optional hardware product. PRISM, AXIOM, AXIOM-TENSOR, CRE, FQNM and QNTA are technologies rather than separately sold products.
 
 **Is this a chip, a compiler, or a library?**
-The ALPHA system spans software and, optionally, hardware. ALPHA Compute is software computational infrastructure that can reuse existing libraries, solvers, compilers, vendor kernels and hardware. ALPHA Core is a separate optional hardware-layer path when deeper implementation is justified.
+No single label covers the portfolio. ASTOP is an observation product. ALPHA Compute is software computational infrastructure that can work with existing libraries, solvers, compilers, vendor kernels and hardware. ALPHA Core is a separate optional hardware-layer product when deeper implementation is justified.
 
 **Do I need to share confidential information to start?**
 No. The first conversation is a non-confidential description of where computational

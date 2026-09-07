@@ -25,6 +25,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from apps.knowledge_core.models import KnowledgeDocument
+from apps.knowledge_core.source_manifest import policy_for
 
 INGESTIBLE_EXTS = {".docx", ".pdf", ".txt", ".md", ".markdown"}
 
@@ -38,6 +39,7 @@ SUPERSEDED_FILENAMES = {
     "alpha_core_problemology_public.md",
     "Brand Story of itriX.docx",
     "WP_Alpha Compute Core.docx",
+    "README_Astop.txt",
 }
 
 # Folder name -> exact disclosure level.  The folder is the decision: registration
@@ -76,6 +78,8 @@ def namespace_for(filename: str) -> str:
     """Infer a canonical namespace from the filename (case-insensitive)."""
     n = filename.lower()
 
+    if "astop" in n or "prism" in n:
+        return "astop"
     # Proof / research materials.
     if "arxiv" in n or "thesis" in n or "comparison" in n or "turboquant" in n:
         return "proofs"
@@ -126,21 +130,38 @@ def namespace_for(filename: str) -> str:
 
 
 def source_authority_for(filename: str) -> tuple[str, bool, str]:
-    """Conservative source-precedence metadata inferred only from explicit version/status cues."""
+    """Return governed source precedence without deriving authority from filename adjectives.
+
+    Significant sources are exact entries in ``source_manifest``.  The fallback is
+    intentionally conservative: explicit historical/archive cues may make a source legacy,
+    while unlisted material remains a current *working* source until an owner assigns a
+    stronger domain-scoped policy.  Words such as ``canonical``, ``register`` and
+    ``executed`` never grant authority by themselves.
+    """
+    policy = policy_for(filename)
+    if policy is not None:
+        return policy.authority, policy.current, policy.canonical_rule
+
     n = filename.lower()
     if filename in SUPERSEDED_FILENAMES or any(x in n for x in ("legacy", "superseded", "archive")):
         return "legacy", False, ""
-    if any(x in n for x in ("canonical", "register", "executed")):
-        return "authoritative", True, "Explicit canonical/register source"
-    if "itrix_company_overview_public" in n:
-        return "governing", True, "Current public company/technology synthesis"
-    if any(x in n for x in ("master technical architecture", "complete backend structure", "complete surface", "legal instruments", "content and flow playbook", "_overview_v2.0", "overview v2.0", "unified mathematical", "v2_4", "v2.4")):
-        return "governing", True, "Current approved governing source"
     return "working", True, ""
 
 
 def technology_family_for(filename: str) -> str:
     n = filename.lower()
+    # The compatibility field cannot express a combined source. Mark it explicitly
+    # cross-cutting and carry the exact families in technology_families metadata.
+    if "axiom_tensor_qnta_current_controlled" in n:
+        return "cross_cutting"
+    if "astop" in n and "prism" not in n:
+        return "astop"
+    if "prism" in n:
+        return "prism"
+    if "axiom_tensor" in n or "axiom-tensor" in n:
+        return "axiom_tensor"
+    if "qnta" in n:
+        return "qnta"
     if "axiom" in n and not any(x in n for x in ("alpha", "unified")):
         return "axiom"
     if ("cre" in n or "conjugation" in n) and not any(x in n for x in ("alpha", "unified")):
@@ -156,6 +177,107 @@ def technology_family_for(filename: str) -> str:
     if any(x in n for x in ("boundary-aware", "boundary aware", "unified mathematical")):
         return "cross_cutting"
     return "general"
+
+
+def entity_relationship_metadata_for(filename: str) -> dict:
+    """Explicit entity/family/product relations for the current September sources."""
+    n = filename.lower()
+    if "axiom_tensor_qnta_current_controlled" in n:
+        return {
+            "canonical_entities": ["AXIOM-TENSOR", "QNTA"],
+            "technology_families": ["axiom_tensor", "qnta"],
+            "related_products": ["ALPHA Compute"],
+        }
+    if "prism_and_astop_explained" in n:
+        return {
+            "canonical_entities": ["PRISM", "ASTOP"],
+            "technology_families": ["prism", "astop"],
+            "related_products": ["ASTOP"],
+        }
+    if "prism-paper-current_v2" in n:
+        return {
+            "canonical_entities": ["PRISM"],
+            "technology_families": ["prism"],
+            "related_products": ["ASTOP"],
+        }
+    if "astop_prism_public_safe_v2_3" in n:
+        return {
+            "canonical_entities": ["ASTOP", "PRISM"],
+            "technology_families": ["astop", "prism"],
+            "related_products": ["ASTOP"],
+        }
+    if "astop_technical_capabilities_current" in n:
+        return {
+            "canonical_entities": ["ASTOP"],
+            "technology_families": ["astop"],
+            "related_products": ["ASTOP"],
+        }
+    if "productization_gtm_plan_v2.3" in n:
+        return {
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "technology_families": ["astop", "alpha_compute", "alpha_core"],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    if "sales_platform_mvp_guide_for_fidel_v3.5" in n:
+        return {
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "technology_families": [],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    if "white_paper_v3.5" in n or "itrix_product_canonical_v3_5" in n or "itrix_company_overview_public" in n:
+        return {
+            "canonical_entities": [
+                "ASTOP", "ALPHA Compute", "ALPHA Core",
+                "PRISM", "AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "QNTA",
+            ],
+            "technology_families": [
+                "astop", "alpha_compute", "alpha_core", "prism", "axiom",
+                "axiom_tensor", "cre", "fqnm", "qnta",
+            ],
+            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+        }
+    return {
+        "canonical_entities": [],
+        "technology_families": [],
+        "related_products": [],
+    }
+
+
+def governance_metadata_for(filename: str, disclosure: str) -> dict:
+    """Explicit September-2026 metadata for authority, audience, evidence and claim ceilings."""
+    n = filename.lower()
+    policy = policy_for(filename)
+    meta = {
+        "approved_audience": ["internal"] if disclosure == "internal_only" else ["public", "visitor", "customer"],
+        "allowed_journey_stages": ["PUBLIC-SAFE", "QUALIFIED", "NDA", "EVALUATION", "LICENSED"],
+        "claim_ceiling": 2 if disclosure in {"public", "controlled_public"} else 3,
+        "entity_type": "mixed",
+        "evidence_status": "mixed",
+        "claim_domains": list(policy.claim_domains) if policy else [],
+        "supersedes": list(policy.supersedes) if policy else [],
+        "superseded_by": policy.superseded_by if policy else "",
+        "prohibited_messages": list(policy.prohibited_messages) if policy else [],
+        **entity_relationship_metadata_for(filename),
+    }
+    if "productization_gtm_plan_v2.3" in n:
+        meta.update(approved_audience=["internal", "commercial"], allowed_journey_stages=["QUALIFIED", "NDA", "EVALUATION", "LICENSED"], claim_ceiling=3, entity_type="governance", evidence_status="governance")
+    elif "sales_platform_mvp_guide_for_fidel_v3.5" in n:
+        meta.update(approved_audience=["internal", "implementation"], claim_ceiling=3, entity_type="platform", evidence_status="governance")
+    elif "white_paper_v3.5" in n:
+        meta.update(approved_audience=["internal"], claim_ceiling=3, entity_type="mixed", evidence_status="mixed")
+    elif "prism-paper-current_v2" in n:
+        meta.update(claim_ceiling=2, entity_type="research", evidence_status="experimental")
+    elif "itrix_product_canonical_v3_5" in n or "itrix_company_overview_public" in n:
+        meta.update(claim_ceiling=2, entity_type="mixed", evidence_status="governance")
+    elif "prism_and_astop_explained" in n or "astop_prism_public_safe" in n:
+        meta.update(claim_ceiling=2, entity_type="mixed", evidence_status="experimental")
+    elif "astop_technical_capabilities_current" in n:
+        meta.update(approved_audience=["internal", "technical"], claim_ceiling=3, entity_type="product", evidence_status="implemented")
+    elif "axiom_tensor_qnta_current_controlled" in n:
+        meta.update(approved_audience=["internal", "technical"], claim_ceiling=2, entity_type="technology", evidence_status="experimental")
+    elif "mvp_acceptance_rerun_feedback" in n:
+        meta.update(approved_audience=["internal", "implementation"], claim_ceiling=3, entity_type="governance", evidence_status="governance")
+    return meta
 
 
 def paraphrase_for(disclosure: str) -> str:
@@ -212,6 +334,7 @@ class Command(BaseCommand):
                 authority, is_current, canonical_rule = source_authority_for(f.name)
                 family = technology_family_for(f.name)
                 paraphrase = paraphrase_for(disclosure)
+                governance = governance_metadata_for(f.name, disclosure)
 
                 # POSIX FORM, ALWAYS. The active-path set is also the reconciliation
                 # source: anything previously registered under knowledge_docs/ that is no
@@ -246,8 +369,15 @@ class Command(BaseCommand):
                         "source_authority": authority,
                         "is_current": is_current,
                         "canonical_rule": canonical_rule,
-                        "permitted_paraphrase": paraphrase,
+                        "permitted_paraphrase": paraphrase if is_current else "none",
                         "technology_family": family,
+                        # A newly registered historical source must be inert immediately.
+                        # Leaving it PENDING lets the default ingestion command create
+                        # local/remote chunks before currentness filtering gets a chance
+                        # to fail closed.
+                        "ingestion_status": "PENDING" if is_current else "COMPLETE",
+                        "chunk_count": 0,
+                        **governance,
                     },
                 )
                 if made:
@@ -272,12 +402,23 @@ class Command(BaseCommand):
                         ("canonical_rule", canonical_rule),
                         ("permitted_paraphrase", paraphrase),
                         ("technology_family", family),
+                        *((field, value) for field, value in governance.items()),
                     ):
                         if getattr(obj, field) != value:
                             setattr(obj, field, value)
                             updates.append(field)
                     if updates:
-                        obj.ingestion_status = "PENDING"
+                        if is_current:
+                            obj.ingestion_status = "PENDING"
+                        else:
+                            # Historical rows remain auditable but must have no local chunks
+                            # capable of entering retrieval. Remote stale ids then fail closed
+                            # because vector results are resolved through current DB chunks.
+                            obj.chunks.all().delete()
+                            obj.chunk_count = 0
+                            obj.ingestion_status = "COMPLETE"
+                            if "chunk_count" not in updates:
+                                updates.append("chunk_count")
                         updates.append("ingestion_status")
                         obj.save(update_fields=updates + ["updated_at"])
                         self.stdout.write(self.style.WARNING(f"  ~ reconciled [{disclosure:17}] [{ns:13}] {title}"))

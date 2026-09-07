@@ -9,8 +9,11 @@ routers, so all three stay consistent with the frontend
 from __future__ import annotations
 
 # ── Canonical product-route codes (match the web result/qualify contract) ────
+PRODUCT_UNDETERMINED = "undetermined"
+PRODUCT_ASTOP = "astop"
 PRODUCT_ALPHA_COMPUTE = "alpha_compute"
 PRODUCT_ALPHA_CORE = "alpha_core"
+# Read-side compatibility only. New discovery-stage routing must not emit these.
 PRODUCT_BOTH = "both"
 PRODUCT_GENERAL = "general"
 

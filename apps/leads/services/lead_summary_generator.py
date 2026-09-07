@@ -38,10 +38,12 @@ _PRESSURE_PHRASE = {
 }
 
 _ROUTE_PHRASE = {
+    "undetermined": "No product route has been assessed yet.",
+    "astop": "ASTOP relevance has been established as a hypothesis; controlled product qualification remains separate.",
     "alpha_compute": "Representation-level diagnosis (ALPHA Compute) is the natural entry point.",
     "alpha_core": "Execution/runtime work (ALPHA Core) is the natural entry point.",
     "both": "Both representation (ALPHA Compute) and execution (ALPHA Core) are relevant.",
-    "general": "A general ALPHA review is the natural entry point.",
+    "general": "No product route has been assessed yet.",
 }
 
 
@@ -51,7 +53,7 @@ def _deterministic_summary(*, prompt: str, pressures: list[str], product_route: 
     base = prompt.strip()
     if len(base) > 280:
         base = base[:277].rstrip() + "…"
-    route_str = _ROUTE_PHRASE.get(product_route, _ROUTE_PHRASE["general"])
+    route_str = _ROUTE_PHRASE.get(product_route, _ROUTE_PHRASE["undetermined"])
     if base:
         return f"Visitor reports {pain_str}. In their words: “{base}”. {route_str}"
     return f"Visitor reports {pain_str}. {route_str}"

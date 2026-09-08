@@ -83,6 +83,12 @@ jobs:
       - name: Clean PostgreSQL migration chain
         run: python manage.py migrate --noinput
 
+      - name: Focused anonymous conversation-management regressions
+        run: >-
+          pytest -q
+          tests/test_conversations/test_anonymous_ownership.py
+          tests/test_conversations/test_thread_management.py
+
       - name: Focused release regressions
         run: >-
           pytest -q

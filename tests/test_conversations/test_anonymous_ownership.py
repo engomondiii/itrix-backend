@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from rest_framework.test import APIClient
 
+from apps.conversations.models_thread import Thread
 from apps.conversations.services import threads as thread_svc
 
 pytestmark = pytest.mark.django_db
@@ -119,33 +120,48 @@ def test_a_twenty_thousand_character_turn_is_accepted():
     assert response.status_code == 201
 
 
-def test_anonymous_owner_can_read_but_cannot_rename_or_delete_their_thread():
-    thread = thread_svc.create_thread(visitor_session="sess-owner")
-    original_title = thread.title
+def test_anonymous_owner_can_read_rename_and_delete_their_thread():
+    target = thread_svc.create_thread(visitor_session="sess-owner", title="Before")
+    keep = thread_svc.create_thread(visitor_session="sess-owner", title="Keep me")
     client = _client()
     client.cookies["itrix_visitor_session"] = "sess-owner"
-    url = f"/api/v1/threads/{thread.id}/"
+    url = f"/api/v1/threads/{target.id}/"
 
     before = client.get(url)
     assert before.status_code == 200
-    assert before.data["threadId"] == str(thread.id)
+    assert before.data["threadId"] == str(target.id)
 
-    rename = client.patch(url, {"title": "Renamed"}, format="json")
-    assert rename.status_code == 401
-    assert rename.data["code"] == "AUTHENTICATION_REQUIRED"
-    assert rename.data["detail"] == "Sign in to manage conversations."
-    assert set(rename.data).issubset({"detail", "code", "requestId"})
+    rename = client.patch(url, {"title": "  한국어 · Anonymous owner  "}, format="json")
+    assert rename.status_code == 200, rename.content
+    assert rename.data["threadId"] == str(target.id)
+    assert rename.data["title"] == "한국어 · Anonymous owner"
+    assert set(rename.data).issubset(
+        {"threadId", "title", "titleSource", "context", "lastActivityAt"}
+    )
 
-    thread.refresh_from_db()
-    assert thread.title == original_title
+    target.refresh_from_db()
+    assert target.title == "한국어 · Anonymous owner"
+    assert client.get(url).data["title"] == "한국어 · Anonymous owner"
 
     delete = client.delete(url)
-    assert delete.status_code == 401
-    assert delete.data["code"] == "AUTHENTICATION_REQUIRED"
-    assert delete.data["detail"] == "Sign in to manage conversations."
-    assert set(delete.data).issubset({"detail", "code", "requestId"})
+    assert delete.status_code == 204, delete.content
+    assert not Thread.objects.filter(id=target.id).exists()
+    assert Thread.objects.filter(id=keep.id).exists()
+    assert client.get(url).status_code == 404
+
+
+def test_cross_session_and_no_session_cannot_mutate_anonymous_owned_thread():
+    thread = thread_svc.create_thread(visitor_session="sess-owner", title="Owner title")
+    url = f"/api/v1/threads/{thread.id}/"
+
+    other = _client()
+    other.cookies["itrix_visitor_session"] = "sess-other"
+    assert other.patch(url, {"title": "Stolen"}, format="json").status_code == 404
+    assert other.delete(url).status_code == 404
+
+    no_session = _client()
+    assert no_session.patch(url, {"title": "Guessed"}, format="json").status_code == 404
+    assert no_session.delete(url).status_code == 404
 
     thread.refresh_from_db()
-    after = client.get(url)
-    assert after.status_code == 200
-    assert after.data["threadId"] == str(thread.id)
+    assert thread.title == "Owner title"

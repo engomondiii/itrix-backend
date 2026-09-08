@@ -1,4 +1,4 @@
-"""Authenticated conversation management overrides for the workspace hotfix."""
+"""Owner-scoped conversation management overrides for the workspace hotfix."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from apps.conversations.serializers_thread import ThreadRenameSerializer, Thread
 from apps.conversations.services import threads as thread_svc
 from apps.conversations.views_thread import (
     ThreadDetailView,
-    _client_from,
     _resolve_thread,
     _safe_error_response,
 )
@@ -21,17 +20,14 @@ logger = logging.getLogger("itrix")
 
 
 class AuthenticatedThreadDetailView(ThreadDetailView):
-    """Keep thread reads unchanged while restricting PATCH/DELETE to signed-in owners."""
+    """Keep reads unchanged while PATCH/DELETE use the canonical ownership resolver."""
 
     @staticmethod
     def _managed_thread(request, thread_id):
-        if _client_from(request) is None:
-            return None, _safe_error_response(
-                request,
-                code="AUTHENTICATION_REQUIRED",
-                detail="Sign in to manage conversations.",
-                status_code=status.HTTP_401_UNAUTHORIZED,
-            )
+        # `_resolve_thread` is the one ownership rule used by thread reads: an
+        # authenticated owner is resolved first, then the current high-entropy visitor
+        # session.  Do not make authentication itself the gate here — an anonymous
+        # visitor session is the authorization credential for its own conversation.
         thread = _resolve_thread(request, thread_id)
         if thread is None:
             return None, _safe_error_response(

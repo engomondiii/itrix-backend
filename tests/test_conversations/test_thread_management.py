@@ -46,7 +46,7 @@ def test_blank_and_overlong_titles_are_rejected():
     assert thread.title == "Before"
 
 
-def test_non_owner_and_anonymous_cannot_rename():
+def test_non_owner_and_no_session_cannot_rename():
     owner = ClientFactory()
     thread = thread_svc.create_thread(client=owner, title="Before")
 
@@ -55,7 +55,7 @@ def test_non_owner_and_anonymous_cannot_rename():
     ).status_code == 404
     assert _api().patch(
         f"/api/v1/threads/{thread.id}/", {"title": "Anonymous"}, format="json"
-    ).status_code == 401
+    ).status_code == 404
     thread.refresh_from_db()
     assert thread.title == "Before"
 
@@ -72,6 +72,33 @@ def test_manual_rename_is_not_overwritten_by_automatic_title_generation():
     thread_svc.set_title_if_unset(thread, "Automatic title")
     thread.refresh_from_db()
     assert thread.title == "Manual title"
+
+
+def test_anonymous_owner_title_validation_and_manual_title_protection():
+    thread = thread_svc.create_thread(visitor_session="sess-owner", title="Before")
+    api = _api(session="sess-owner")
+    url = f"/api/v1/threads/{thread.id}/"
+
+    assert api.patch(url, {"title": "   "}, format="json").status_code == 400
+    assert api.patch(url, {"title": "x" * 201}, format="json").status_code == 400
+    assert api.patch(url, {"title": "한국어 수동 제목"}, format="json").status_code == 200
+
+    thread.refresh_from_db()
+    thread_svc.set_title_if_unset(thread, "Automatic title")
+    thread.refresh_from_db()
+    assert thread.title == "한국어 수동 제목"
+
+
+def test_signed_in_same_browser_can_manage_still_anonymous_thread():
+    client_row = ClientFactory()
+    thread = thread_svc.create_thread(visitor_session="sess-browser", title="Anonymous before sign-in")
+    api = _api(client_row, session="sess-browser")
+    url = f"/api/v1/threads/{thread.id}/"
+
+    response = api.patch(url, {"title": "Continued after sign-in"}, format="json")
+    assert response.status_code == 200, response.content
+    thread.refresh_from_db()
+    assert thread.title == "Continued after sign-in"
 
 
 def test_owner_delete_is_persistent_and_leaves_unrelated_thread(monkeypatch):
@@ -94,7 +121,7 @@ def test_owner_delete_is_persistent_and_leaves_unrelated_thread(monkeypatch):
     assert str(keep.id) in ids
 
 
-def test_non_owner_and_anonymous_cannot_delete(monkeypatch):
+def test_non_owner_and_no_session_cannot_delete(monkeypatch):
     owner = ClientFactory()
     thread = thread_svc.create_thread(client=owner, title="Mine")
 
@@ -109,8 +136,69 @@ def test_non_owner_and_anonymous_cannot_delete(monkeypatch):
 
     monkeypatch.setattr(retention, "purge_thread", _purge)
     assert _api(ClientFactory()).delete(f"/api/v1/threads/{thread.id}/").status_code == 404
-    assert _api().delete(f"/api/v1/threads/{thread.id}/").status_code == 401
+    assert _api().delete(f"/api/v1/threads/{thread.id}/").status_code == 404
     assert not called
+    assert Thread.objects.filter(id=thread.id).exists()
+
+
+def test_anonymous_owner_delete_purges_bound_attachment(settings, tmp_path, monkeypatch):
+    from apps.attachments import storage
+    from apps.attachments.models import Attachment, AttachmentStatus
+    from apps.attachments.services import retention
+
+    settings.ATTACHMENT_STORAGE_BACKEND = "filesystem"
+    settings.ATTACHMENT_BLOB_ROOT = str(tmp_path / "blobs")
+    settings.ENABLE_ATTACHMENTS = True
+
+    target = thread_svc.create_thread(visitor_session="sess-owner", title="With attachment")
+    keep = thread_svc.create_thread(visitor_session="sess-owner", title="Keep me")
+    blob_key = storage.new_blob_key("proof.txt")
+    size, digest = storage.write(blob_key, b"anonymous owner attachment")
+    Attachment.objects.create(
+        thread=target,
+        uploaded_by_kind=Attachment.UploadedByKind.SESSION,
+        uploaded_by_id="sess-owner",
+        filename="proof.txt",
+        declared_mime="text/plain",
+        detected_mime="text/plain",
+        bytes=size,
+        sha256=digest,
+        blob_key=blob_key,
+        status=AttachmentStatus.READY,
+    )
+    assert storage.exists(blob_key)
+
+    real_purge_thread = retention.purge_thread
+    purged: list[str] = []
+
+    def _tracked_purge(thread):
+        purged.append(str(thread.id))
+        return real_purge_thread(thread)
+
+    monkeypatch.setattr(retention, "purge_thread", _tracked_purge)
+    response = _api(session="sess-owner").delete(f"/api/v1/threads/{target.id}/")
+
+    assert response.status_code == 204, response.content
+    assert purged == [str(target.id)]
+    assert not storage.exists(blob_key)
+    assert not Thread.objects.filter(id=target.id).exists()
+    assert Thread.objects.filter(id=keep.id).exists()
+
+
+def test_anonymous_purge_failure_is_truthful_and_keeps_thread(monkeypatch):
+    thread = thread_svc.create_thread(visitor_session="sess-owner", title="Keep on purge failure")
+
+    from apps.attachments.services import retention
+
+    def _fail(_thread):
+        raise RuntimeError("simulated anonymous storage deletion failure")
+
+    monkeypatch.setattr(retention, "purge_thread", _fail)
+    response = _api(session="sess-owner").delete(f"/api/v1/threads/{thread.id}/")
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "THREAD_DELETE_FAILED"
+    assert "simulated" not in response.json()["detail"]
     assert Thread.objects.filter(id=thread.id).exists()
 
 

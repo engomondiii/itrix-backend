@@ -8,13 +8,9 @@ from django.urls import reverse
 
 from apps.emails.services.internal_alert_builder import build_internal_alert
 from apps.leads.models import ASTOPEngagement, Lead, ProductRouteCode
+from apps.legal.services import instruments as instruments_svc
 
 pytestmark = pytest.mark.django_db
-
-ASSENT = [
-    {"slug": "terms", "version": "1.2", "effective": "2026-07-30"},
-    {"slug": "privacy", "version": "1.2", "effective": "2026-07-30"},
-]
 
 
 def test_fresh_open_signup_remains_product_and_commercially_neutral(api_client, settings):
@@ -27,7 +23,7 @@ def test_fresh_open_signup_remains_product_and_commercially_neutral(api_client, 
             "fullName": "Neutral Signup",
             "organization": "Example Org",
             "role": "Engineer",
-            "assent": ASSENT,
+            "assent": instruments_svc.current_versions(["terms", "privacy"]),
         },
         format="json",
     )

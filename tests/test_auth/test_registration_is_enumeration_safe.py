@@ -12,14 +12,10 @@ import pytest
 from django.urls import reverse
 
 from apps.clients.models import Client
+from apps.legal.services import instruments as instruments_svc
 from tests.factories.client_factory import ClientFactory
 
 pytestmark = pytest.mark.django_db
-
-ASSENT = [
-    {"slug": "terms", "version": "1.2", "effective": "2026-07-30"},
-    {"slug": "privacy", "version": "1.2", "effective": "2026-07-30"},
-]
 
 
 def _post(api_client, email):
@@ -30,7 +26,7 @@ def _post(api_client, email):
             "password": "a-long-enough-password",
             "fullName": "A Person",
             "organization": "An Organisation",
-            "assent": ASSENT,
+            "assent": instruments_svc.current_versions(["terms", "privacy"]),
         },
         format="json",
     )

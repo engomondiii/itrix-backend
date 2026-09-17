@@ -1,37 +1,51 @@
-"""
-SESSION INVALIDATION ON A PASSWORD CHANGE (Backend v7.2 §15.3 property 3).
+"""Client-plane session invalidation boundaries.
 
-── HOW YOU INVALIDATE A STATELESS JWT ──────────────────────────────────────
-You cannot revoke one. So the client plane compares the token's issue time against
-`Client.password_changed_at`: a token minted before the last password change is refused by
-`ClientJWTAuthentication`. Stamping the timestamp IS the invalidation.
-
-That means the guarantee lives in two places and both are load-bearing — the stamp here,
-and the check in the authentication class. A test asserts the pair, because either one
-alone is silently useless.
-
-── AND THE RESPONSE SAYS IT HAPPENED ───────────────────────────────────────
-Being signed out of another device without being told reads as a fault. Being told reads
-as a security feature the person can watch work, which is why the copy names it
-(Playbook v1.9 §18E).
+Client JWTs are stateless, but every token carries ``Client.session_version``. Advancing
+that monotonic generation is the authoritative revocation operation: access, refresh and
+WS credentials minted before the change immediately fail their normal DB-backed session
+check.
 """
 
 from __future__ import annotations
 
 import logging
 
+from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger("itrix")
 
 
-def invalidate_other_sessions(client) -> None:
-    """
-    Stamp ``password_changed_at``, which invalidates every previously minted token.
+def revoke_current_session(client) -> int:
+    """Atomically revoke every credential in the client's current token generation.
 
-    Called inside the transaction that writes the new password, so a rolled-back password
-    change does not leave a customer mysteriously signed out everywhere.
+    This is used by explicit logout. Database failure is intentionally allowed to
+    propagate: a caller must never claim that revocation succeeded when the generation
+    could not be durably advanced.
     """
+
+    model = client.__class__
+    with transaction.atomic():
+        locked = model.objects.select_for_update().get(pk=client.pk)
+        locked.session_version = int(getattr(locked, "session_version", 0) or 0) + 1
+        locked.save(update_fields=["session_version", "updated_at"])
+        generation = int(locked.session_version)
+
+    # Keep the authenticated in-memory instance coherent for any code that observes it
+    # later in the same request.
+    client.session_version = generation
+    logger.info("clients.session_revoked client=%s generation=%s", client.id, generation)
+    return generation
+
+
+def invalidate_other_sessions(client) -> None:
+    """Invalidate prior sessions inside the transaction that writes a new password.
+
+    Password change also records the time of the security event for audit/display. The
+    monotonic generation remains the actual token-revocation boundary because JWT ``iat``
+    is only second-resolution.
+    """
+
     client.password_changed_at = timezone.now()
     client.session_version = int(getattr(client, "session_version", 0) or 0) + 1
     client.save(update_fields=["password_changed_at", "session_version", "updated_at"])

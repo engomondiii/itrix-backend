@@ -60,21 +60,36 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
-    """Blacklist the supplied refresh token (best-effort idempotent logout)."""
+    """Blacklist the supplied refresh token with idempotent invalid-token semantics."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request):
         refresh = request.data.get("refresh")
-        if refresh:
-            try:
-                RefreshToken(refresh).blacklist()
-            except TokenError:
-                # Already expired/blacklisted/invalid — logout is still a success.
-                pass
-            except Exception:  # noqa: BLE001
-                logger.exception("Unexpected error blacklisting refresh token")
+        if not refresh:
+            # With no credential there is nothing left for the server to revoke.
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+
+        try:
+            RefreshToken(refresh).blacklist()
+        except TokenError:
+            # Already expired/blacklisted/invalid is already a safely logged-out state.
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception:  # noqa: BLE001 - persistence failure is not successful logout
+            request_id = str(getattr(request, "correlation_id", "") or "")
+            logger.exception(
+                "team.logout blacklist_failed request_id=%s",
+                request_id or "unknown",
+            )
+            body = {
+                "detail": "Session revocation is temporarily unavailable.",
+                "code": "SESSION_REVOCATION_UNAVAILABLE",
+            }
+            if request_id:
+                body["requestId"] = request_id
+            return Response(body, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
         return Response(status=status.HTTP_205_RESET_CONTENT)
 
 

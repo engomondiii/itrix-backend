@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 from apps.clients.services.invite import mint_invite
 from apps.journey.models import JourneyEvent
 from apps.journey.services.advance import advance
+from apps.legal.services import instruments as instruments_svc
 from tests.factories.client_factory import ClientFactory
 from tests.factories.lead_factory import LeadFactory
 
@@ -27,7 +28,11 @@ def test_existing_passwordless_invitee_gets_dedicated_set_password_capability(se
     invite, client = _invite_for_passwordless_existing_client()
     api = APIClient()
 
-    claim = api.post(f"/api/v1/accounts/invite/{invite}/claim/", {}, format="json")
+    claim = api.post(
+        f"/api/v1/accounts/invite/{invite}/claim/",
+        {"assent": instruments_svc.current_versions(["terms", "privacy"])},
+        format="json",
+    )
     assert claim.status_code == 201
     assert claim.data["requiresPasswordSet"] is True
     set_password_token = claim.data["setPasswordToken"]
@@ -59,10 +64,15 @@ def test_existing_passwordless_invitee_gets_dedicated_set_password_capability(se
     client.credential.refresh_from_db()
     assert client.credential.check_password("Valid-password-12345")
 
-    # Password capability and invitation are both one-use.
+    # Password capability and invitation are both one-use. Supply current assent again
+    # so legal-version validation does not mask the consumed-invite contract.
     assert api.post(
         "/api/v1/client/auth/password/set/",
         {"token": set_password_token, "password": "Another-valid-password-678"},
         format="json",
     ).status_code == 400
-    assert api.post(f"/api/v1/accounts/invite/{invite}/claim/", {}, format="json").status_code == 404
+    assert api.post(
+        f"/api/v1/accounts/invite/{invite}/claim/",
+        {"assent": instruments_svc.current_versions(["terms", "privacy"])},
+        format="json",
+    ).status_code == 404

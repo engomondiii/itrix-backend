@@ -9,6 +9,8 @@ The signed download endpoint (Backend v6.0 §4.4, §19.7 rule 2).
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from rest_framework.test import APIClient
 
@@ -56,8 +58,12 @@ def test_an_html_upload_still_downloads_rather_than_rendering(thread):
     """
     THE ATTACK THIS CLOSES. A stored HTML file served inline is stored XSS on our origin.
     """
-    attachment = _ready(thread, name="payload.html",
-                        data=b"<script>alert(1)</script>", mime="text/html")
+    attachment = _ready(
+        thread,
+        name="payload.html",
+        data=b"<script>alert(1)</script>",
+        mime="text/html",
+    )
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert response.status_code == 200
     assert response["Content-Disposition"].startswith("attachment;")
@@ -67,8 +73,12 @@ def test_an_html_upload_still_downloads_rather_than_rendering(thread):
 
 
 def test_an_svg_upload_is_not_rendered_inline(thread):
-    attachment = _ready(thread, name="logo.svg",
-                        data=b"<svg onload=\"alert(1)\"></svg>", mime="image/svg+xml")
+    attachment = _ready(
+        thread,
+        name="logo.svg",
+        data=b"<svg onload=\"alert(1)\"></svg>",
+        mime="image/svg+xml",
+    )
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert response["Content-Type"] == "application/octet-stream"
     assert response["Content-Disposition"].startswith("attachment;")
@@ -88,12 +98,10 @@ def test_the_filename_header_cannot_be_injected(thread):
     assert "\r" not in disposition and "\n" not in disposition
     assert '"' not in disposition.split("filename=")[1][1:-1]
     assert ":" not in disposition.split("filename=")[1]
-    # No header was actually created.
     assert not response.has_header("X-Injected")
 
 
 def test_a_traversal_filename_is_reduced_to_a_basename(thread):
-    """'../../etc/passwd' is a filename. It must not survive as a path."""
     attachment = _ready(thread, name="../../etc/passwd")
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert "/" not in response["Content-Disposition"]
@@ -101,21 +109,24 @@ def test_a_traversal_filename_is_reduced_to_a_basename(thread):
 
 
 def test_an_ordinary_filename_survives_intact(thread):
-    """The sanitizer must not mangle normal names."""
     attachment = _ready(thread, name="Q3 architecture review (final).txt")
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert "Q3 architecture review (final).txt" in response["Content-Disposition"]
 
 
 def test_a_quarantined_file_cannot_be_downloaded(thread):
-    """Release requires a deliberate, logged team action."""
-    import io, zipfile
+    import io
+    import zipfile
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("big.txt", b"0" * 20_000_000)
-    attachment = _ready(thread, name="bomb.zip", data=buffer.getvalue(),
-                        mime="application/zip")
+    attachment = _ready(
+        thread,
+        name="bomb.zip",
+        data=buffer.getvalue(),
+        mime="application/zip",
+    )
     assert attachment.status == "quarantined"
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert response.status_code == 404
@@ -131,3 +142,20 @@ def test_the_response_is_not_cacheable(thread):
     attachment = _ready(thread)
     response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
     assert "no-store" in response["Cache-Control"]
+
+
+def test_authorized_download_streams_provider_independent_chunks(thread):
+    """The HTTP view must not require a filesystem path from canonical storage."""
+    attachment = _ready(thread)
+    with (
+        patch("apps.attachments.views.storage.exists", return_value=True),
+        patch(
+            "apps.attachments.views.storage.iter_chunks",
+            return_value=iter([b"remote-", b"object"]),
+        ) as chunks,
+    ):
+        response = _client().get(f"/api/v1/attachments/{attachment.id}/download/")
+        body = b"".join(response.streaming_content)
+    assert response.status_code == 200
+    assert body == b"remote-object"
+    chunks.assert_called_once_with(attachment.blob_key)

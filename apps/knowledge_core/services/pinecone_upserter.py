@@ -1,13 +1,4 @@
-"""
-Pinecone upserter.
-
-Upserts chunk vectors (with metadata) into the configured Pinecone index/namespace when
-``ENABLE_AI_ENGINE`` is on and a key is present. When disabled, it **no-ops gracefully**
-(logging what it would have upserted) so ingestion still completes and marks chunks with
-vector ids — the records exist, only the remote upsert is skipped until keys are live.
-
-The Pinecone client is imported lazily.
-"""
+"""Pinecone persistence helpers for the configured itriX Knowledge index."""
 
 from __future__ import annotations
 
@@ -36,14 +27,31 @@ class PineconeUpserter:
             self._index = pc.Index(settings.PINECONE_INDEX)
         return self._index
 
-    def upsert(self, *, namespace: str, vectors: list[dict]) -> int:
-        """
-        Upsert vectors into a namespace.
+    def namespace_counts(self) -> dict[str, int]:
+        """Return namespace -> vector count for the configured index only.
 
-        ``vectors`` is a list of ``{"id", "values", "metadata"}`` dicts. Returns the
-        number of vectors processed (also returned when disabled, since the records were
-        prepared).
+        This is deliberately index-scoped. Reconciliation never lists accounts or other
+        indexes; ``PINECONE_INDEX`` is the outer safety boundary selected by the operator.
         """
+        if not self.enabled:
+            return {}
+        try:
+            stats = self.index.describe_index_stats()
+            namespaces = getattr(stats, "namespaces", None)
+            if namespaces is None and isinstance(stats, dict):
+                namespaces = stats.get("namespaces", {})
+            out: dict[str, int] = {}
+            for name, info in dict(namespaces or {}).items():
+                count = getattr(info, "vector_count", None)
+                if count is None and isinstance(info, dict):
+                    count = info.get("vector_count", 0)
+                out[str(name)] = int(count or 0)
+            return out
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Pinecone namespace inventory failed")
+            raise PineconeUpsertError("Could not inventory configured Pinecone namespaces") from exc
+
+    def upsert(self, *, namespace: str, vectors: list[dict]) -> int:
         if not vectors:
             return 0
         if not self.enabled:
@@ -55,11 +63,10 @@ class PineconeUpserter:
             )
             return len(vectors)
         try:
-            # Pinecone accepts batches; keep them modest.
-            BATCH = 100
+            batch_size = 100
             total = 0
-            for i in range(0, len(vectors), BATCH):
-                batch = vectors[i : i + BATCH]
+            for i in range(0, len(vectors), batch_size):
+                batch = vectors[i : i + batch_size]
                 self.index.upsert(vectors=batch, namespace=namespace)
                 total += len(batch)
             logger.info("Upserted %d vectors to Pinecone namespace '%s'", total, namespace)
@@ -71,7 +78,6 @@ class PineconeUpserter:
             ) from exc
 
     def delete_ids(self, *, namespace: str, ids: list[str]) -> bool:
-        """Delete specific stale vectors before a single-document re-ingest."""
         ids = [str(i) for i in ids if i]
         if not ids:
             return True
@@ -83,9 +89,6 @@ class PineconeUpserter:
                 self.index.delete(ids=ids[i : i + 1000], namespace=namespace)
             return True
         except Exception as exc:  # noqa: BLE001
-            # During a full namespace rebuild, the namespace is deliberately removed
-            # before individual documents are re-ingested. Deleting stale ids from a
-            # namespace that no longer exists is therefore a successful no-op.
             if "not found" in str(exc).lower() or "404" in str(exc):
                 logger.debug(
                     "Namespace '%s' did not exist while deleting stale ids — nothing to delete.",
@@ -98,14 +101,7 @@ class PineconeUpserter:
             ) from exc
 
     def delete_namespace(self, namespace: str) -> bool:
-        """
-        Delete all vectors in a namespace (used by reingest).
-
-        A namespace that doesn't exist yet (e.g. on a freshly-created index, or one being
-        ingested for the first time) is NOT an error — Pinecone returns 404 "Namespace not
-        found", which we treat as a successful no-op and log quietly rather than dumping a
-        traceback.
-        """
+        """Delete every vector in one namespace of the configured index."""
         if not self.enabled:
             logger.info("[pinecone-disabled] would delete namespace '%s'", namespace)
             return True
@@ -113,9 +109,10 @@ class PineconeUpserter:
             self.index.delete(delete_all=True, namespace=namespace)
             return True
         except Exception as exc:  # noqa: BLE001
-            # "Namespace not found" just means there's nothing to clear — that's fine.
             if "not found" in str(exc).lower() or "404" in str(exc):
                 logger.debug("Namespace '%s' did not exist yet — nothing to clear.", namespace)
                 return True
-            logger.warning("Pinecone namespace delete failed for '%s': %s", namespace, exc)
-            return False
+            logger.exception("Pinecone namespace delete failed for '%s'", namespace)
+            raise PineconeUpsertError(
+                f"Could not clear Pinecone namespace {namespace!r}"
+            ) from exc

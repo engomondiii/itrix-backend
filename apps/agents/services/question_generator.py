@@ -113,7 +113,10 @@ _FORBIDDEN = [
      "pre_nda_confidential"),
     (re.compile(r"\bshare (?:your )?(?:source code|actual data|real numbers)\b", re.I),
      "pre_nda_confidential"),
-    # Assertions — this is a QUESTION generator.
+    # Assertions — this is a QUESTION generator. Guarantee terminology is rejected
+    # conservatively here even when the general message scrubber would allow safe
+    # discussion/refusal language; risky generated questions fall back to the bank.
+    (re.compile(r"\bguarantee(?:s|d)?\b", re.I), "assertion"),
     (re.compile(r"\b(?:we guarantee|will reduce|will improve|proven to)\b", re.I), "assertion"),
     (re.compile(r"\b\d+\s?%\s*(?:faster|cheaper|less|lower|improvement)", re.I), "figure"),
     (re.compile(r"\b\d+\s?x\s*(?:faster|cheaper)", re.I), "figure"),

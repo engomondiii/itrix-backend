@@ -28,7 +28,7 @@ from apps.knowledge_core.models import (
     KnowledgeChunk,
     KnowledgeConflict,
 )
-from apps.knowledge_core.source_manifest import ClaimDomain
+from apps.knowledge_core.source_manifest import ClaimDomain, people_sources_for, policy_for
 from apps.knowledge_core.services.embedder import Embedder
 from apps.knowledge_core.services.namespace_router import normalize_namespace
 
@@ -232,9 +232,13 @@ def _keyword_fallback(
         .filter(namespace__in=namespaces, disclosure_level__in=candidate_levels, document__is_current=True)
         .exclude(document__permitted_paraphrase="none")
     )
+    person_sources = people_sources_for(query)
+    expanded = query
+    for filename in person_sources:
+        expanded += " " + " ".join(policy_for(filename).canonical_entities)
     terms = [
-        t for t in {w.strip(".,;:!?()[]{}\"'").lower() for w in (query or "").split()}
-        if len(t) > 3
+        t for t in {w.strip(".,;:!?()[]{}\"'").lower() for w in (expanded or "").split()}
+        if len(t) > 3 or t in {"강명주", "박준후"}
     ]
     if terms:
         condition = Q()
@@ -244,6 +248,16 @@ def _keyword_fallback(
     else:
         ranked = list(qs.order_by("-created_at")[: max(top_k * 8, 40)])
 
+    # Keep named profiles in the candidate pool even with a large current corpus.
+    # The same namespace, disclosure and metadata filters still apply.
+    if person_sources:
+        person_condition = Q()
+        for filename in person_sources:
+            person_condition |= Q(document__file_path__endswith="/" + filename)
+        by_id = {row.pk: row for row in ranked}
+        by_id.update({row.pk: row for row in qs.filter(person_condition)})
+        ranked = list(by_id.values())
+
     def overlap(row: KnowledgeChunk) -> int:
         blob = f"{row.document.title}\n{row.heading}\n{row.text}".lower()
         return sum(blob.count(t) for t in terms)
@@ -251,6 +265,7 @@ def _keyword_fallback(
     query_domains = _query_claim_domains(query)
     ranked.sort(
         key=lambda row: (
+            row.document.file_path.rsplit("/", 1)[-1] in person_sources,
             _domain_rank(_row_to_dict(row), query_domains),
             _canonical_priority_for_row(row),
             overlap(row),
@@ -326,6 +341,7 @@ def _apply_source_precedence(query: str, chunks: list[dict], *, top_k: int) -> l
         ]
     chunks.sort(
         key=lambda c: (
+            str(c.get("document_path") or "").rsplit("/", 1)[-1] in people_sources_for(query),
             _domain_rank(c, query_domains),
             _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0),
             int(c.get("canonical_priority") or 0),
@@ -429,7 +445,13 @@ class KnowledgeRetriever:
 
         if self.engine_on:
             try:
-                vector = Embedder().embed_one(query)
+                people = people_sources_for(query)
+                expanded_query = query
+                if people:
+                    expanded_query += " " + " ".join(
+                        entity for filename in people for entity in policy_for(filename).canonical_entities
+                    )
+                vector = Embedder().embed_one(expanded_query)
                 query_client = PineconeQueryClient()
                 raw: list[dict] = []
                 per_namespace_k = max(12, top_k * 4)

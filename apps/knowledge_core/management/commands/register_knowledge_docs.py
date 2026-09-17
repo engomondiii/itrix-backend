@@ -19,6 +19,7 @@ knowledge_docs directory.
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
 import re
 
 from django.conf import settings
@@ -76,6 +77,9 @@ def assert_not_attachment_store(base) -> None:
 
 def namespace_for(filename: str) -> str:
     """Infer a canonical namespace from the filename (case-insensitive)."""
+    policy = policy_for(filename)
+    if policy and policy.namespace:
+        return policy.namespace
     n = filename.lower()
 
     if "astop" in n or "prism" in n:
@@ -181,6 +185,13 @@ def technology_family_for(filename: str) -> str:
 
 def entity_relationship_metadata_for(filename: str) -> dict:
     """Explicit entity/family/product relations for the current September sources."""
+    policy = policy_for(filename)
+    if policy and policy.canonical_entities:
+        return {
+            "canonical_entities": list(policy.canonical_entities),
+            "technology_families": ["astop", "prism"] if policy.namespace == "astop" else [],
+            "related_products": ["ASTOP"] if policy.namespace == "astop" else [],
+        }
     n = filename.lower()
     if "axiom_tensor_qnta_current_controlled" in n:
         return {
@@ -259,6 +270,11 @@ def governance_metadata_for(filename: str, disclosure: str) -> dict:
         "prohibited_messages": list(policy.prohibited_messages) if policy else [],
         **entity_relationship_metadata_for(filename),
     }
+    if policy and policy.verified_date:
+        meta.update(
+            verified_at=datetime.fromisoformat(policy.verified_date).replace(tzinfo=timezone.utc),
+            evidence_status="mixed",
+        )
     if "productization_gtm_plan_v2.3" in n:
         meta.update(approved_audience=["internal", "commercial"], allowed_journey_stages=["QUALIFIED", "NDA", "EVALUATION", "LICENSED"], claim_ceiling=3, entity_type="governance", evidence_status="governance")
     elif "sales_platform_mvp_guide_for_fidel_v3.5" in n:

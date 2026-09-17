@@ -279,3 +279,37 @@ def test_collectstatic_succeeds(tmp_path, settings):
     assert (tmp_path / "static" / "admin_itrix" / "css" / "itrix-admin.css").exists()
     assert (tmp_path / "static" / "admin_itrix" / "brand" / "itrix-x.svg").exists()
     assert (tmp_path / "static" / "staticfiles.json").exists()
+
+
+def test_admin_renders_under_manifest_storage(tmp_path, settings, superuser_client):
+    """Render the admin under the storage production actually uses.
+
+    Every other test in this module runs with plain static storage (see this
+    package's conftest) so it does not need a collectstatic run. That made the
+    whole suite blind to the failure that took the production admin down:
+    Jazzmin's ``admin/base.html`` calls ``{% static 'vendor/bootswatch' %}``,
+    which names a directory. A manifest contains only files, so the strict
+    lookup raised and every admin page 500'd — while 357 green tests said
+    nothing, because none of them used a manifest.
+
+    Collecting is not enough to catch that (``test_collectstatic_succeeds``
+    already passed throughout the outage); the page has to be *rendered* with
+    the manifest in force. Hence this test: collect for real, then render.
+    """
+    from django.core.management import call_command
+
+    settings.STATIC_ROOT = tmp_path / "static"
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "staticfiles": {
+            "BACKEND": "itrix.staticfiles.AdminTolerantManifestStaticFilesStorage"
+        },
+    }
+    call_command("collectstatic", interactive=False, verbosity=0)
+
+    # The index, a changelist and a change form between them cover base.html,
+    # base_site.html and the form media — the templates that carry the
+    # {% static %} calls.
+    assert superuser_client.get(reverse("admin:index")).status_code == 200
+    assert superuser_client.get(reverse("admin:authentication_user_changelist")).status_code == 200
+    assert superuser_client.get(reverse("admin:authentication_user_add")).status_code == 200

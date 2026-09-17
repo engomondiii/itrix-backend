@@ -235,7 +235,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    # A thin subclass of WhiteNoise's manifest storage; see the module docstring
+    # for the one vendor path it has to forgive and why strictness is kept elsewhere.
+    "staticfiles": {"BACKEND": "itrix.staticfiles.AdminTolerantManifestStaticFilesStorage"},
 }
 
 MEDIA_URL = "media/"

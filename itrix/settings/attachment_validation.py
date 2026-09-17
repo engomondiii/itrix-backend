@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import posixpath
 import shlex
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -59,7 +60,14 @@ def validate_production_attachments(
                 "Filesystem attachment storage requires ATTACHMENT_BLOB_ROOT in production."
             )
         root = Path(raw_root).expanduser()
-        if not root.is_absolute():
+        # Production runs on Linux, so operators configure POSIX roots. On a Windows dev
+        # box "/srv/attachments" is drive-relative, Path.is_absolute() is False, and the
+        # root would be rejected before any real check ran. Keep a POSIX view alongside
+        # the native one; on Linux they agree, so production behaviour is unchanged.
+        # normpath collapses '..' so this view matches the resolved one below:
+        # "/tmp/../var/lib/x" is a durable root, not a /tmp root.
+        posix_root = PurePosixPath(posixpath.normpath(raw_root))
+        if not (root.is_absolute() or posix_root.is_absolute()):
             raise ImproperlyConfigured("ATTACHMENT_BLOB_ROOT must be an absolute production path.")
         resolved_root = root.resolve(strict=False)
         resolved_base = Path(base_dir).resolve(strict=False)
@@ -69,11 +77,18 @@ def validate_production_attachments(
             )
         except AttributeError:  # pragma: no cover
             inside_checkout = str(resolved_root).startswith(str(resolved_base) + "/")
-        if (
-            inside_checkout
-            or str(resolved_root).startswith("/tmp/")
+        # The resolved comparison is what catches a symlink into /tmp on Linux, so it
+        # stays. The lexical POSIX comparison is additive: it also holds on Windows,
+        # where resolve() rewrites "/tmp/..." to a drive-qualified path that no longer
+        # matches. Being additive it can only reject more, never less.
+        posix_tmp = PurePosixPath("/tmp")
+        in_tmp = (
+            str(resolved_root).startswith("/tmp/")
             or resolved_root == Path("/tmp")
-        ):
+            or posix_root == posix_tmp
+            or posix_tmp in posix_root.parents
+        )
+        if inside_checkout or in_tmp:
             raise ImproperlyConfigured(
                 "ATTACHMENT_BLOB_ROOT must not use the application checkout or /tmp in production."
             )

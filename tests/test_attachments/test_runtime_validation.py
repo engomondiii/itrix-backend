@@ -15,6 +15,11 @@ from apps.attachments.runtime_validation import (
     validate_attachment_runtime,
 )
 
+# The validator hands storage.materialize's path to the scanner via str(). Build the
+# expected argument from the same Path so the assertion compares native separators
+# instead of hardcoding POSIX ones, which differ on Windows.
+PROBE_PATH = Path("/secure/probe.scan")
+
 
 @override_settings(ENABLE_ATTACHMENTS=False)
 def test_runtime_validator_skips_all_probes_when_disabled():
@@ -38,7 +43,7 @@ def test_runtime_validator_proves_write_read_scan_and_durable_delete_without_cus
         patch("apps.attachments.runtime_validation.storage.read", side_effect=lambda _key: captured["payload"]),
         patch("apps.attachments.runtime_validation.storage.exists", side_effect=[True, False]) as exists,
         patch("apps.attachments.runtime_validation.storage.delete", return_value=True) as delete,
-        patch("apps.attachments.runtime_validation.storage.materialize", return_value=nullcontext(Path("/secure/probe.scan"))),
+        patch("apps.attachments.runtime_validation.storage.materialize", return_value=nullcontext(PROBE_PATH)),
         patch("apps.attachments.runtime_validation.storage.backend_name", return_value="s3"),
         patch(
             "apps.attachments.runtime_validation.scanner._external_av",
@@ -52,7 +57,7 @@ def test_runtime_validator_proves_write_read_scan_and_durable_delete_without_cus
     assert report["probe_deleted"] is True
     assert captured["payload"].startswith(b"itriX attachment runtime validation probe\n")
     write_mock.assert_called_once()
-    av.assert_called_once_with("/secure/probe.scan")
+    av.assert_called_once_with(str(PROBE_PATH))
     delete.assert_called_once_with("probe.txt")
     assert exists.call_count == 2
 

@@ -8,6 +8,7 @@ fall back to conservative working-source metadata in the registration command.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 class ClaimDomain:
@@ -29,9 +30,76 @@ class SourcePolicy:
     supersedes: tuple[str, ...] = ()
     superseded_by: str = ""
     prohibited_messages: tuple[str, ...] = ()
+    namespace: str = ""
+    verified_date: str = ""
+    canonical_entities: tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
+    permitted_paraphrase: str = ""
 
 
 SOURCE_MANIFEST: dict[str, SourcePolicy] = {
+    "itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx": SourcePolicy(
+        "authoritative", True,
+        "Company-authorized profile verified 8 September 2026. Use stable identity first; "
+        "date dynamic facts 'As of 8 September 2026'. KSIAM auditor/candidacy is not an election result. "
+        "Separate research leadership, supervision and coauthorship from patent inventorship. "
+        "A/B evidence supports bounded answers; C requires dating; D is not automatically public. "
+        "Use approved professional summaries, never source-register identifiers.",
+        (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.RESEARCH, ClaimDomain.TECHNICAL, ClaimDomain.LEGAL),
+        prohibited_messages=(
+            "Kang invented all itriX technology or is sole inventor of AXIOM/CRE/FQNM",
+            "Kang is currently KSIAM president or president-elect without a later authorized source",
+            "Company-wide paper/project/IP metrics attributed personally to Kang",
+            "Private patent-file identifiers, filing numbers, residential addresses or personal identifiers",
+            "Internal D-class claims automatically disclosed; preprints described as peer-reviewed validation",
+            "Universal performance guarantees or applications described as granted patents",
+        ),
+        namespace="company", verified_date="2026-09-08", permitted_paraphrase="summary",
+        canonical_entities=("Myungjoo Kang",),
+        aliases=("Myungjoo Kang", "Kang Myungjoo", "Myung-Joo Kang", "Professor Kang", "강명주", "강명주 교수", "강명주 대표"),
+    ),
+    "itriX_Knowledge_Core_Park_Junhu_v1.0.docx": SourcePolicy(
+        "authoritative", True,
+        "Company-authorized profile verified 8 September 2026. Director, AI R&D Center is project-confirmed; "
+        "public papers verify affiliation, not exact title. SNU master's degree 2026 verified; doctoral study "
+        "is profile/self-reported, not a completed doctorate. Named inventor on three supplied January 2026 "
+        "Korean applications only. A/B evidence supports bounded answers; C requires dating; D is not "
+        "automatically public. Use approved professional summaries; no source-register identifiers.",
+        (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.RESEARCH, ClaimDomain.TECHNICAL, ClaimDomain.LEGAL),
+        prohibited_messages=(
+            "Dr. Park or completed PhD on the supplied evidence",
+            "Exact director title independently verified on an official public company page",
+            "Park invented every itriX technology or owns all itriX IP",
+            "Three granted patents rather than three supplied Korean patent applications",
+            "Private patent-file identifiers, filing numbers, home address, resident-registration number, birth date or age",
+            "Internal D-class claims automatically disclosed; 2026 preprints described as peer-reviewed validation",
+            "Universal 300× or 50× results without workload, hardware, precision, baseline and publication status",
+        ),
+        namespace="company", verified_date="2026-09-08", permitted_paraphrase="summary",
+        canonical_entities=("Park Junhu",),
+        aliases=("Park Junhu", "Junhu Park", "박준후", "박준후 연구원", "박준후 센터장"),
+    ),
+    "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx": SourcePolicy(
+        "authoritative", True,
+        "Comparative source dated 16 September 2026. Primary layers: Anthropic request/model use; "
+        "SoL-Pi agent harness/trajectory; ASTOP observation/supervision. Overlap and complementarity are possible. "
+        "Preserve required events. PRISM 51.9–84.5% token reduction versus polling is internal, task-specific "
+        "evidence, not customer savings. Net value subtracts observer compute, storage, integration and "
+        "failure overhead. Measure combined savings; retain ASTOP product / PRISM technology distinction.",
+        (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH),
+        prohibited_messages=(
+            "ASTOP always saves 51.9–84.5% or is 51.9–84.5% cheaper than SoL-Pi",
+            "Combined savings equal ASTOP + SoL-Pi + Anthropic benchmark percentages",
+            "Token reduction equals monetary savings; observer compute is free",
+            "Anthropic only optimizes price; SoL-Pi never handles observation; ASTOP alone changes behavior",
+            "ASTOP is universally better, makes models inherently smarter, or suppresses required events",
+            "SoL-Pi is an official Pi distribution; compatibility proves a validated integration",
+            "PRISM and ASTOP are legally identical or fully equivalent implementations",
+            "ASTOP is a strong fit for every sample, one-shot inference or already sufficient webhooks",
+        ),
+        namespace="astop", verified_date="2026-09-16", permitted_paraphrase="summary",
+        canonical_entities=("ASTOP", "PRISM"),
+    ),
     # Current taxonomy / public explanation.
     "itrix_product_canonical_v3_5.md": SourcePolicy(
         "authoritative", True,
@@ -258,3 +326,30 @@ def policy_for(filename: str) -> SourcePolicy | None:
         if name.casefold() == folded:
             return policy
     return None
+
+
+def people_sources_for(query: str) -> tuple[str, ...]:
+    """Resolve only source-approved person aliases and narrow leadership questions.
+
+    This affects relevance within the caller's existing namespaces, never authorization.
+    Bare surnames are question references, not new stored person aliases.
+    """
+    text = query or ""
+    names = []
+    for filename, policy in SOURCE_MANIFEST.items():
+        if policy.aliases and any(
+            re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", text, re.I)
+            for alias in policy.aliases
+        ):
+            names.append(filename)
+    kang = "itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx"
+    park = "itriX_Knowledge_Core_Park_Junhu_v1.0.docx"
+    if re.search(r"\bKang\b", text, re.I) or re.search(r"\bCEO\b.*\bitriX\b", text, re.I):
+        names.append(kang)
+    if re.search(r"\bPark\b", text, re.I) and re.search(r"\b(?:Junhu|AXIOM|CRE|FQNM|doctor|PhD|patents?|invent|home|resident)\b", text, re.I):
+        names.append(park)
+    if re.search(r"who\s+(?:leads?|heads?)\s+itriX\s+(?:AI\s+)?R&D|who\s+(?:wrote|authored)\s+AXIOM", text, re.I):
+        names.append(park)
+    if re.search(r"who\s+is\s+behind\s+FQNM", text, re.I):
+        names.extend((kang, park))
+    return tuple(dict.fromkeys(names))

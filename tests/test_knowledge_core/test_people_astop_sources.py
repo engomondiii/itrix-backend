@@ -45,7 +45,7 @@ def corpus(db, settings):
 
 @pytest.mark.parametrize('name', HASHES)
 def test_exact_binary_and_paragraph_table_extraction(name):
-    path = ROOT / 'knowledge_docs/controlled_public' / name
+    path = ROOT / 'knowledge_docs/public' / name
     assert sha256(path.read_bytes()).hexdigest() == HASHES[name]
     parsed = docx.Document(path)
     loaded = load_document_text(str(path))
@@ -68,7 +68,8 @@ def test_registration_and_reingestion_are_idempotent(corpus, name):
     assert document.ingestion_status == 'COMPLETE'
     assert KnowledgeDocument.objects.filter(file_path=document.file_path).count() == 1
     assert document.is_current
-    assert document.disclosure_level == 'controlled_public'
+    assert document.disclosure_level == 'public'
+    assert document.permitted_paraphrase == 'summary'
     assert document.namespace == ('astop' if name == ASTOP else 'company')
     assert document.verified_at.date().isoformat() == policy_for(name).verified_date
     assert len(document.canonical_rule) <= 512
@@ -106,7 +107,7 @@ def test_people_retrieval_and_constraints(corpus, query, name):
     chunks = KnowledgeRetriever().retrieve(query, journey_stage='ARRIVED')
     selected = [c for c in chunks if c['document_id'] == str(corpus[name].id)]
     assert selected, query
-    assert all(c['namespace'] == 'company' and c['disclosure_level'] == 'controlled_public' for c in selected)
+    assert all(c['namespace'] == 'company' and c['disclosure_level'] == 'public' for c in selected)
     assert all(c['verified_at'].startswith('2026-09-08') for c in selected)
     prompt = _format_context(chunks)
     assert corpus[name].canonical_rule in prompt
@@ -173,3 +174,22 @@ def test_vector_alias_retrieval_uses_existing_namespaces_and_db_governance(corpu
         assert {c.kwargs['namespace'] for c in client.return_value.query.call_args_list} == {
             'company', 'astop', 'technology', 'alpha-compute', 'alpha-core', 'proofs', 'licensing'
         }
+
+@pytest.mark.parametrize('query,required', [
+    ('Who is Myungjoo Kang?', ('CEO', 'numerical analysis', 'Seoul National University')),
+    ('Who is Park Junhu?', ('project-confirmed', 'master', 'R&D')),
+    ('Did Kang invent AXIOM?', ('supervisor', 'Park', 'inventor')),
+    ('Is Park a doctor?', ('master', 'profile', 'doctorate')),
+    ('Is Kang currently KSIAM president?', ('8 Sep', 'candidate', 'auditor')),
+    ('How many patents does Park have?', ('three', 'applications', 'inventor')),
+    ('How is ASTOP different from prompt caching?', ('request', 'supervision', 'caching')),
+    ('Why not just use webhooks?', ('webhooks', 'incremental', 'events')),
+    ('Does ASTOP itself consume compute?', ('observer', 'storage', 'overhead')),
+])
+def test_retrieved_evidence_answers_the_question(corpus, query, required):
+    # Also include the existing hard facts, which take space in the final top-k.
+    call_command('sync_hard_facts', stdout=StringIO())
+    chunks = KnowledgeRetriever().retrieve(query, journey_stage='ARRIVED')
+    evidence = '\n'.join(c['text'] for c in chunks).casefold()
+    for term in required:
+        assert term.casefold() in evidence, (query, term)

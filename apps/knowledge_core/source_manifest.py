@@ -34,6 +34,7 @@ class SourcePolicy:
     verified_date: str = ""
     canonical_entities: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
+    permitted_paraphrase: str = ""
 
 
 SOURCE_MANIFEST: dict[str, SourcePolicy] = {
@@ -53,7 +54,7 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
             "Internal D-class claims automatically disclosed; preprints described as peer-reviewed validation",
             "Universal performance guarantees or applications described as granted patents",
         ),
-        namespace="company", verified_date="2026-09-08",
+        namespace="company", verified_date="2026-09-08", permitted_paraphrase="summary",
         canonical_entities=("Myungjoo Kang",),
         aliases=("Myungjoo Kang", "Kang Myungjoo", "Myung-Joo Kang", "Professor Kang", "강명주", "강명주 교수", "강명주 대표"),
     ),
@@ -74,7 +75,7 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
             "Internal D-class claims automatically disclosed; 2026 preprints described as peer-reviewed validation",
             "Universal 300× or 50× results without workload, hardware, precision, baseline and publication status",
         ),
-        namespace="company", verified_date="2026-09-08",
+        namespace="company", verified_date="2026-09-08", permitted_paraphrase="summary",
         canonical_entities=("Park Junhu",),
         aliases=("Park Junhu", "Junhu Park", "박준후", "박준후 연구원", "박준후 센터장"),
     ),
@@ -96,7 +97,7 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
             "PRISM and ASTOP are legally identical or fully equivalent implementations",
             "ASTOP is a strong fit for every sample, one-shot inference or already sufficient webhooks",
         ),
-        namespace="astop", verified_date="2026-09-16",
+        namespace="astop", verified_date="2026-09-16", permitted_paraphrase="summary",
         canonical_entities=("ASTOP", "PRISM"),
     ),
     # Current taxonomy / public explanation.
@@ -341,10 +342,11 @@ def people_sources_for(query: str) -> tuple[str, ...]:
             for alias in policy.aliases
         ):
             names.append(filename)
-    kang, park = tuple(name for name, p in SOURCE_MANIFEST.items() if p.aliases)
+    kang = "itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx"
+    park = "itriX_Knowledge_Core_Park_Junhu_v1.0.docx"
     if re.search(r"\bKang\b", text, re.I) or re.search(r"\bCEO\b.*\bitriX\b", text, re.I):
         names.append(kang)
-    if re.search(r"\bPark\b.*\b(?:Junhu|AXIOM|CRE|FQNM|doctor|PhD|patents?|invent|home|resident)\b", text, re.I):
+    if re.search(r"\bPark\b", text, re.I) and re.search(r"\b(?:Junhu|AXIOM|CRE|FQNM|doctor|PhD|patents?|invent|home|resident)\b", text, re.I):
         names.append(park)
     if re.search(r"who\s+(?:leads?|heads?)\s+itriX\s+(?:AI\s+)?R&D|who\s+(?:wrote|authored)\s+AXIOM", text, re.I):
         names.append(park)

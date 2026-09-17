@@ -350,6 +350,12 @@ class Command(BaseCommand):
                 authority, is_current, canonical_rule = source_authority_for(f.name)
                 family = technology_family_for(f.name)
                 paraphrase = paraphrase_for(disclosure)
+                policy = policy_for(f.name)
+                if policy and policy.permitted_paraphrase and disclosure in {"public", "controlled_public"}:
+                    # These authorized training sources are visitor-retrievable, but
+                    # only their approved, qualified summaries may be externalized.
+                    # Their per-source rules apply to every retrieved chunk.
+                    paraphrase = policy.permitted_paraphrase
                 governance = governance_metadata_for(f.name, disclosure)
 
                 # POSIX FORM, ALWAYS. The active-path set is also the reconciliation

@@ -41,3 +41,26 @@ def test_import_rejects_checkout_destination_and_incomplete_archive(tmp_path,set
     with ZipFile(archive,'w') as z:z.writestr('test.pdf',b'altered')
     with pytest.raises(CommandError):call_command('import_october_sources',archive=str(archive),storage_root=str(tmp_path/'private'))
     assert not KnowledgeDocument.objects.exists()
+
+
+def test_validator_requires_october_sources_and_rejects_reactivated_old_canonical(settings):
+    from io import StringIO
+    from apps.knowledge_core.models import KnowledgeChunk
+    settings.ENABLE_AI_ENGINE=False
+    settings.PINECONE_API_KEY=''
+    for filename,tier,authority,namespace in (
+        ('itrix_product_portfolio_v1_4.md','public','authoritative','company'),
+        ('astop_product_and_access_20261002.md','public','authoritative','astop'),
+        ('research_portfolio_summary_20261002.md','public','governing','technology'),
+        ('itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx','internal_only','governing','company'),
+    ):
+        doc=KnowledgeDocument.objects.create(title=filename,file_path=f'knowledge_docs/{tier}/{filename}',
+            namespace=namespace,disclosure_level=tier,source_authority=authority,is_current=True,
+            ingestion_status='COMPLETE',chunk_count=1)
+        KnowledgeChunk.objects.create(document=doc,chunk_index=0,text='Curated evidence.',namespace=namespace,vector_id=filename)
+    out=StringIO()
+    call_command('validate_knowledge_core',stdout=out)
+    assert 'Knowledge Core validation passed' in out.getvalue()
+    KnowledgeDocument.objects.create(title='old',file_path='knowledge_docs/public/itrix_product_canonical_v3_5.md',
+        namespace='company',disclosure_level='public',source_authority='legacy',is_current=True)
+    with pytest.raises(SystemExit):call_command('validate_knowledge_core',stdout=StringIO())

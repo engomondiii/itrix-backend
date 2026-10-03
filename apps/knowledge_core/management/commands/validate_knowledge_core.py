@@ -137,7 +137,7 @@ class Command(BaseCommand):
         # ── Current product doctrine ─────────────────────────────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("Canonical product source"))
         canonical = KnowledgeDocument.objects.filter(
-            file_path__icontains="itrix_product_canonical_v3_5.md",
+            file_path__icontains="itrix_product_portfolio_v1_4.md",
             is_current=True,
             source_authority="authoritative",
             ingestion_status=IngestionStatus.COMPLETE,
@@ -147,12 +147,14 @@ class Command(BaseCommand):
             doc = canonical.first()
             self.stdout.write(self.style.SUCCESS(f"  current: {doc.title} ({doc.chunk_count} chunks)"))
         else:
-            self.stdout.write(self.style.ERROR("  ! Current September v3.5 product canonical is not authoritative/current/COMPLETE + public."))
+            self.stdout.write(self.style.ERROR("  ! Current October portfolio v1.4 is not authoritative/current/COMPLETE + public."))
             problems += 1
 
         old_current = KnowledgeDocument.objects.filter(is_current=True).filter(
             Q(file_path__icontains="itrix_product_canonical_v2_4.md")
             | Q(file_path__icontains="WP_ALPHA_Compute_Core_v2.4.docx")
+            | Q(file_path__icontains="itrix_product_canonical_v3_5.md")
+            | Q(file_path__icontains="astop_prism_public_safe_v2_3.md")
         )
         if old_current.exists():
             problems += old_current.count()
@@ -173,14 +175,12 @@ class Command(BaseCommand):
                     f"  ! current public conflict ({label}): {chunk.document.file_path} chunk {chunk.chunk_index}"
                 ))
 
-        # ── September 2026 ASTOP / Sales Platform authority ─────────────────
-        self.stdout.write(self.style.MIGRATE_HEADING("September 2026 governing sources"))
+        # ── October 2026 domain authority ─────────────────
+        self.stdout.write(self.style.MIGRATE_HEADING("October 2026 governing sources"))
         required_sources = (
-            ("ASTOP_Productization_GTM_Plan_v2.3", "internal_only", "authoritative"),
-            ("itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5", "internal_only", "authoritative"),
-            ("itriX_White_Paper_v3.5", "internal_only", "authoritative"),
-            ("prism-paper-current_v2", "controlled_public", "authoritative"),
-            ("astop_prism_public_safe_v2_3", "public", "governing"),
+            ("itrix_product_portfolio_v1_4.md", "public", "authoritative"),
+            ("astop_product_and_access_20261002.md", "public", "authoritative"),
+            ("research_portfolio_summary_20261002.md", "public", "governing"),
             ("itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel", "internal_only", "governing"),
         )
         for filename, level, authority in required_sources:

@@ -39,8 +39,8 @@ class WaiverType(models.TextChoices):
 
 
 class EvaluationPackage(models.TextChoices):
-    COMPUTE = "ALPHA Compute Bottleneck Assessment", "ALPHA Compute Bottleneck Assessment"
-    CORE = "ALPHA Core Runtime Fit Assessment", "ALPHA Core Runtime Fit Assessment"
+    COMPUTE = "ALPHA Compute Bottleneck Assessment", "AXIOM Compute Bottleneck Assessment"
+    CORE = "ALPHA Core Runtime Fit Assessment", "AXIOM Core Runtime Fit Assessment"
     COMBINED = "Combined ALPHA Evaluation", "Combined ALPHA Evaluation"
 
 
@@ -62,7 +62,7 @@ class Evaluation(BaseModel):
     fee = models.CharField(max_length=120, blank=True, default="")
     timeline = models.CharField(max_length=120, blank=True, default="")
 
-    # v3.5 ALPHA Compute assessment governance. `fee` remains for compatibility;
+    # v3.5 AXIOM Compute assessment governance. `fee` remains for compatibility;
     # these fields separate the standard fee, delegated AI decision, IWL override
     # and final customer-facing treatment. No numeric fee is invented by defaults.
     separate_workload = models.TextField(blank=True, default="")

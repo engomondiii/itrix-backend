@@ -84,7 +84,7 @@ def test_registration_and_reingestion_are_idempotent(corpus, name):
     assert not document.supersedes
     for other in ('ASTOP_Productization_GTM_Plan_v2.3.docx', 'prism-paper-current_v2.pdf',
                   'astop_prism_public_safe_v2_3.md', 'ASTOP_Technical_Capabilities_Current_v0.3.1.md'):
-        assert KnowledgeDocument.objects.get(file_path__endswith='/' + other).is_current
+        assert KnowledgeDocument.objects.get(file_path__endswith='/' + other).is_current == policy_for(other).current
 
 
 PEOPLE_CASES = [

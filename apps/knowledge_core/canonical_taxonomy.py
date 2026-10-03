@@ -1,69 +1,34 @@
-"""Canonical September 2026 itriX product/technology taxonomy.
-
-This module is deliberately data-only.  It is the repository-level source used by
-system-prompt construction, hard-fact synchronization and Knowledge validation so those
-surfaces cannot drift into slightly different catalogues.
-
-Entity type and evidence status are separate axes: being a product says nothing about
-whether a workload has been validated, value-verified or made licensable.
-"""
+"""Portfolio v1.4 (2 October 2026). Legacy wire codes remain compatible."""
 from __future__ import annotations
 
-PRODUCTS: tuple[dict[str, str | bool], ...] = (
-    {
-        "code": "astop",
-        "name": "ASTOP",
-        "kind": "product",
-        "description": "Observation product that operationalizes the PRISM observation domain.",
-        "optional": False,
-    },
-    {
-        "code": "alpha_compute",
-        "name": "ALPHA Compute",
-        "kind": "product",
-        "description": "Independent software computational infrastructure product for eligible workloads.",
-        "optional": False,
-    },
-    {
-        "code": "alpha_core",
-        "name": "ALPHA Core",
-        "kind": "product",
-        "description": "Separate optional hardware product, considered only when validated software-layer evidence justifies deeper hardware implementation or acceleration.",
-        "optional": True,
-    },
+PRODUCTS = (
+    {"code": "astop", "name": "ASTOP", "kind": "product", "family": "ASTOP", "stage": "Implementation demonstrated", "description": "Observation software using PRISM to invoke reasoning on decision-relevant state changes.", "optional": False},
+    {"code": "alpha_compute", "name": "AXIOM Compute", "kind": "product", "family": "AXIOM", "stage": "Validation stage", "description": "Software for suitable structured tensor/operator workloads using AXIOM and AXIOM-TENSOR; quality, memory and speed need workload-specific validation.", "optional": False},
+    {"code": "alpha_core", "name": "AXIOM Core", "kind": "product", "family": "AXIOM", "stage": "Planned offering", "description": "Proposed dedicated hardware or IP implementing validated AXIOM structures; delivery depends on development and validation.", "optional": True},
+    {"code": "qnta_runtime", "name": "QNTA Runtime", "kind": "product", "family": "QNTA", "stage": "Feasibility demonstrated", "description": "Runtime software implementing QNTA Inference-Based Training Architecture on supported inference infrastructure with explicit numerical and state-transition control.", "optional": False},
 )
-
-TECHNOLOGIES: tuple[str, ...] = (
-    "PRISM",
-    "AXIOM",
-    "AXIOM-TENSOR",
-    "CRE",
-    "FQNM",
-    "QNTA",
-)
-
-PRODUCT_NAMES: tuple[str, ...] = tuple(str(item["name"]) for item in PRODUCTS)
-PRODUCT_CODES: tuple[str, ...] = tuple(str(item["code"]) for item in PRODUCTS)
-
+TECHNOLOGIES = ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES")
+PRODUCT_NAMES = tuple(item["name"] for item in PRODUCTS)
+PRODUCT_CODES = tuple(item["code"] for item in PRODUCTS)
 COMMERCIALIZATION_MECHANISM = "AI-Powered Sales Platform"
 INTERNAL_KNOWLEDGE_COMPONENT = "Internal AI Knowledge Core"
 
-
 def prompt_block() -> str:
-    """Return a compact deterministic taxonomy block for model system prompts."""
-    product_lines = "\n".join(
-        f"- {item['name']}: {item['description']}" for item in PRODUCTS
-    )
-    technology_lines = "\n".join(f"- {name}" for name in TECHNOLOGIES)
+    lines = "\n".join(f"- {p['name']} ({p['stage']}): {p['description']}" for p in PRODUCTS)
     return (
-        "CANONICAL SEPTEMBER 2026 TAXONOMY (entity type is deterministic):\n"
-        "PRODUCTS — the complete currently sold product catalogue:\n"
-        f"{product_lines}\n"
-        "TECHNOLOGIES — these are NOT separately sold products:\n"
-        f"{technology_lines}\n"
-        f"COMMERCIALIZATION MECHANISM: {COMMERCIALIZATION_MECHANISM}.\n"
-        "Do not list PRISM, AXIOM, AXIOM-TENSOR, CRE, FQNM or QNTA as products. "
-        "Do not omit ASTOP from an explicit complete product catalogue. "
-        "ASTOP and ALPHA are technically independent; commercial sequencing does not imply technical dependency. "
-        "Entity type is not evidence status: 'product' does not mean validated, value-verified, licensable or applicable to a particular workload."
+        "CANONICAL OCTOBER 2026 PORTFOLIO (v1.4):\n" + lines + "\n"
+        "Product families ASTOP, AXIOM and QNTA are group labels, not additional offerings. "
+        "QNTA Runtime is a product; QNTA is the abbreviated technology name. QNTA Contract and "
+        "QNTA Systems describe one technology, not separate products. QNTA Core is a future hardware "
+        "designation, not a current offering. CRE is enabling technology; FQNM and SPADES are research "
+        "assets, not required dependencies or standalone products. ALPHA Compute/Core are historical "
+        "names, replaced by AXIOM Compute/Core. Observe/represent/learn/execute are capabilities, not "
+        "a mandatory sequence. Assess each product independently; no universal speed, energy or quality claim. "
+        "Availability, disclosure and commercial scope require separate confirmation. "
+        "Never expose private application identifiers or infer granted patents. "
+        "ASTOP has individual and organization License Order routes plus protected enterprise evaluation. "
+        "Identity verification, exact LO acceptance, verified payment and entitlement must precede download. "
+        "Public Q&A stays open without identity collection. Current standard pricing is USD 20 individual "
+        "and USD 16 per seat for organizations with 2+ seats; eligible Branch discount is 10%, not stacked "
+        "with the organization discount. Production checkout availability is deployment state, not a document claim."
     )

@@ -2,8 +2,8 @@
 
 Qualification answers can reveal *signals* about a problem.  They cannot, by themselves,
 open an ASTOP/ALPHA opportunity or assign a governed product route.  Current GTM requires
-ASTOP controlled proof first where legitimately established, a separate ALPHA Compute
-qualification for a deeper workload, and ALPHA Core only after validated software-layer
+ASTOP controlled proof first where legitimately established, a separate AXIOM Compute
+qualification for a deeper workload, and AXIOM Core only after validated software-layer
 evidence supports hardware.
 
 ``route_product`` therefore returns the neutral route for this legacy Q1–Q9 surface.

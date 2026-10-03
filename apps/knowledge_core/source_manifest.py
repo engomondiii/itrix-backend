@@ -319,6 +319,49 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
 }
 
 
+# October 2026 domain-specific alignment. Raw confidential contracts, patent files and
+# QNTA mechanisms are not copied into this public repository. Hashes and dispositions
+# live in docs/source_alignment_20261003.json; approved summaries are retrievable.
+from dataclasses import replace as _replace
+
+_OCTOBER_REPLACEMENTS = {
+    "itrix_product_canonical_v3_5.md": "itrix_product_portfolio_v1_4.md",
+    "itrix_company_overview_public.md": "itrix_product_portfolio_v1_4.md",
+    "itriX_White_Paper_v3.5.docx": "itrix_product_portfolio_v1_4.md",
+    "astop_prism_public_safe_v2_3.md": "astop_product_and_access_20261002.md",
+    "ASTOP_Productization_GTM_Plan_v2.3.docx": "astop_product_and_access_20261002.md",
+    "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx": "astop_product_and_access_20261002.md",
+    "prism-paper-current_v2.pdf": "astop_product_and_access_20261002.md",
+    "AXIOM_TENSOR_QNTA_Current_Controlled.md": "research_portfolio_summary_20261002.md",
+}
+for _old, _replacement in _OCTOBER_REPLACEMENTS.items():
+    SOURCE_MANIFEST[_old] = _replace(SOURCE_MANIFEST[_old], authority="legacy", current=False,
+        superseded_by=_replacement, canonical_rule="Historical source retained; October source governs updated claims. " + SOURCE_MANIFEST[_old].canonical_rule)
+
+SOURCE_MANIFEST.update({
+    "itrix_product_portfolio_v1_4.md": SourcePolicy("authoritative", True,
+        "Portfolio v1.4 dated 2 October 2026; retain development stages and separately confirm availability. No private filing identifiers.",
+        (ClaimDomain.TAXONOMY, ClaimDomain.PUBLIC_EXPLANATION),
+        tuple(k for k,v in _OCTOBER_REPLACEMENTS.items() if v == "itrix_product_portfolio_v1_4.md"),
+        namespace="company", verified_date="2026-10-02", canonical_entities=("ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime")),
+    "astop_product_and_access_20261002.md": SourcePolicy("authoritative", True,
+        "White Paper v2.3 evidence; LO v2.6 overrides journey USD19/12-download examples. Identity, LO, verified payment and active entitlement gate delivery. No live-service claims without deployment evidence.",
+        (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.COMMERCIALIZATION, ClaimDomain.RESEARCH, ClaimDomain.LEGAL),
+        tuple(k for k,v in _OCTOBER_REPLACEMENTS.items() if v == "astop_product_and_access_20261002.md"),
+        namespace="astop", canonical_entities=("ASTOP", "PRISM"), permitted_paraphrase="summary"),
+    "research_portfolio_summary_20261002.md": SourcePolicy("governing", True,
+        "Bounded research summary; no raw patent identifiers, protected QNTA mechanisms, grant or universal performance inference.",
+        (ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH, ClaimDomain.LEGAL),
+        namespace="technology", canonical_entities=("AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "SPADES", "QNTA"), permitted_paraphrase="summary"),
+})
+_comparative = "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx"
+SOURCE_MANIFEST[_comparative] = _replace(SOURCE_MANIFEST[_comparative], canonical_rule=(
+    "Comparative source dated 16 September 2026: Anthropic request/model layer, SoL-Pi harness/trajectory layer, ASTOP/PRISM observation layer. "
+    "Separate software, harness and observation effects; do not multiply savings or infer universal customer results. "
+    "October White Paper v2.3 governs latest benchmark values; 51.9–84.5% here is historical. Preserve product/technology distinctions."
+))
+
+
 def policy_for(filename: str) -> SourcePolicy | None:
     """Return explicit policy using case-insensitive basename matching."""
     folded = filename.casefold()

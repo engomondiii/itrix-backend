@@ -16,7 +16,7 @@ Enum design (Backend v3) and the dashboard contract:
 * **LeadActivity types (11)** — dashboard's 10 (incl. ``meeting``) + ``paid_eval`` companion.
 * **product_route / commercial_path** — stored as canonical codes
   (``alpha_compute`` / ``non_exclusive`` …) and serialized to the dashboard's display
-  strings ("ALPHA Compute" / "Non-Exclusive") by the serializer.
+  strings ("AXIOM Compute" / "Non-Exclusive") by the serializer.
 """
 
 from __future__ import annotations
@@ -79,8 +79,8 @@ class SpecialRights(models.TextChoices):
 class ProductRouteCode(models.TextChoices):
     UNDETERMINED = "undetermined", "Not yet assessed"
     ASTOP = "astop", "ASTOP"
-    ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
-    ALPHA_CORE = "alpha_core", "ALPHA Core"
+    ALPHA_COMPUTE = "alpha_compute", "AXIOM Compute"
+    ALPHA_CORE = "alpha_core", "AXIOM Core"
     # Historical compatibility codes. New discovery-stage records must not use these as
     # a shortcut for qualification.
     BOTH = "both", "Multiple products (legacy)"
@@ -91,8 +91,8 @@ class CommercialStage(models.TextChoices):
     DISCOVERY = "discovery", "Discovery"
     SALES_PLATFORM = "sales_platform", "AI-Powered Sales Platform"
     ASTOP = "astop", "ASTOP"
-    ALPHA_COMPUTE = "alpha_compute", "ALPHA Compute"
-    ALPHA_CORE = "alpha_core", "ALPHA Core"
+    ALPHA_COMPUTE = "alpha_compute", "AXIOM Compute"
+    ALPHA_CORE = "alpha_core", "AXIOM Core"
 
 
 class TrustStatus(models.TextChoices):
@@ -113,11 +113,11 @@ class CommercialPathCode(models.TextChoices):
 PRODUCT_ROUTE_DISPLAY = {
     "undetermined": "Not yet assessed",
     "astop": "ASTOP",
-    "alpha_compute": "ALPHA Compute",
-    "alpha_core": "ALPHA Core",
+    "alpha_compute": "AXIOM Compute",
+    "alpha_core": "AXIOM Core",
     "both": "Multiple products",
     # Historical neutral/general rows are deliberately presented as unassessed; they
-    # must never masquerade as an ALPHA Compute qualification.
+    # must never masquerade as an AXIOM Compute qualification.
     "general": "Not yet assessed",
     "": "Not yet assessed",
 }

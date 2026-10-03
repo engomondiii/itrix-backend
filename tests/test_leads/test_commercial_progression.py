@@ -416,18 +416,18 @@ def test_serializer_preserves_zero_null_and_separate_estimate_fields():
     assert serializer.validated_data["estimated_savings"]["value"] is None
 
 
-def test_alpha_compute_gate_requires_verified_astop_and_separate_workload():
+def test_alpha_compute_gate_requires_separate_workload_without_astop_dependency():
     lead = _verified_lead()
     ASTOPEngagement.objects.create(lead=lead, stage=ASTOPStage.LO_DEPLOYMENT)
     decision = alpha_compute_gate(lead, separate_workload="", technical_route="axiom_tensor")
     assert decision.allowed is False
-    assert "astop_verified_value_required" in decision.reasons
+    assert "astop_verified_value_required" not in decision.reasons
     assert "separate_workload_required" in decision.reasons
 
 
 def test_alpha_compute_gate_allows_fully_governed_case():
     lead = _verified_lead()
-    _verified_astop(lead)
+    # An independently qualified workload does not require ASTOP.
     decision = alpha_compute_gate(
         lead,
         separate_workload="Separate tensor workload",

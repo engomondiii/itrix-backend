@@ -13,7 +13,7 @@ logger = logging.getLogger("itrix")
 
 @receiver(post_save, sender=Evaluation, dispatch_uid="evaluations.alpha_fee_policy_orchestration")
 def orchestrate_new_alpha_assessment(sender, instance: Evaluation, created: bool, **kwargs) -> None:
-    """Wire every newly-created governed ALPHA Compute assessment to policy once.
+    """Wire every newly-created governed AXIOM Compute assessment to policy once.
 
     Legacy/general Evaluation rows have no separate_workload/technical route and are left
     alone. The hook runs only on create, so the decision service's own save cannot recurse.

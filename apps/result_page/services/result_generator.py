@@ -205,8 +205,8 @@ def _alpha_fit(snapshot, profile) -> str:
     focus = profile.focus or _t(snapshot, "the bounded workload and its decision criteria", "제한된 워크로드와 의사결정 기준")
     return _t(
         snapshot,
-        f"For {focus}, itriX would first examine whether the selected workload reaches the existing execution stack in a computational representation that creates avoidable work. ALPHA Compute defines the representation hypothesis and can be evaluated on the existing software/hardware path; ALPHA Core is a separate, optional execution-validation path only when evidence justifies deeper implementation. No fit, no measurable advantage, or a conventional substitution being better are valid outcomes.",
-        f"{focus}에 대해 itriX는 먼저 선택한 워크로드가 기존 실행 스택에 전달되는 계산 표현 때문에 불필요한 작업을 만드는지 확인합니다. ALPHA Compute는 표현 가설을 정의하고 기존 소프트웨어/하드웨어 경로에서 검증할 수 있습니다. ALPHA Core는 증거가 더 깊은 구현 검증을 정당화할 때만 별도로 검토하는 선택적 실행 검증 경로입니다. 적합하지 않음, 측정 가능한 이점 없음, 또는 기존 대체 방식이 더 나음도 유효한 결과입니다.",
+        f"For {focus}, itriX would first examine whether the selected workload reaches the existing execution stack in a computational representation that creates avoidable work. AXIOM Compute defines the representation hypothesis and can be evaluated on the existing software/hardware path; AXIOM Core is a separate, optional execution-validation path only when evidence justifies deeper implementation. No fit, no measurable advantage, or a conventional substitution being better are valid outcomes.",
+        f"{focus}에 대해 itriX는 먼저 선택한 워크로드가 기존 실행 스택에 전달되는 계산 표현 때문에 불필요한 작업을 만드는지 확인합니다. AXIOM Compute는 표현 가설을 정의하고 기존 소프트웨어/하드웨어 경로에서 검증할 수 있습니다. AXIOM Core는 증거가 더 깊은 구현 검증을 정당화할 때만 별도로 검토하는 선택적 실행 검증 경로입니다. 적합하지 않음, 측정 가능한 이점 없음, 또는 기존 대체 방식이 더 나음도 유효한 결과입니다.",
     )
 
 

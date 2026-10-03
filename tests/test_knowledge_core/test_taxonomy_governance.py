@@ -13,16 +13,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_canonical_entity_types_are_deterministic():
-    assert PRODUCT_NAMES == ("ASTOP", "ALPHA Compute", "ALPHA Core")
-    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "QNTA")
+    assert PRODUCT_NAMES == ("ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime")
+    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES")
     block = prompt_block()
-    assert "PRODUCTS — the complete currently sold product catalogue" in block
-    assert "ASTOP" in block and "ALPHA Compute" in block and "ALPHA Core" in block
-    assert "these are NOT separately sold products" in block
+    assert "CANONICAL OCTOBER 2026 PORTFOLIO" in block
+    assert "ASTOP" in block and "AXIOM Compute" in block and "AXIOM Core" in block
+    assert "not separate products" in block
 
 
 def test_current_v35_canonical_is_current_and_old_v24_is_explicitly_noncurrent():
-    current = policy_for("itrix_product_canonical_v3_5.md")
+    current = policy_for("itrix_product_portfolio_v1_4.md")
     old = policy_for("itrix_product_canonical_v2_4.md")
     assert current is not None and current.current is True and current.authority == "authoritative"
     assert ClaimDomain.TAXONOMY in current.claim_domains
@@ -46,25 +46,22 @@ def test_claim_domain_precedence_prefers_taxonomy_source_for_product_question():
 
 
 def test_current_public_canonical_contains_all_products_and_separates_technologies():
-    text = (ROOT / "knowledge_docs/public/itrix_product_canonical_v3_5.md").read_text()
+    text = (ROOT / "knowledge_docs/public/itrix_product_portfolio_v1_4.md").read_text()
     for product in PRODUCT_NAMES:
         assert product in text
     for technology in TECHNOLOGIES:
         assert technology in text
-    assert "They are not separately sold products" in text
+    assert "not additional products" in text
     assert current_public_conflicts(text) == []
 
 
 def test_validator_detects_positive_obsolete_public_doctrine():
     cases = {
         "itriX currently has only two products: ALPHA Compute and ALPHA Core.": "two-product public catalogue",
-        "The complete products are ALPHA Compute and ALPHA Core.": "complete product catalogue omits ASTOP",
+        "The complete products are AXIOM Compute and AXIOM Core.": "complete product catalogue omits ASTOP",
         "Products are AXIOM, CRE and ALPHA Compute.": "technology classified as sold product",
-        "ASTOP is self-service for public visitors.": "ASTOP self-service claim",
         "Choose ASTOP Pro for $499 per month.": "obsolete ASTOP tier model",
-        "ASTOP checkout lets you buy the product online.": "ASTOP public checkout",
         "Public visitors can download the ASTOP production binary.": "public unrestricted executable access",
-        "ASTOP includes a money-back guarantee.": "obsolete money-back guarantee",
     }
     for text, expected in cases.items():
         assert expected in current_public_conflicts(text), text
@@ -244,3 +241,10 @@ def test_alpha_product_names_are_taxonomy_queries_for_source_precedence():
     domains = _query_claim_domains('Does ALPHA Compute require ALPHA Core?')
     assert ClaimDomain.TAXONOMY in domains
     assert ClaimDomain.PUBLIC_EXPLANATION in domains
+
+
+def test_october_checkout_is_allowed_without_unrestricted_delivery():
+    assert current_public_conflicts("ASTOP checkout requires verified identity, LO acceptance and payment.") == []
+    assert current_public_conflicts("Products include AXIOM Compute, AXIOM Core and QNTA Runtime.") == []
+    assert policy_for("itrix_product_canonical_v3_5.md").current is False
+    assert policy_for("astop_prism_public_safe_v2_3.md").current is False

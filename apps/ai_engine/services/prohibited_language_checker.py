@@ -46,7 +46,7 @@ CANONICAL_SUBSTITUTIONS = [
 # IMPORTANT: the methodology phrase "benchmarked against an agreed baseline" is NOT a
 # performance claim and appears naturally in ALPHA's proof discipline.  Treating the
 # words "benchmarked against" themselves as a hard block caused ordinary, grounded
-# product explanations (for example "Go deeper on ALPHA Compute") to be replaced by
+# product explanations (for example "Go deeper on AXIOM Compute") to be replaced by
 # the indefinite specialist-review notice.  Quantified comparisons remain blocked here;
 # named-competitor comparisons are separately blocked by the stream guard.
 HARD_BLOCK_PATTERNS = [

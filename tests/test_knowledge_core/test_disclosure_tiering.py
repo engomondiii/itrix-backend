@@ -123,7 +123,7 @@ def test_combined_axiom_tensor_qnta_source_is_not_collapsed_to_one_family():
     metadata = entity_relationship_metadata_for(filename)
     assert metadata["technology_families"] == ["axiom_tensor", "qnta"]
     assert metadata["canonical_entities"] == ["AXIOM-TENSOR", "QNTA"]
-    assert metadata["related_products"] == ["ALPHA Compute"]
+    assert metadata["related_products"] == ["AXIOM Compute"]
 
 
 def test_prism_to_astop_relationship_is_explicit_metadata():
@@ -145,7 +145,7 @@ def test_vector_metadata_carries_entities_products_and_multiple_families(db):
         technology_family="cross_cutting",
         technology_families=["axiom_tensor", "qnta"],
         canonical_entities=["AXIOM-TENSOR", "QNTA"],
-        related_products=["ALPHA Compute"],
+        related_products=["AXIOM Compute"],
     )
     chunk = KnowledgeChunk(
         document=document,
@@ -158,4 +158,4 @@ def test_vector_metadata_carries_entities_products_and_multiple_families(db):
     metadata = build_chunk_metadata(document=document, chunk=chunk)
     assert metadata["technology_families"] == ["axiom_tensor", "qnta"]
     assert metadata["canonical_entities"] == ["AXIOM-TENSOR", "QNTA"]
-    assert metadata["related_products"] == ["ALPHA Compute"]
+    assert metadata["related_products"] == ["AXIOM Compute"]

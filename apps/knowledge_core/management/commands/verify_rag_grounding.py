@@ -11,8 +11,8 @@ from apps.ai_engine.services.knowledge_retriever import (
 
 
 DEFAULT_QUESTION = (
-    "What are ALPHA Compute and ALPHA Core, and can ALPHA Compute deploy in "
-    "production without ALPHA Core?"
+    "What are AXIOM Compute and AXIOM Core, and can AXIOM Compute deploy in "
+    "production without AXIOM Core?"
 )
 
 

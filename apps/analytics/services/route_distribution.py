@@ -16,8 +16,8 @@ def route_distribution(*, since=None) -> dict:
     dist = {
         "Not yet assessed": 0,
         "ASTOP": 0,
-        "ALPHA Compute": 0,
-        "ALPHA Core": 0,
+        "AXIOM Compute": 0,
+        "AXIOM Core": 0,
         "Multiple products": 0,
     }
     qs = Lead.objects.all()

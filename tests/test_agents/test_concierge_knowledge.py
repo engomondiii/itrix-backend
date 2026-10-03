@@ -237,11 +237,11 @@ def test_brand_core_rejects_retired_split_and_anchors_current_taxonomy():
     from apps.ai_engine.services.system_prompt_builder import _BRAND_CORE
 
     assert "representation diagnosis — the adoption wedge" not in _BRAND_CORE
-    assert "ALPHA Core (runtime/execution)" not in _BRAND_CORE
+    assert "AXIOM Core (runtime/execution)" not in _BRAND_CORE
     assert "use only the supplied KNOWLEDGE CONTEXT, the canonical taxonomy below" in _BRAND_CORE
-    assert "PRODUCTS — the complete currently sold product catalogue" in _BRAND_CORE
-    assert "ASTOP" in _BRAND_CORE and "ALPHA Compute" in _BRAND_CORE and "ALPHA Core" in _BRAND_CORE
-    assert "TECHNOLOGIES — these are NOT separately sold products" in _BRAND_CORE
+    assert "CANONICAL OCTOBER 2026 PORTFOLIO" in _BRAND_CORE
+    assert "ASTOP" in _BRAND_CORE and "AXIOM Compute" in _BRAND_CORE and "AXIOM Core" in _BRAND_CORE
+    assert "QNTA Runtime is a product" in _BRAND_CORE
     assert "Prefer current higher-authority sources" in _BRAND_CORE
 
 
@@ -252,7 +252,7 @@ def test_context_labels_current_canonical_sources_for_the_model():
             {
                 "document_title": "itriX Product Canonical v3.5",
                 "heading": "Canonical Product Taxonomy",
-                "text": "itriX currently has three products: ASTOP, ALPHA Compute and ALPHA Core.",
+                "text": "itriX currently has three products: ASTOP, AXIOM Compute and AXIOM Core.",
                 "canonical_priority": 100,
                 "retrieval_backend": "pinecone",
             }

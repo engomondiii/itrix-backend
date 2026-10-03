@@ -27,7 +27,7 @@ from apps.knowledge_core.management.commands.register_knowledge_docs import FOLD
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NEGATION = re.compile(r"\b(?:not|never|no|does\s+not|do\s+not|is\s+not|isn't|cannot|can't|without)\b", re.I)
-_TECH_ENTITY = r"(?:PRISM|AXIOM(?:-TENSOR)?|CRE|FQNM|QNTA)"
+_TECH_ENTITY = r"(?:PRISM|AXIOM(?:-TENSOR)?(?![-\w]|\s+(?:Compute|Core))|CRE|FQNM|QNTA(?!\s+Runtime))"
 
 
 def current_public_conflicts(text: str) -> list[str]:
@@ -49,25 +49,20 @@ def current_public_conflicts(text: str) -> list[str]:
         problems.append("technology classified as sold product")
 
     if re.search(r"(?:complete|current|all)\s+(?:itrix\s+)?products?|what does itrix actually sell", value, re.I | re.S):
-        if "ALPHA Compute" in value and "ALPHA Core" in value and "ASTOP" not in value:
+        if "AXIOM Compute" in value and "AXIOM Core" in value and "ASTOP" not in value:
             problems.append("complete product catalogue omits ASTOP")
 
     for sentence in _SENTENCE_SPLIT.split(value):
         sentence = sentence.strip()
         if not sentence or _NEGATION.search(sentence):
             continue
-        if re.search(r"\bASTOP\b.{0,80}\bself[- ]service\b|\bself[- ]service\b.{0,80}\bASTOP\b", sentence, re.I):
-            problems.append("ASTOP self-service claim")
         if re.search(r"\bASTOP\s+(?:Team|Pro|Business|Enterprise)\b", sentence, re.I):
             problems.append("obsolete ASTOP tier model")
         if re.search(r"\$(?:99|499|12(?:,?000)|100(?:,?000))\b", sentence) and re.search(r"\b(?:ASTOP|Team|Pro|Business|Enterprise|price|pricing|plan|tier)\b", sentence, re.I):
             problems.append("obsolete public ASTOP pricing")
-        if re.search(r"\b(?:buy|purchase|checkout)\b.{0,100}\bASTOP\b|\bASTOP\b.{0,100}\b(?:buy|purchase|checkout)\b", sentence, re.I):
-            problems.append("ASTOP public checkout")
         if re.search(r"\b(?:public|anonymous|anyone|visitor)\b.{0,120}\b(?:executable|binary|download|installer)\b", sentence, re.I):
             problems.append("public unrestricted executable access")
-        if re.search(r"\b(?:money[- ]back|refund)\s+guarantee\b", sentence, re.I):
-            problems.append("obsolete money-back guarantee")
+
 
     # Stable order and no duplicate labels when one chunk repeats the same doctrine.
     return list(dict.fromkeys(problems))

@@ -587,7 +587,7 @@ def _technical_brief(thread) -> dict:
             "boundedHypothesis": "가설 — 추가 컴퓨트 자원을 전제하기 전에 표현·데이터 이동·실행 경계를 검토할 가치가 있을 수 있습니다. 이는 진단이 아닙니다.",
             "kpis": ["워크로드별 지연시간/처리량", "전력·열·메모리 경계", "기존 기준선 대비 검증 가능한 결과"],
             "proofPlan": ["기준선 고정", "대표 입력과 환경 고정", "성공·부분·부정 결과 기준 사전 합의", "동일 조건에서 결과 검토"],
-            "unknowns": ["적용 가능한 itriX 방법군은 기술 검토 전 확정하지 않습니다.", "ALPHA Core는 ALPHA Compute 가설이 검증되고 추가 실행 계층의 가치가 증거로 뒷받침될 때만 검토합니다."],
+            "unknowns": ["적용 가능한 itriX 방법군은 기술 검토 전 확정하지 않습니다.", "AXIOM Core는 AXIOM Compute 가설이 검증되고 추가 실행 계층의 가치가 증거로 뒷받침될 때만 검토합니다."],
         }
     return {
         "kind": "technical_brief",
@@ -598,7 +598,7 @@ def _technical_brief(thread) -> dict:
         "boundedHypothesis": "Hypothesis — representation, data-movement or execution boundaries may be worth examining before assuming more compute is the answer. This is not a diagnosis.",
         "kpis": ["Workload-specific latency/throughput", "Power, thermal and memory boundaries", "Verifiable result against the frozen baseline"],
         "proofPlan": ["Freeze the baseline", "Freeze representative inputs and environment", "Pre-agree pass/partial/negative criteria", "Review results under like-for-like conditions"],
-        "unknowns": ["No itriX method family is assigned before technical applicability is established.", "ALPHA Core is considered only after an ALPHA Compute hypothesis is validated and evidence supports value at a deeper execution layer."],
+        "unknowns": ["No itriX method family is assigned before technical applicability is established.", "AXIOM Core is considered only after an AXIOM Compute hypothesis is validated and evidence supports value at a deeper execution layer."],
     }
 
 
@@ -612,7 +612,7 @@ def _product_brief(thread) -> dict:
             "userImpact": c["pressure"] or "최종 사용자 영향은 아직 측정되지 않았습니다.",
             "tradeoffs": ["기능 확장과 지연시간/전력/열/비용 예산의 균형", "평균값뿐 아니라 지속 성능과 꼬리 지연시간 검토"],
             "evidenceNeeded": ["제품 경험 기준 KPI", "대표 사용 시나리오", "지속 동작 조건과 실패 기준"],
-            "deploymentImplications": "검증 결과가 나오기 전에는 하드웨어 교체, ALPHA Core 또는 상용 전환을 전제하지 않습니다.",
+            "deploymentImplications": "검증 결과가 나오기 전에는 하드웨어 교체, AXIOM Core 또는 상용 전환을 전제하지 않습니다.",
             "nextDecision": c["decision"] or "어떤 제품·플랫폼 결정을 이 검토가 지원해야 하는지 확인합니다.",
         }
     return {
@@ -622,7 +622,7 @@ def _product_brief(thread) -> dict:
         "userImpact": c["pressure"] or "End-user impact has not yet been measured.",
         "tradeoffs": ["Capability growth versus latency, energy, thermal and cost budgets", "Sustained performance and tail latency, not averages alone"],
         "evidenceNeeded": ["Product-experience KPI", "Representative usage scenario", "Sustained operating conditions and failure criteria"],
-        "deploymentImplications": "Do not assume hardware replacement, ALPHA Core or commercial transfer before evidence supports it.",
+        "deploymentImplications": "Do not assume hardware replacement, AXIOM Core or commercial transfer before evidence supports it.",
         "nextDecision": c["decision"] or "Confirm which product or platform decision this review should support.",
     }
 
@@ -638,7 +638,7 @@ def _boundary_waste_map(thread) -> dict:
     is WORTH is what the PoC exists to answer.
     """
     return {
-        "title": "Your ALPHA Compute Assessment",
+        "title": "Your AXIOM Compute Assessment",
         "intro": (
             "This holds the whole assessment: what we took in, the baseline we agreed, "
             "the Boundary Waste Map of your workload, technical feasibility, the "

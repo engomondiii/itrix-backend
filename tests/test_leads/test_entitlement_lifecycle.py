@@ -232,7 +232,7 @@ def test_revocation_is_terminal_audited_and_idempotent():
         update_astop_entitlement(lead, action="activate")
 
 
-def test_revoked_entitlement_blocks_alpha_compute_progression():
+def test_revoked_astop_entitlement_does_not_block_independent_compute_qualification():
     lead, _record = _verified_record()
     update_astop_entitlement(lead, action="revoke", reason="Access withdrawn")
 
@@ -242,9 +242,9 @@ def test_revoked_entitlement_blocks_alpha_compute_progression():
         technical_route="axiom_tensor",
     )
 
-    assert decision.allowed is False
-    assert "active_entitlement_required" in decision.reasons
-    assert "entitlement_revoked_or_suspended" in decision.reasons
+    assert decision.allowed is True
+    assert "active_entitlement_required" not in decision.reasons
+    assert "entitlement_revoked_or_suspended" not in decision.reasons
 
 
 def test_generic_astop_progress_cannot_write_terminal_entitlement_states():

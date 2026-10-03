@@ -91,6 +91,7 @@ def api_index(_request):
 
 
 urlpatterns = [
+    path("commerce/", include("apps.commerce.urls")),
     path("", api_index, name="api-v1-index"),
     # ── Phase 1 — Foundation, Identity & Public Intake ───────────────────────
     path("auth/", include("apps.authentication.urls")),

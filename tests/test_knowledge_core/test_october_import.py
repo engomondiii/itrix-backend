@@ -52,7 +52,13 @@ def test_validator_requires_october_sources_and_rejects_reactivated_old_canonica
         ('itrix_product_portfolio_v1_4.md','public','authoritative','company'),
         ('astop_product_and_access_20261002.md','public','authoritative','astop'),
         ('research_portfolio_summary_20261002.md','public','governing','technology'),
-        ('itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx','internal_only','governing','company'),
+        ('platform_governance_current_20261003.md','internal_only','governing','company'),
+        ('astop_customer_journey_20261003.md','public','governing','astop'),
+        ('astop_license_order_summary_v2_6.md','public','governing','astop'),
+        ('astop_branch_program_summary_v1_4.md','public','governing','astop'),
+        ('astop_comparison_current_20261003.md','public','authoritative','astop'),
+        ('astop_software_protection_v1_5.md','internal_only','governing','astop'),
+        ('research_evidence_register_20261003.md','controlled_public','governing','technology'),
     ):
         doc=KnowledgeDocument.objects.create(title=filename,file_path=f'knowledge_docs/{tier}/{filename}',
             namespace=namespace,disclosure_level=tier,source_authority=authority,is_current=True,
@@ -64,3 +70,11 @@ def test_validator_requires_october_sources_and_rejects_reactivated_old_canonica
     KnowledgeDocument.objects.create(title='old',file_path='knowledge_docs/public/itrix_product_canonical_v3_5.md',
         namespace='company',disclosure_level='public',source_authority='legacy',is_current=True)
     with pytest.raises(SystemExit):call_command('validate_knowledge_core',stdout=StringIO())
+
+
+def test_catalogue_validator_keeps_adjacent_technology_statement_separate():
+    from apps.knowledge_core.management.commands.validate_knowledge_core import current_public_conflicts
+    assert not current_public_conflicts(
+        "Current products are ASTOP, AXIOM Compute, AXIOM Core and QNTA Runtime. "
+        "CRE is enabling technology; FQNM and SPADES are research assets.")
+    assert "technology classified as sold product" in current_public_conflicts("Our products are CRE and FQNM.")

@@ -21,13 +21,13 @@ def test_canonical_entity_types_are_deterministic():
     assert "not separate products" in block
 
 
-def test_current_v35_canonical_is_current_and_old_v24_is_explicitly_noncurrent():
+def test_october_canonical_supersedes_both_old_product_canonicals():
     current = policy_for("itrix_product_portfolio_v1_4.md")
     old = policy_for("itrix_product_canonical_v2_4.md")
     assert current is not None and current.current is True and current.authority == "authoritative"
     assert ClaimDomain.TAXONOMY in current.claim_domains
     assert old is not None and old.current is False and old.authority == "legacy"
-    assert old.superseded_by == "itrix_product_canonical_v3_5.md"
+    assert old.superseded_by == "itrix_product_portfolio_v1_4.md"
 
 
 def test_filename_word_canonical_does_not_grant_authority():

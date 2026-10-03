@@ -22,11 +22,10 @@ from apps.knowledge_core.source_manifest import people_sources_for, policy_for
 ROOT = Path(__file__).resolve().parents[2]
 KANG = 'itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx'
 PARK = 'itriX_Knowledge_Core_Park_Junhu_v1.0.docx'
-ASTOP = 'itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx'
+ASTOP = 'astop_comparison_current_20261003.md'
 HASHES = {
     KANG: 'abc65cc135a0a50da98843cdb1185c9fd8c318381a88f94ba6af5032f0eafa3c',
     PARK: 'e7fd10d47e8050b5aabeff5204e7d770a1452ac6a7915fce8358d2289eab1c97',
-    ASTOP: 'a5c91a732e38e53a2dab57a3d43825b4a18b2b60407e21bff7040bf1ec6c4764',
 }
 
 
@@ -35,7 +34,7 @@ def corpus(db, settings):
     settings.ENABLE_AI_ENGINE = False
     call_command('register_knowledge_docs', stdout=StringIO())
     docs = {}
-    for name in (*HASHES, 'itrix_product_canonical_v3_5.md', 'astop_prism_public_safe_v2_3.md'):
+    for name in (*HASHES, ASTOP, 'itrix_product_portfolio_v1_4.md', 'astop_product_and_access_20261002.md'):
         document = KnowledgeDocument.objects.get(file_path__endswith='/' + name)
         result = ingest_document(document)
         assert result.ok, result.error
@@ -84,7 +83,10 @@ def test_registration_and_reingestion_are_idempotent(corpus, name):
     assert not document.supersedes
     for other in ('ASTOP_Productization_GTM_Plan_v2.3.docx', 'prism-paper-current_v2.pdf',
                   'astop_prism_public_safe_v2_3.md', 'ASTOP_Technical_Capabilities_Current_v0.3.1.md'):
-        assert KnowledgeDocument.objects.get(file_path__endswith='/' + other).is_current == policy_for(other).current
+        if policy_for(other).current:
+            assert KnowledgeDocument.objects.get(file_path__endswith='/' + other).is_current
+        else:
+            assert not KnowledgeDocument.objects.filter(file_path__endswith='/' + other, is_current=True).exists()
 
 
 PEOPLE_CASES = [
@@ -130,7 +132,7 @@ def test_astop_comparison_retrieval_and_constraints(corpus, query):
     selected = [c for c in chunks if c['document_id'] == str(corpus[ASTOP].id)]
     assert selected, query
     assert all(c['namespace'] == 'astop' for c in selected)
-    assert all(c['verified_at'].startswith('2026-09-16') for c in selected)
+    assert all(c['verified_at'].startswith('2026-10-03') for c in selected)
     prompt = _format_context(chunks)
     assert corpus[ASTOP].canonical_rule in prompt
     for boundary in corpus[ASTOP].prohibited_messages:

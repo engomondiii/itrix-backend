@@ -1,7 +1,7 @@
 # iTrix Technology Deep-Dive — NDA Only
 
 ## Secret
-Under NDA, the deeper explanation of the approach can be shared: how the mapping engine
+Only after both an applicable NDA and explicit content authorization, an approved deeper explanation may be shared: how the mapping engine
 identifies eligible structure in a workload, and how the routing decision is made. This
 material is disclosure-gated and never appears in public payloads.
 

@@ -42,7 +42,7 @@ def build_problem_mirror(*, prompt: str, pressures: list[str], product_route: st
     elif product_route == "both":
         frame = (
             " That pattern usually sits across both how the problem is represented and how it "
-            "executes — which is exactly where ALPHA looks first."
+            "executes — which is exactly where AXIOM looks first."
         )
     else:
         frame = (

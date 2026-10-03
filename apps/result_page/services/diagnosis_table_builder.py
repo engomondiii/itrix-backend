@@ -2,7 +2,7 @@
 Diagnosis-table builder.
 
 Builds ``diagnosis`` — one row per pressure area the visitor selected, each with the
-observation, itriX's interpretation, and the ALPHA role. Matches the web ``DiagnosisRow``
+observation, itriX's interpretation, and the AXIOM role. Matches the web ``DiagnosisRow``
 type: ``{pressure, observation, itrixInterpretation, alphaRole}``. Deterministic; the AI
 path may replace this with a richer version, falling back to this when absent.
 """
@@ -24,7 +24,7 @@ _DIAGNOSIS = {
     "energy": {
         "observation": "Power or cooling is a binding constraint on how much you can run.",
         "itrixInterpretation": "Energy per useful result is a function of representation efficiency, not only of the chip.",
-        "alphaRole": "ALPHA looks for representations that need fewer operations per result.",
+        "alphaRole": "AXIOM looks for representations that need fewer operations per result.",
     },
     "stability_accuracy": {
         "observation": "Numerical stability or accuracy degrades as the problem scales.",

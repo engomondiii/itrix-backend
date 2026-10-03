@@ -23,7 +23,7 @@ This change reconciles the old itriX archive, the new archive and the knowledge 
 
 Three public, bounded summaries are added: `itrix_product_portfolio_v1_4.md`, `astop_product_and_access_20261002.md`, `research_portfolio_summary_20261002.md`. These are editorial derivatives, not replacements falsely represented as byte-identical originals. Source hashes identify their inputs. The exact confidential originals must remain in approved private storage. `import_october_sources --archive <new-documents.zip> --storage-root <private-directory> --dry-run` validates every supported original against the reviewed hashes. Without `--dry-run`, it writes exact bytes outside the Git checkout and registers internal-only originals; patent specifications and the unsupported strategy deck are prohibited from embedding. It makes no embedding or public-disclosure call. Use an approved private volume for deployment.
 
-The source manifest marks the September product canonical, company overview, White Paper v3.5, old ASTOP summary/GTM, MVP guide v3.5, older PRISM paper and combined controlled AXIOM-TENSOR/QNTA summary noncurrent for retrieval. Files are retained for traceability rather than destructively deleted. Existing registration removes stale SQL chunks; existing namespace reconciliation removes stale vector entries. The comparative document remains useful for request/harness/observation distinctions, with its older benchmark explicitly historical. Other technical and legal baseline material remains unchanged where no replacement exists.
+The follow-up physically replaces/removes 35 older source files, adds 13 current/revised editions and edits six retained guides. The active corpus contains 31 sources; no retired source copy remains inside an ingestion folder. `knowledge_cleanup_20261003.json` records all paths and hashes and `knowledge_docs/README.md` maps current subjects to files. The manifest retains noncurrent tombstones so historical rows or copied old files cannot silently restore obsolete doctrine. Existing registration removes stale SQL chunks; all-namespace reconciliation removes stale remote vectors. The original ASTOP comparative DOCX is replaced by a curated comparison retaining request/harness/observation distinctions and historical benchmark context. Both exact people DOCXs, the Atelier Indigo design DOCX and dated enterprise acceptance feedback DOCX remain unchanged. Six revised baseline editions preserve technical overviews, the shared representation framework, workload/bottleneck guidance and platform operating controls. The cleanup audit distinguishes replacement/consolidation from removal without a direct replacement.
 
 Product families are not extra products. CRE is enabling technology; FQNM and SPADES are research assets. QNTA Core is a future designation. Observe/represent/learn/execute are not mandatory customer stages. Independent AXIOM qualification no longer requires prior ASTOP value; workload, identity, NDA and commercial gates still apply to the existing protected assessment flow.
 
@@ -49,9 +49,9 @@ Activation/build signing, native binary enforcement, provider tax treatment, com
 
 ## Manual rollout after review
 
-1. Review and merge coordinated backend, public-web and staff-dashboard PRs. Backend goes first; frontend unavailable states tolerate commerce not being configured.
+1. Review and merge the backend and public-web PRs. The staff dashboard is owned by a separate teammate and is outside this change. Backend goes first; frontend unavailable states tolerate commerce not being configured.
 2. Back up the production database and index. Apply migrations. Existing customer IDs, ALPHA wire codes and authentication mechanisms are unchanged. Display-choice migrations do not rewrite customer data.
-3. Run `register_knowledge_docs`, `sync_hard_facts`, `sync_evidence_metadata`, then the existing scoped `reingest_namespace` procedure for affected company/astop/technology namespaces. Use its dry-run first; inspect obsolete vector removal before committing the index changes. Run `validate_knowledge_core`, `verify_rag_grounding` and `verify_ai_answer` in the approved environment. No production calls were made while authoring this PR.
+3. Run `register_knowledge_docs`, `sync_hard_facts`, `sync_evidence_metadata`, then `reingest_namespace --all --dry-run` followed by the reviewed `reingest_namespace --all` reconciliation. Retired files occupied other historical namespaces too; inspect obsolete vector removal before committing the index changes. Run `validate_knowledge_core`, `verify_rag_grounding` and `verify_ai_answer` in the approved environment. No production calls were made while authoring this PR.
 4. Verify public answers for all four offerings, bounded research metrics, historical comparisons, people qualifications, pricing and access prerequisites. Check anonymous and restricted-content behavior separately.
 5. Complete missing legal and service configuration. Exercise sandbox payment capture/replay, wrong amount, unverified identity, stale LO, named-seat overflow/reassignment, refund provider failure/retry, chargeback, revoked download/renewal, offline expiry and five-level reward reversal. Only then consider enabling real sales.
 
@@ -63,8 +63,11 @@ Run `python manage.py import_october_sources --archive '/secure/New documents.zi
 
 ## Validation at submission
 
-- Full backend suite: 2,127 passed, 2 skipped; follow-up commerce/import checks: 17 passed after final identity and evidence safeguards.
+- Initial implementation full backend suite: 2,127 passed, 2 skipped. Cleanup validation is recorded below after its checks finish.
 - Migration drift check: no changes detected. Source manifest canonical rules fit database limits.
 - Actual supplied archive import dry-run: 25 exact originals verified; no private source bytes were published.
-- Companion dashboard: lint and TypeScript pass, 72 tests pass, production build passes.
-- Companion web: TypeScript and lint pass (existing warning-only lint output), production build passes. Local browser automation is blocked by the macOS Chromium sandbox; GitHub's Linux release workflow must provide browser validation before merge.
+- Companion web: TypeScript and lint pass (existing warning-only lint output), production build passes. Local browser automation is blocked by the macOS Chromium sandbox; The GitHub web base partition has 32 failures matching the current main baseline (26 unique test/line locations); three new product cases passed. Later browser partitions were not reached. This is not a fully green frontend release.
+
+## Cleanup follow-up validation
+
+Full backend suite: 2,127 passed, 2 skipped. Web production build passed; lint had zero errors (60 existing warnings). The isolated corpus registration, hard-fact/evidence sync, ingestion and validation passed; the final selective-retention corpus also passed. The focused Knowledge Core regression suite covers the updated source mappings and validator boundary. No production ingestion, merge or dashboard work was performed.

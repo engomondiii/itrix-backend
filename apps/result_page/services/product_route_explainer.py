@@ -3,7 +3,7 @@ Product-route explainer.
 
 Maps the routed product code to (a) the display route the web expects and (b) the set of
 primary technologies (AXIOM / CRE / FQNM) to highlight, plus a short rationale used by the
-ALPHA-fit summary. The TechnologyId values match the web ``product.types.ts``.
+AXIOM-fit summary. The TechnologyId values match the web ``product.types.ts``.
 """
 
 from __future__ import annotations
@@ -35,13 +35,13 @@ _ROUTE_RATIONALE = {
         "computational-infrastructure product — is the natural entry point for eligibility, transformation and proof."
     ),
     "alpha_core": (
-        "Your problem looks hardware-integration-shaped, so an AXIOM Core hardware-layer evaluation may be relevant after a validated ALPHA software route is established."
+        "Your problem looks hardware-integration-shaped, so planned AXIOM Core dedicated hardware/IP may be relevant for a separately scoped feasibility discussion. It is not an available general-purpose runtime."
     ),
     "both": (
         "Your problem spans software representation and possible deeper hardware integration. AXIOM Compute can stand alone in software; AXIOM Core is considered only where hardware implementation adds verified value."
     ),
     "general": (
-        "No product route has been assessed yet; the historical general code is treated as neutral discovery rather than an ALPHA qualification."
+        "No product route has been assessed yet; the historical general code is treated as neutral discovery rather than an AXIOM qualification."
     ),
 }
 

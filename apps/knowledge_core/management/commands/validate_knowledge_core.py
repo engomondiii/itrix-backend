@@ -45,7 +45,8 @@ def current_public_conflicts(text: str) -> list[str]:
         problems.append("two-product public catalogue")
     if re.search(r"\bitrix\s+(?:currently\s+)?has\s+(?:only\s+)?two\s+products\b", value, re.I):
         problems.append("two-product public catalogue")
-    if re.search(rf"\bproducts?\s+(?:are|include|consist of|comprise)\b.{{0,120}}\b{_TECH_ENTITY}\b", value, re.I | re.S):
+    if any(re.search(rf"\bproducts?\s+(?:are|include|consist of|comprise)\b.{{0,120}}\b{_TECH_ENTITY}\b", sentence, re.I)
+           for sentence in _SENTENCE_SPLIT.split(value)):
         problems.append("technology classified as sold product")
 
     if re.search(r"(?:complete|current|all)\s+(?:itrix\s+)?products?|what does itrix actually sell", value, re.I | re.S):
@@ -181,7 +182,13 @@ class Command(BaseCommand):
             ("itrix_product_portfolio_v1_4.md", "public", "authoritative"),
             ("astop_product_and_access_20261002.md", "public", "authoritative"),
             ("research_portfolio_summary_20261002.md", "public", "governing"),
-            ("itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel", "internal_only", "governing"),
+            ("platform_governance_current_20261003.md", "internal_only", "governing"),
+            ("astop_customer_journey_20261003.md", "public", "governing"),
+            ("astop_license_order_summary_v2_6.md", "public", "governing"),
+            ("astop_branch_program_summary_v1_4.md", "public", "governing"),
+            ("astop_comparison_current_20261003.md", "public", "authoritative"),
+            ("astop_software_protection_v1_5.md", "internal_only", "governing"),
+            ("research_evidence_register_20261003.md", "controlled_public", "governing"),
         )
         for filename, level, authority in required_sources:
             row = KnowledgeDocument.objects.filter(

@@ -41,9 +41,9 @@ def test_operational_and_customer_material_are_not_public_by_default():
     assert FOLDER_DISCLOSURE["customer_contract"] == "customer_contract"
 
 
-def test_current_alpha_whitepaper_is_in_the_public_source_set():
-    assert (KNOWLEDGE_DOCS / "public" / "WP_ALPHA_Compute_Core_v2.4.docx").exists()
-    assert (KNOWLEDGE_DOCS / "public" / "itrix_product_canonical_v2_4.md").exists()
+def test_october_portfolio_replaces_alpha_sources():
+    assert (KNOWLEDGE_DOCS / "public" / "itrix_product_portfolio_v1_4.md").exists()
+    assert not (KNOWLEDGE_DOCS / "public" / "itrix_product_canonical_v2_4.md").exists()
 
 
 def test_superseded_product_doctrine_is_explicitly_excluded_from_registration():
@@ -60,12 +60,18 @@ def test_superseded_product_doctrine_is_explicitly_excluded_from_registration():
 
 
 
-def test_september_astop_sources_exist_in_the_governed_source_set():
-    assert (KNOWLEDGE_DOCS / "internal_only" / "ASTOP_Productization_GTM_Plan_v2.3.docx").exists()
-    assert (KNOWLEDGE_DOCS / "internal_only" / "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx").exists()
-    assert (KNOWLEDGE_DOCS / "internal_only" / "itriX_White_Paper_v3.5.docx").exists()
-    assert (KNOWLEDGE_DOCS / "controlled_public" / "prism-paper-current_v2.pdf").exists()
-    assert (KNOWLEDGE_DOCS / "public" / "astop_prism_public_safe_v2_3.md").exists()
+def test_retired_october_sources_are_physically_absent_and_noncurrent():
+    from apps.knowledge_core.source_manifest import RETIRED_OCTOBER_SOURCES, policy_for
+    present = {p.name for p in KNOWLEDGE_DOCS.rglob("*") if p.is_file()}
+    for name in RETIRED_OCTOBER_SOURCES:
+        assert name not in present
+        assert not policy_for(name).current
+    for name in ("astop_license_order_summary_v2_6.md", "astop_customer_journey_20261003.md",
+                 "astop_branch_program_summary_v1_4.md", "astop_comparison_current_20261003.md",
+                 "astop_software_protection_v1_5.md", "research_evidence_register_20261003.md",
+                 "platform_governance_current_20261003.md"):
+        assert name in present
+        assert policy_for(name).current
 
 
 def test_noncurrent_astop_pricing_chunk_cannot_be_retrieved(db):
@@ -111,10 +117,10 @@ def test_journey_states_map_to_knowledge_disclosure_stages():
 
 
 def test_current_prism_astop_explanation_has_explicit_governing_authority():
-    authority, current, rule = source_authority_for("PRISM_and_ASTOP_Explained.docx")
-    assert authority == "governing"
+    authority, current, rule = source_authority_for("astop_comparison_current_20261003.md")
+    assert authority == "authoritative"
     assert current is True
-    assert "PRISM-to-ASTOP" in rule
+    assert "observation/supervision" in rule
 
 
 def test_combined_axiom_tensor_qnta_source_is_not_collapsed_to_one_family():
@@ -159,3 +165,24 @@ def test_vector_metadata_carries_entities_products_and_multiple_families(db):
     assert metadata["technology_families"] == ["axiom_tensor", "qnta"]
     assert metadata["canonical_entities"] == ["AXIOM-TENSOR", "QNTA"]
     assert metadata["related_products"] == ["AXIOM Compute"]
+
+
+def test_physical_cleanup_deactivates_previously_ingested_rows(db, settings):
+    from io import StringIO
+    from django.core.management import call_command
+    from apps.knowledge_core.models import KnowledgeDocument, KnowledgeChunk
+    settings.ENABLE_AI_ENGINE = False
+    old = KnowledgeDocument.objects.create(title="Historical product doctrine",
+        file_path="knowledge_docs/public/itrix_product_canonical_v3_5.md",
+        namespace="company", disclosure_level="public", is_current=True,
+        ingestion_status="COMPLETE", chunk_count=1)
+    KnowledgeChunk.objects.create(document=old, chunk_index=0, text="Superseded doctrine",
+        namespace="company", vector_id="old-canonical")
+    call_command("register_knowledge_docs", stdout=StringIO())
+    old.refresh_from_db()
+    assert not old.is_current
+    assert old.chunk_count == 0
+    assert not old.chunks.exists()
+    assert old.permitted_paraphrase == "none"
+    call_command("register_knowledge_docs", stdout=StringIO())
+    assert KnowledgeDocument.objects.filter(file_path=old.file_path).count() == 1

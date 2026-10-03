@@ -5,8 +5,7 @@ The typical iTrix buying group has a technical champion who first feels the bott
 economic buyer who owns the engineering or R&D budget, and a technical evaluator who would
 run a scoped assessment. Recognizing who plays each role early makes the conversation
 faster and more honest. Likely blockers are procurement and security review and concerns
-about integration risk — both addressed by keeping specifics NDA-gated until trust is
-earned.
+about integration risk — addressed through clear integration scope, appropriate confidentiality agreements and explicit content authorization. An NDA alone never unlocks protected content.
 
 ## Objection
 Common objections and the honest responses to them: "How do we know it will work on our
@@ -14,7 +13,7 @@ workload?" is answered by proposing a scoped evaluation rather than asserting a 
 "Integration looks risky" is answered by describing the integration path in
 non-confidential terms first. "We've tried other approaches" is answered by focusing on the
 specific pressure named rather than on generic capability. Every response stays within the
-claims discipline — no benchmark numbers, no guarantees, no competitor comparisons.
+claims discipline: attributed published results and dated comparisons may be discussed with their workload, baseline, fidelity and evidence limits. Never promise universal customer results or treat research benchmarks as this customer’s proof.
 
 ## Commercialization
 The buyer and objection views feed the commercial path: qualify honestly, deliver value

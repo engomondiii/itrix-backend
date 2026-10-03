@@ -6,28 +6,32 @@
       "source": "itriX Website Build Execution Plan_V2.0.docx",
       "sha256": "03a9541b7be29190e5600c6e5ab94f24cd6dbd84398517f8ac63b849e5c08576",
       "bytes": 38388,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
       "source": "itriX Homepage Wireframe v0.3.docx",
       "sha256": "b45684863365e69dc3466c922515bbf5afd9ad2da860e406824d36f3d08c8ae4",
       "bytes": 34494,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
       "source": "itriX Website Personas v0.1.docx",
       "sha256": "18dbf3ecde000d7eb7c7f5a94b0c1975642801bac54559796e431bcb882d5626",
       "bytes": 32899,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "itriX AI Sales Engine MVP Functional Specification_V1.0.docx",
       "sha256": "f5da3aded58cf79668508cbbe322368e85b1c01ed68fdef75f88ee1ed64a436a",
       "bytes": 46044,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
@@ -41,14 +45,16 @@
       "source": "itriX Compute Bottleneck Review Briefing Template v0.3.docx",
       "sha256": "6eab88e31bd38d4f0dc47b3bd3c77a673f95238a16fa86ace837e5f67ed4524a",
       "bytes": 26324,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "iTrix Website Build Package_V1.0.docx",
       "sha256": "99493336d7ac942debdb4a0d23d457c22c463e4569f699ecbaee1a66bfb60b9b",
       "bytes": 45688,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
@@ -69,7 +75,8 @@
       "source": "Project Playbook_Ai Sales Platform for ITrix.docx",
       "sha256": "7f503806beaac872bf9f0b79b9e65beadde9f803a9656c64a718f45e91610ab1",
       "bytes": 60404,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
@@ -90,14 +97,16 @@
       "source": "iTrix Investor Data Room File List.docx",
       "sha256": "c9d1677d65f12e437065be01c6af8cb388e9d1bcc94460e99f8ab2a19d4468d9",
       "bytes": 58784,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
       "source": "iTrix Website UX & Content Blueprint_V1.0.docx",
       "sha256": "87c5f98db4bcfa07f5da4735fe29b1c62fd481e03055cf8f34bc9e085d8dbe84",
       "bytes": 51854,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
@@ -111,7 +120,8 @@
       "source": "iTrix Website MVP Product Requirement Document_V1.0.docx",
       "sha256": "9d410b4f8ad8ca1239b038e291de43d0e31b2e37a91eeebd49ee9372c0e61375",
       "bytes": 140523,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
@@ -139,7 +149,8 @@
       "source": "Kickoff Direction for the itriX Project.docx",
       "sha256": "a5a62fe153d51d2acad8a8913273cd044ae27c9eb6cd7c43bb889ec5a4de8eaf",
       "bytes": 24345,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
@@ -153,14 +164,16 @@
       "source": "itriX Website Building Guideline Book.docx",
       "sha256": "c4737de240408e43f7d1cb1529b160346f27176e8e3c8bde261a33df3d5bd52e",
       "bytes": 33964,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "itriX Knowledge Core Input Request List v0.1.docx",
       "sha256": "ec8f00d81f50f48368cc20b37886b5bd99218b153839e21a5c889dff996cc1cf",
       "bytes": 32874,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
     },
     {
       "group": "old",
@@ -174,7 +187,8 @@
       "source": "itriX Visitor Journey Map v0.1.docx",
       "sha256": "5708a404aa2186a285ad26c7b9b4ce3d9a428241197b299f1654c037326767e9",
       "bytes": 34804,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
     },
     {
       "group": "old",
@@ -216,14 +230,16 @@
       "source": "itriX_White_Paper_v3.5.docx",
       "sha256": "5d3d66bf31ed0c616ee1f0118a35b3dd03f758988ab356b289e5774b110dc699",
       "bytes": 82117,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md"
     },
     {
       "group": "old",
       "source": "PRISM_and_ASTOP_Explained.docx",
       "sha256": "a391b06b52dcef8c15b5eab68468600213737c3641abfed78976fcde63a124bf",
       "bytes": 34000,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_product_and_access_20261002.md"
     },
     {
       "group": "old",
@@ -244,7 +260,8 @@
       "source": "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx",
       "sha256": "6f6741fe173bcf260fa4a7054c72ca03ff05a01bad8acc566d219fea149dbfdd",
       "bytes": 53084,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_governance_current_20261003.md"
     },
     {
       "group": "old",
@@ -265,7 +282,8 @@
       "source": "ASTOP_Productization_GTM_Plan_v2.3.docx",
       "sha256": "4d4eaae9e896465317f938246e365e719e48b7de2f89824c374bafe2ff413634",
       "bytes": 45569,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_product_and_access_20261002.md"
     },
     {
       "group": "old",
@@ -307,7 +325,8 @@
       "source": "prism-paper-current_v2.pdf",
       "sha256": "e57138093714c23e6e9143359bb8a4964a21635bd2bab1b5b4c37c0c4ef130f6",
       "bytes": 599449,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/research_evidence_register_20261003.md"
     },
     {
       "group": "old",
@@ -405,14 +424,16 @@
       "source": "4_4_Unified Mathematical View_Inventor_V2.0.docx",
       "sha256": "8e05e83e2291d1eb9e79e3b8ae1d0457b9f816b45bf21e2face2cee2f321a9be",
       "bytes": 36742,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/representation_framework_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx",
       "sha256": "a5c91a732e38e53a2dab57a3d43825b4a18b2b60407e21bff7040bf1ec6c4764",
       "bytes": 49365,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_comparison_current_20261003.md"
     },
     {
       "group": "old",
@@ -433,28 +454,32 @@
       "source": "iTrix Pricing Policy Version 2.0.docx",
       "sha256": "dac7cc4a893bd1a8ab15ae95d7b4a80aefa0c4e8d3acb5ee37c60310936d4488",
       "bytes": 27244,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/licensing_and_commercialization_internal.md"
     },
     {
       "group": "old",
       "source": "4_2_CRE_Overview_v2.0.docx",
       "sha256": "7fd21b1e83b7a39ae96336073c0a6a67495224edd1e0a4fb5bbba20acfc9786d",
       "bytes": 38629,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/cre_technology_overview_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "4_3_FQNM_Overview_v2.0.docx",
       "sha256": "d961a4dc52f45997e41562082efcd6a969c0dca408b72d0f52392f82616116be",
       "bytes": 44235,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "7_AI-Aggravated Bottleneck Materials_V2.0.docx",
       "sha256": "1c102e4d2e03c1447ae00c33aeee1b1c6e2b4fd81772f9fc8f7cddfd8ebcf7ce",
       "bytes": 50964,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md"
     },
     {
       "group": "old",
@@ -468,14 +493,16 @@
       "source": "4_1_AXIOM_Overview_v2.0.docx",
       "sha256": "1f3ef710ca72c2b71360bae3c3478450e3278d717e65418e11479b5a9093e01e",
       "bytes": 40157,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/axiom_technology_overview_revised_20261003.md"
     },
     {
       "group": "old",
       "source": "6_Computational Workload and Platform Materials_V2.0.docx",
       "sha256": "3075bb47d55b1c355a8df954a6ab414e90730d70c0f9c84b0f0f01e69e97ea9f",
       "bytes": 38406,
-      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md"
     },
     {
       "group": "new",

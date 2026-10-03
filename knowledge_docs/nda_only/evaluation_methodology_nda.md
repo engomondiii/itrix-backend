@@ -11,5 +11,4 @@ pressure a team named, so the result speaks to their actual bottleneck rather th
 generic benchmark.
 
 ## Commercialization
-A completed evaluation is the gate to a broader commercial conversation. The methodology is
-deliberately conservative so that any claim made afterward is one the evidence supports.
+This methodology applies to separately scoped enterprise evaluations. It is not a universal prerequisite for ASTOP retail purchase under LO v2.6. Later enterprise scope and rights require explicit agreement, and claims must remain within measured evidence.

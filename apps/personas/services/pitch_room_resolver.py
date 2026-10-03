@@ -62,7 +62,7 @@ GENERIC_ROOM = {
         {
             "key": "where_itrix_fits",
             "title": "Where itriX fits",
-            "body": "ALPHA Compute can diagnose, transform, execute or route, verify and deploy eligible workloads in software. ALPHA Core is the optional hardware-layer path for deeper implementation or acceleration when validated evidence supports it.",
+            "body": "AXIOM Compute can diagnose, transform, execute or route, verify and deploy eligible workloads in software. AXIOM Core is the optional hardware-layer path for deeper implementation or acceleration when validated evidence supports it.",
             "disclosure": "public",
         },
         {

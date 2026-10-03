@@ -319,6 +319,192 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
 }
 
 
+# October 2026 domain-specific alignment. Raw confidential contracts, patent files and
+# QNTA mechanisms are not copied into this public repository. Hashes and dispositions
+# live in docs/source_alignment_20261003.json; approved summaries are retrievable.
+from dataclasses import replace as _replace
+
+_OCTOBER_REPLACEMENTS = {
+    "itrix_product_canonical_v3_5.md": "itrix_product_portfolio_v1_4.md",
+    "itrix_company_overview_public.md": "itrix_product_portfolio_v1_4.md",
+    "itriX_White_Paper_v3.5.docx": "itrix_product_portfolio_v1_4.md",
+    "astop_prism_public_safe_v2_3.md": "astop_product_and_access_20261002.md",
+    "ASTOP_Productization_GTM_Plan_v2.3.docx": "astop_product_and_access_20261002.md",
+    "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx": "astop_product_and_access_20261002.md",
+    "prism-paper-current_v2.pdf": "astop_product_and_access_20261002.md",
+    "AXIOM_TENSOR_QNTA_Current_Controlled.md": "research_portfolio_summary_20261002.md",
+}
+for _old, _replacement in _OCTOBER_REPLACEMENTS.items():
+    SOURCE_MANIFEST[_old] = _replace(SOURCE_MANIFEST[_old], authority="legacy", current=False,
+        superseded_by=_replacement, canonical_rule="Historical source retained; October source governs updated claims. " + SOURCE_MANIFEST[_old].canonical_rule)
+
+SOURCE_MANIFEST.update({
+    "itrix_product_portfolio_v1_4.md": SourcePolicy("authoritative", True,
+        "Portfolio v1.4 dated 2 October 2026; retain development stages and separately confirm availability. No private filing identifiers.",
+        (ClaimDomain.TAXONOMY, ClaimDomain.PUBLIC_EXPLANATION),
+        tuple(k for k,v in _OCTOBER_REPLACEMENTS.items() if v == "itrix_product_portfolio_v1_4.md"),
+        namespace="company", verified_date="2026-10-02", canonical_entities=("ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime")),
+    "astop_product_and_access_20261002.md": SourcePolicy("authoritative", True,
+        "White Paper v2.3 evidence; LO v2.6 overrides journey USD19/12-download examples. Identity, LO, verified payment and active entitlement gate delivery. No live-service claims without deployment evidence.",
+        (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.COMMERCIALIZATION, ClaimDomain.RESEARCH, ClaimDomain.LEGAL),
+        tuple(k for k,v in _OCTOBER_REPLACEMENTS.items() if v == "astop_product_and_access_20261002.md"),
+        namespace="astop", canonical_entities=("ASTOP", "PRISM"), permitted_paraphrase="summary"),
+    "research_portfolio_summary_20261002.md": SourcePolicy("governing", True,
+        "Bounded research summary; no raw patent identifiers, protected QNTA mechanisms, grant or universal performance inference.",
+        (ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH, ClaimDomain.LEGAL),
+        namespace="technology", canonical_entities=("AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "SPADES", "QNTA"), permitted_paraphrase="summary"),
+})
+_comparative = "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx"
+SOURCE_MANIFEST[_comparative] = _replace(SOURCE_MANIFEST[_comparative], canonical_rule=(
+    "Comparative source dated 16 September 2026: Anthropic request/model layer, SoL-Pi harness/trajectory layer, ASTOP/PRISM observation layer. "
+    "Separate software, harness and observation effects; do not multiply savings or infer universal customer results. "
+    "October White Paper v2.3 governs latest benchmark values; 51.9–84.5% here is historical. Preserve product/technology distinctions."
+))
+
+
+# Physical October cleanup: tombstones prevent an old checkout or historical row
+# from silently restoring retired doctrine. Originals remain in Git history.
+RETIRED_OCTOBER_SOURCES = ('PRISM_and_ASTOP_Explained.docx',
+ 'itriX Compute Bottleneck Review Briefing Template v0.3.docx',
+ 'prism-paper-current_v2.pdf',
+ 'ASTOP_Productization_GTM_Plan_v2.3.docx',
+ 'AXIOM_TENSOR_QNTA_Current_Controlled.md',
+ 'Kickoff Direction for the itriX Project.docx',
+ 'Project Playbook_Ai Sales Platform for ITrix.docx',
+ 'iTrix Investor Data Room File List.docx',
+ 'iTrix Pricing Policy Version 2.0.docx',
+ 'iTrix Website Build Package_V1.0.docx',
+ 'iTrix Website MVP Product Requirement Document_V1.0.docx',
+ 'iTrix Website UX & Content Blueprint_V1.0.docx',
+ 'itriX AI Sales Engine MVP Functional Specification_V1.0.docx',
+ 'itriX Homepage Wireframe v0.3.docx',
+ 'itriX Knowledge Core Input Request List v0.1.docx',
+ 'itriX Visitor Journey Map v0.1.docx',
+ 'itriX Website Build Execution Plan_V2.0.docx',
+ 'itriX Website Building Guideline Book.docx',
+ 'itriX Website Personas v0.1.docx',
+ 'itriX_AI_Sales_Engine_MVP_Execution_Milestone_Operations_Command_v1.0 (1).docx',
+ 'itriX_AI_Sales_Engine_Master_Architecture_Flow_Document_v1.0 (1).docx',
+ 'itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx',
+ 'itriX_White_Paper_v3.5.docx',
+ '4_1_AXIOM_Overview_v2.0.docx',
+ '4_2_CRE_Overview_v2.0.docx',
+ '4_3_FQNM_Overview_v2.0.docx',
+ '4_4_Unified Mathematical View_Inventor_V2.0.docx',
+ '6_Computational Workload and Platform Materials_V2.0.docx',
+ '7_AI-Aggravated Bottleneck Materials_V2.0.docx',
+ 'WP_ALPHA_Compute_Core_v2.4.docx',
+ 'astop_prism_public_safe_v2_3.md',
+ 'itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx',
+ 'itrix_company_overview_public.md',
+ 'itrix_product_canonical_v2_4.md',
+ 'itrix_product_canonical_v3_5.md')
+for _old in RETIRED_OCTOBER_SOURCES:
+    _previous = SOURCE_MANIFEST.get(_old, SourcePolicy("legacy", False))
+    SOURCE_MANIFEST[_old] = _replace(_previous, authority="legacy", current=False,
+        superseded_by=_previous.superseded_by or "platform_governance_current_20261003.md",
+        canonical_rule="Retired from the active folder; use the October domain sources. Historical evidence only.")
+
+SOURCE_MANIFEST.update({
+    "astop_customer_journey_20261003.md": SourcePolicy("governing", True,
+        "Curated journey reconciled to LO v2.6; retail and protected enterprise are separate routes. No claim that services are live.",
+        (ClaimDomain.COMMERCIALIZATION, ClaimDomain.PUBLIC_EXPLANATION), namespace="astop"),
+    "astop_license_order_summary_v2_6.md": SourcePolicy("governing", True,
+        "Curated LO v2.6 summary, not an executed contract. Exact accepted text governs; USD20 individual, USD16 per organization seat, two-seat minimum; no discount stacking.",
+        (ClaimDomain.COMMERCIALIZATION, ClaimDomain.LEGAL), namespace="astop"),
+    "astop_branch_program_summary_v1_4.md": SourcePolicy("governing", True,
+        "Curated Branch v1.4 summary. Approval and separate complete agreement precede referral access. Five rates total 19.5%; 30-day period and settlement/fraud review precede payout eligibility.",
+        (ClaimDomain.COMMERCIALIZATION, ClaimDomain.LEGAL), namespace="astop"),
+    "astop_software_protection_v1_5.md": SourcePolicy("governing", True,
+        "Curated protection policy; identity, signed delivery, activation and refund revocation require actual service integrations. No secrets or raw identity in builds.",
+        (ClaimDomain.INTERNAL_POLICY, ClaimDomain.TECHNICAL), namespace="astop"),
+    "platform_governance_current_20261003.md": SourcePolicy("governing", True,
+        "October platform policy preserves acceptance controls; distinct retail and enterprise routes, no automatic NDA disclosure, no mandatory ASTOP-first product sequence.",
+        (ClaimDomain.INTERNAL_POLICY, ClaimDomain.COMMERCIALIZATION), namespace="company"),
+    "research_evidence_register_20261003.md": SourcePolicy("governing", True,
+        "Curated R01–R07 and QNTA evidence; no protected mechanisms, filing identifiers, implied grants or universal performance claims. Preserve negative evidence and maturity stages.",
+        (ClaimDomain.RESEARCH, ClaimDomain.TECHNICAL), namespace="technology"),
+    "astop_comparison_current_20261003.md": _replace(SOURCE_MANIFEST[_comparative],
+        authority="authoritative", current=True, superseded_by="", supersedes=(_comparative,),
+        verified_date="2026-10-03", canonical_rule=
+        "Curated October comparison: request/model, harness/trajectory and observation/supervision are different layers. Competitor descriptions date to September; latest finite-panel evidence is not 24-hour or universal proof. Measure overhead and combined effects, preserve required events.")
+})
+for _name in ("astop_customer_journey_20261003.md", "astop_license_order_summary_v2_6.md",
+              "astop_branch_program_summary_v1_4.md", "astop_software_protection_v1_5.md",
+              "platform_governance_current_20261003.md", "research_evidence_register_20261003.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-03", permitted_paraphrase="summary")
+
+
+# Selectively retain useful baseline originals and revised technical editions.
+# Age alone does not retire a source. Current domain authorities resolve changes.
+_RETAINED_BASELINE = (
+    "iTrix_Atelier_Indigo_Theme_System_v2 (2).docx",
+    "itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx",
+)
+RETIRED_OCTOBER_SOURCES = tuple(n for n in RETIRED_OCTOBER_SOURCES if n not in _RETAINED_BASELINE)
+SOURCE_MANIFEST[_RETAINED_BASELINE[0]] = SourcePolicy("working", True,
+    "Retained visual design specification; internal presentation guidance only. Historical implementation descriptions do not establish current deployment state.",
+    (ClaimDomain.INTERNAL_POLICY,), namespace="company", permitted_paraphrase="summary")
+SOURCE_MANIFEST[_RETAINED_BASELINE[1]] = SourcePolicy("governing", True,
+    "Retained historical enterprise acceptance feedback and regression requirements. ALPHA names describe the tested older version. Not current retail pricing, new test evidence or authority to override October portfolio/LO rules.",
+    (ClaimDomain.INTERNAL_POLICY,), namespace="company", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['axiom_technology_overview_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.PUBLIC_EXPLANATION,), namespace='technology', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['cre_technology_overview_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.PUBLIC_EXPLANATION,), namespace='technology', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['fqnm_technology_overview_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.PUBLIC_EXPLANATION,), namespace='technology', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['representation_framework_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.PUBLIC_EXPLANATION,), namespace='technology', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['workload_and_bottleneck_guide_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.PUBLIC_EXPLANATION,), namespace='technology', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+SOURCE_MANIFEST['platform_operating_reference_revised_20261003.md'] = SourcePolicy("working", True,
+    "Revised supporting baseline: preserve useful concepts, but October portfolio and specific evidence/contracts govern changed claims. No private filing identifiers or automatic product qualification.",
+    (ClaimDomain.INTERNAL_POLICY,), namespace='company', verified_date="2026-10-03", permitted_paraphrase="summary")
+
+_CLEANUP_REPLACEMENTS = {'4_1_AXIOM_Overview_v2.0.docx': 'axiom_technology_overview_revised_20261003.md',
+ '4_2_CRE_Overview_v2.0.docx': 'cre_technology_overview_revised_20261003.md',
+ '4_3_FQNM_Overview_v2.0.docx': 'fqnm_technology_overview_revised_20261003.md',
+ '4_4_Unified Mathematical View_Inventor_V2.0.docx': 'representation_framework_revised_20261003.md',
+ '6_Computational Workload and Platform Materials_V2.0.docx': 'workload_and_bottleneck_guide_revised_20261003.md',
+ '7_AI-Aggravated Bottleneck Materials_V2.0.docx': 'workload_and_bottleneck_guide_revised_20261003.md',
+ 'ASTOP_Productization_GTM_Plan_v2.3.docx': 'astop_product_and_access_20261002.md',
+ 'AXIOM_TENSOR_QNTA_Current_Controlled.md': 'research_evidence_register_20261003.md',
+ 'PRISM_and_ASTOP_Explained.docx': 'astop_product_and_access_20261002.md',
+ 'Project Playbook_Ai Sales Platform for ITrix.docx': 'platform_operating_reference_revised_20261003.md',
+ 'WP_ALPHA_Compute_Core_v2.4.docx': 'itrix_product_portfolio_v1_4.md',
+ 'astop_prism_public_safe_v2_3.md': 'astop_product_and_access_20261002.md',
+ 'iTrix Pricing Policy Version 2.0.docx': 'licensing_and_commercialization_internal.md',
+ 'iTrix Website UX & Content Blueprint_V1.0.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX AI Sales Engine MVP Functional Specification_V1.0.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX Compute Bottleneck Review Briefing Template v0.3.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX Visitor Journey Map v0.1.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX Website Building Guideline Book.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX Website Personas v0.1.docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX_AI_Sales_Engine_MVP_Execution_Milestone_Operations_Command_v1.0 (1).docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX_AI_Sales_Engine_Master_Architecture_Flow_Document_v1.0 (1).docx': 'platform_operating_reference_revised_20261003.md',
+ 'itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx': 'platform_governance_current_20261003.md',
+ 'itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx': 'astop_comparison_current_20261003.md',
+ 'itriX_White_Paper_v3.5.docx': 'itrix_product_portfolio_v1_4.md',
+ 'itrix_company_overview_public.md': 'itrix_product_portfolio_v1_4.md',
+ 'itrix_product_canonical_v2_4.md': 'itrix_product_portfolio_v1_4.md',
+ 'itrix_product_canonical_v3_5.md': 'itrix_product_portfolio_v1_4.md',
+ 'prism-paper-current_v2.pdf': 'research_evidence_register_20261003.md'}
+for _old, _new in _CLEANUP_REPLACEMENTS.items():
+    SOURCE_MANIFEST[_old] = _replace(SOURCE_MANIFEST[_old], superseded_by=_new)
+
+
 def policy_for(filename: str) -> SourcePolicy | None:
     """Return explicit policy using case-insensitive basename matching."""
     folded = filename.casefold()

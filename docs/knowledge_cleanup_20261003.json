@@ -1,0 +1,420 @@
+{
+  "removed": [
+    {
+      "path": "knowledge_docs/controlled_public/PRISM_and_ASTOP_Explained.docx",
+      "sha256": "a391b06b52dcef8c15b5eab68468600213737c3641abfed78976fcde63a124bf",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/itriX Compute Bottleneck Review Briefing Template v0.3.docx",
+      "sha256": "6eab88e31bd38d4f0dc47b3bd3c77a673f95238a16fa86ace837e5f67ed4524a",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/prism-paper-current_v2.pdf",
+      "sha256": "e57138093714c23e6e9143359bb8a4964a21635bd2bab1b5b4c37c0c4ef130f6",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/controlled_public/research_evidence_register_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/ASTOP_Productization_GTM_Plan_v2.3.docx",
+      "sha256": "4d4eaae9e896465317f938246e365e719e48b7de2f89824c374bafe2ff413634",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/AXIOM_TENSOR_QNTA_Current_Controlled.md",
+      "sha256": "3a59e8b2c36bbcd3e1dac78fef262217d67982befe2f1ff919d7e05bb0d77320",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/controlled_public/research_evidence_register_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/Kickoff Direction for the itriX Project.docx",
+      "sha256": "a5a62fe153d51d2acad8a8913273cd044ae27c9eb6cd7c43bb889ec5a4de8eaf",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/Project Playbook_Ai Sales Platform for ITrix.docx",
+      "sha256": "7f503806beaac872bf9f0b79b9e65beadde9f803a9656c64a718f45e91610ab1",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix Investor Data Room File List.docx",
+      "sha256": "c9d1677d65f12e437065be01c6af8cb388e9d1bcc94460e99f8ab2a19d4468d9",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix Pricing Policy Version 2.0.docx",
+      "sha256": "dac7cc4a893bd1a8ab15ae95d7b4a80aefa0c4e8d3acb5ee37c60310936d4488",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/licensing_and_commercialization_internal.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix Website Build Package_V1.0.docx",
+      "sha256": "99493336d7ac942debdb4a0d23d457c22c463e4569f699ecbaee1a66bfb60b9b",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix Website MVP Product Requirement Document_V1.0.docx",
+      "sha256": "9d410b4f8ad8ca1239b038e291de43d0e31b2e37a91eeebd49ee9372c0e61375",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix Website UX & Content Blueprint_V1.0.docx",
+      "sha256": "87c5f98db4bcfa07f5da4735fe29b1c62fd481e03055cf8f34bc9e085d8dbe84",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX AI Sales Engine MVP Functional Specification_V1.0.docx",
+      "sha256": "f5da3aded58cf79668508cbbe322368e85b1c01ed68fdef75f88ee1ed64a436a",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Homepage Wireframe v0.3.docx",
+      "sha256": "b45684863365e69dc3466c922515bbf5afd9ad2da860e406824d36f3d08c8ae4",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Knowledge Core Input Request List v0.1.docx",
+      "sha256": "ec8f00d81f50f48368cc20b37886b5bd99218b153839e21a5c889dff996cc1cf",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Visitor Journey Map v0.1.docx",
+      "sha256": "5708a404aa2186a285ad26c7b9b4ce3d9a428241197b299f1654c037326767e9",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Website Build Execution Plan_V2.0.docx",
+      "sha256": "03a9541b7be29190e5600c6e5ab94f24cd6dbd84398517f8ac63b849e5c08576",
+      "reason": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "replacement": null,
+      "decision": "remove_from_retrieval"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Website Building Guideline Book.docx",
+      "sha256": "c4737de240408e43f7d1cb1529b160346f27176e8e3c8bde261a33df3d5bd52e",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX Website Personas v0.1.docx",
+      "sha256": "18dbf3ecde000d7eb7c7f5a94b0c1975642801bac54559796e431bcb882d5626",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX_AI_Sales_Engine_MVP_Execution_Milestone_Operations_Command_v1.0 (1).docx",
+      "sha256": "bb9149a8174b46697f1f86d0ea843088ddf1a7f912d0c00b85ddfd30347298e2",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX_AI_Sales_Engine_Master_Architecture_Flow_Document_v1.0 (1).docx",
+      "sha256": "7bae79d2651d636050f5a828de402440cfe9e01fbf3c93964306853b4db44416",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx",
+      "sha256": "6f6741fe173bcf260fa4a7054c72ca03ff05a01bad8acc566d219fea149dbfdd",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX_White_Paper_v3.5.docx",
+      "sha256": "5d3d66bf31ed0c616ee1f0118a35b3dd03f758988ab356b289e5774b110dc699",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/4_1_AXIOM_Overview_v2.0.docx",
+      "sha256": "1f3ef710ca72c2b71360bae3c3478450e3278d717e65418e11479b5a9093e01e",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/axiom_technology_overview_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/4_2_CRE_Overview_v2.0.docx",
+      "sha256": "7fd21b1e83b7a39ae96336073c0a6a67495224edd1e0a4fb5bbba20acfc9786d",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/cre_technology_overview_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/4_3_FQNM_Overview_v2.0.docx",
+      "sha256": "d961a4dc52f45997e41562082efcd6a969c0dca408b72d0f52392f82616116be",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/4_4_Unified Mathematical View_Inventor_V2.0.docx",
+      "sha256": "8e05e83e2291d1eb9e79e3b8ae1d0457b9f816b45bf21e2face2cee2f321a9be",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/controlled_public/representation_framework_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/6_Computational Workload and Platform Materials_V2.0.docx",
+      "sha256": "3075bb47d55b1c355a8df954a6ab414e90730d70c0f9c84b0f0f01e69e97ea9f",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/7_AI-Aggravated Bottleneck Materials_V2.0.docx",
+      "sha256": "1c102e4d2e03c1447ae00c33aeee1b1c6e2b4fd81772f9fc8f7cddfd8ebcf7ce",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/WP_ALPHA_Compute_Core_v2.4.docx",
+      "sha256": "ad39436d5398a74f762557602dd3772268f7c146b52389643a43b43c2ceaaf2f",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/astop_prism_public_safe_v2_3.md",
+      "sha256": "a59d01b51fa8eb69533e33524c0f73e6d29f7af6e71597fa173d74d618ab4399",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx",
+      "sha256": "a5c91a732e38e53a2dab57a3d43825b4a18b2b60407e21bff7040bf1ec6c4764",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/astop_comparison_current_20261003.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/itrix_company_overview_public.md",
+      "sha256": "d59220cfa477b4e777f0aa7f3eafce0d55e4aca5cc2e17f45f8fc898a937a04d",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/itrix_product_canonical_v2_4.md",
+      "sha256": "aa8f279e2ebb0e23a32ca46be37b9be224bdb4e06fb7feca5cee60d1383c2715",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "decision": "replace_with_revised_edition"
+    },
+    {
+      "path": "knowledge_docs/public/itrix_product_canonical_v3_5.md",
+      "sha256": "613fd3844987e3d6fa56ab11c4b6cf1889b92ac23afd3de29d190e12e43c7538",
+      "reason": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "decision": "replace_with_revised_edition"
+    }
+  ],
+  "date": "2026-10-03",
+  "added": [
+    "knowledge_docs/controlled_public/representation_framework_revised_20261003.md",
+    "knowledge_docs/controlled_public/research_evidence_register_20261003.md",
+    "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md",
+    "knowledge_docs/internal_only/astop_software_protection_v1_5.md",
+    "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+    "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+    "knowledge_docs/public/astop_branch_program_summary_v1_4.md",
+    "knowledge_docs/public/astop_comparison_current_20261003.md",
+    "knowledge_docs/public/astop_customer_journey_20261003.md",
+    "knowledge_docs/public/astop_license_order_summary_v2_6.md",
+    "knowledge_docs/public/axiom_technology_overview_revised_20261003.md",
+    "knowledge_docs/public/cre_technology_overview_revised_20261003.md",
+    "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md"
+  ],
+  "modified": [
+    "knowledge_docs/internal_only/ASTOP_Technical_Capabilities_Current_v0.3.1.md",
+    "knowledge_docs/internal_only/licensing_and_commercialization_internal.md",
+    "knowledge_docs/nda_only/technology_deep_dive_nda.md",
+    "knowledge_docs/nda_only/evaluation_methodology_nda.md",
+    "knowledge_docs/controlled_public/buyer_and_objection_controlled.md",
+    "knowledge_docs/controlled_public/meeting_and_purpose_controlled.md"
+  ],
+  "current_corpus": [
+    {
+      "path": "knowledge_docs/controlled_public/FQNM_arXiv.pdf",
+      "sha256": "8e660bc442e4b420a2c1454e62c23e534d266df2deb313eed1655a2bd35da5ff"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/buyer_and_objection_controlled.md",
+      "sha256": "0feffa54442d5916020a94201bf864e182a3e0d7465d814d32e370d3ff08b862"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/meeting_and_purpose_controlled.md",
+      "sha256": "a3834e417f318ede3f7493b55eaef272fb1ef794fa7b0736fa878557731bc6f5"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/representation_framework_revised_20261003.md",
+      "sha256": "5a5a0b2700feacd4424c1eb7de6d7e566523d4765cac6870b7dc9fb363db47d5"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/research_evidence_register_20261003.md",
+      "sha256": "af1ecde9554c462c6220a9071018c99df4b0ee0a611932fbf2487761e1f96636"
+    },
+    {
+      "path": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md",
+      "sha256": "cd4af536a6d87363bbc11258374507d4b14c6967a0dfb02f46634ad6feb343e9"
+    },
+    {
+      "path": "knowledge_docs/internal_only/ASTOP_Technical_Capabilities_Current_v0.3.1.md",
+      "sha256": "d173f1f36d6083ed71e1dd3d46510a574f111695778084b70bbbfd394f5d3a92"
+    },
+    {
+      "path": "knowledge_docs/internal_only/astop_software_protection_v1_5.md",
+      "sha256": "c5e900e33aad36c5273127ba79cd104cb96727f7b9afdecc4211794c6c78e861"
+    },
+    {
+      "path": "knowledge_docs/internal_only/iTrix_Atelier_Indigo_Theme_System_v2 (2).docx",
+      "sha256": "c54c19a3d3e650c47c957e7ed5105501a87d53ee047d802ad5ed422b7489d705"
+    },
+    {
+      "path": "knowledge_docs/internal_only/itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx",
+      "sha256": "04a5b04b1919d47b5e84ca0348a06f11ec253c326e03da2c99429fab458ace08"
+    },
+    {
+      "path": "knowledge_docs/internal_only/licensing_and_commercialization_internal.md",
+      "sha256": "35697d52b565cf5a19ccd1576a5cb4fd6d5442804524cc4a2ce454dd2ff1972a"
+    },
+    {
+      "path": "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+      "sha256": "55268ecd0a47c67b6e7c6caa6a1805f8a8964a9537e5d43eaa07beaff4b46a8c"
+    },
+    {
+      "path": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md",
+      "sha256": "5cbc4d0d7ee9a59ed7f23ddb8b1ea8229d61b4c39913528af291b026f476c1c9"
+    },
+    {
+      "path": "knowledge_docs/internal_only/strategy_and_milestone_internal.md",
+      "sha256": "ba2955d95d2ae95b32e80d331494760e657755d7f021a9da6d19ad2c0a2a3da6"
+    },
+    {
+      "path": "knowledge_docs/nda_only/Master_Thesis_2026_Feb.pdf",
+      "sha256": "e2625b7b0f9d037cbd8bb9ef1d751b24e485ba0e83780fc0e28533fe2cd5150d"
+    },
+    {
+      "path": "knowledge_docs/nda_only/TurboQuant_vs_FQNM_Comparison_Paper_V1.0.docx",
+      "sha256": "ecdf2c7c80375356cf78e5302b96f2ea4ee47bc6388528cfcd6e96647636a49d"
+    },
+    {
+      "path": "knowledge_docs/nda_only/evaluation_methodology_nda.md",
+      "sha256": "6a8a967a9599ecd466f3da3be37b8ed071272f12ccecc8f9fff9cfea6fd33c55"
+    },
+    {
+      "path": "knowledge_docs/nda_only/technology_deep_dive_nda.md",
+      "sha256": "8e0e602f2d80c376cc1ff00c2c0392d8d575125071f5311276a9a48586101fde"
+    },
+    {
+      "path": "knowledge_docs/public/astop_branch_program_summary_v1_4.md",
+      "sha256": "21eaa55f5d4d27ec7bd89d9811d7d6eb137dde15117b82dcda5c20d7645a399d"
+    },
+    {
+      "path": "knowledge_docs/public/astop_comparison_current_20261003.md",
+      "sha256": "1ec92f56c00bbd75bbb6278aaa2e007521e9fb836c0300f07e393166a220c1ff"
+    },
+    {
+      "path": "knowledge_docs/public/astop_customer_journey_20261003.md",
+      "sha256": "62d79c2a5ce95b7c989de8d79c8fa396642260d75e36d5f824a3dbaf0f7b77b0"
+    },
+    {
+      "path": "knowledge_docs/public/astop_license_order_summary_v2_6.md",
+      "sha256": "54b17da5655c045032e9ee025cfda4c589059a6634859bfafe374b80b5ad0aeb"
+    },
+    {
+      "path": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "sha256": "ec228a4e5570742a9884b5688afaa78170a67aa2a78ae1546a3e24467183a40c"
+    },
+    {
+      "path": "knowledge_docs/public/axiom_technology_overview_revised_20261003.md",
+      "sha256": "3c666f94351794519c6988cfe3d9fe11141bbb1617fb99a786b1c6a251fd637a"
+    },
+    {
+      "path": "knowledge_docs/public/brand_story_company_public.md",
+      "sha256": "23620d9a210deca4bac4c22661606be1c340c4620d91c2cbd783e0a4fa2105b2"
+    },
+    {
+      "path": "knowledge_docs/public/cre_technology_overview_revised_20261003.md",
+      "sha256": "b156cebf7abe8c3f77ca16d2f11f34576bce2df55b1d4d9b3c3b7ce6a90d3833"
+    },
+    {
+      "path": "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md",
+      "sha256": "d0bd3f1c46259a884bf1075e001e7732b7426732ef440f3ebec98d1b82837163"
+    },
+    {
+      "path": "knowledge_docs/public/itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx",
+      "sha256": "abc65cc135a0a50da98843cdb1185c9fd8c318381a88f94ba6af5032f0eafa3c"
+    },
+    {
+      "path": "knowledge_docs/public/itriX_Knowledge_Core_Park_Junhu_v1.0.docx",
+      "sha256": "e7fd10d47e8050b5aabeff5204e7d770a1452ac6a7915fce8358d2289eab1c97"
+    },
+    {
+      "path": "knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+      "sha256": "0f0acd988dcf91a6e8ffa53616181533cc186744a9baaad30ce6fa4ad4b660d7"
+    },
+    {
+      "path": "knowledge_docs/public/research_portfolio_summary_20261002.md",
+      "sha256": "120a3543a3ea1813465467f88418c22f65bcc035a7aa47ab0aefb308523612e6"
+    }
+  ],
+  "source_audit": "source_alignment_20261003.json",
+  "retained_originals_after_review": [
+    "knowledge_docs/internal_only/iTrix_Atelier_Indigo_Theme_System_v2 (2).docx",
+    "knowledge_docs/internal_only/itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx"
+  ],
+  "revised_baseline_editions": [
+    "knowledge_docs/public/axiom_technology_overview_revised_20261003.md",
+    "knowledge_docs/public/cre_technology_overview_revised_20261003.md",
+    "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md",
+    "knowledge_docs/controlled_public/representation_framework_revised_20261003.md",
+    "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md",
+    "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+  ],
+  "counts": {
+    "active_sources": 31,
+    "removed_old_files": 35,
+    "replaced_by_current_editions": 28,
+    "removed_without_direct_replacement": 7,
+    "new_files": 13,
+    "existing_files_edited": 6
+  }
+}

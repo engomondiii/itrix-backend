@@ -96,10 +96,10 @@ def namespace_for(filename: str) -> str:
         return "company"
     if "itrix_product_canonical" in n or "itrix company overview" in n or "itrix_company_overview" in n:
         return "company"
-    # ALPHA Core product.
+    # AXIOM Core product.
     if "alpha core" in n or "alpha_core" in n:
         return "alpha-core"
-    # ALPHA Compute product + workload/bottleneck materials + the compute white paper.
+    # AXIOM Compute product + workload/bottleneck materials + the compute white paper.
     if (
         "alpha_compute" in n
         or "alpha compute" in n
@@ -186,6 +186,10 @@ def technology_family_for(filename: str) -> str:
 def entity_relationship_metadata_for(filename: str) -> dict:
     """Explicit entity/family/product relations for the current September sources."""
     policy = policy_for(filename)
+    if filename == "itrix_product_portfolio_v1_4.md":
+        return {"canonical_entities": ["ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime"], "technology_families": ["prism", "axiom", "axiom_tensor", "qnta"], "related_products": ["ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime"]}
+    if filename == "research_portfolio_summary_20261002.md":
+        return {"canonical_entities": list(policy.canonical_entities), "technology_families": ["axiom", "axiom_tensor", "cre", "fqnm", "qnta"], "related_products": ["AXIOM Compute", "QNTA Runtime"]}
     if policy and policy.canonical_entities:
         return {
             "canonical_entities": list(policy.canonical_entities),
@@ -197,7 +201,7 @@ def entity_relationship_metadata_for(filename: str) -> dict:
         return {
             "canonical_entities": ["AXIOM-TENSOR", "QNTA"],
             "technology_families": ["axiom_tensor", "qnta"],
-            "related_products": ["ALPHA Compute"],
+            "related_products": ["AXIOM Compute"],
         }
     if "prism_and_astop_explained" in n:
         return {
@@ -225,27 +229,27 @@ def entity_relationship_metadata_for(filename: str) -> dict:
         }
     if "productization_gtm_plan_v2.3" in n:
         return {
-            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "AXIOM Compute", "AXIOM Core"],
             "technology_families": ["astop", "alpha_compute", "alpha_core"],
-            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "related_products": ["ASTOP", "AXIOM Compute", "AXIOM Core"],
         }
     if "sales_platform_mvp_guide_for_fidel_v3.5" in n:
         return {
-            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "canonical_entities": ["AI-Powered Sales Platform", "ASTOP", "AXIOM Compute", "AXIOM Core"],
             "technology_families": [],
-            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "related_products": ["ASTOP", "AXIOM Compute", "AXIOM Core"],
         }
     if "white_paper_v3.5" in n or "itrix_product_canonical_v3_5" in n or "itrix_company_overview_public" in n:
         return {
             "canonical_entities": [
-                "ASTOP", "ALPHA Compute", "ALPHA Core",
+                "ASTOP", "AXIOM Compute", "AXIOM Core",
                 "PRISM", "AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "QNTA",
             ],
             "technology_families": [
                 "astop", "alpha_compute", "alpha_core", "prism", "axiom",
                 "axiom_tensor", "cre", "fqnm", "qnta",
             ],
-            "related_products": ["ASTOP", "ALPHA Compute", "ALPHA Core"],
+            "related_products": ["ASTOP", "AXIOM Compute", "AXIOM Core"],
         }
     return {
         "canonical_entities": [],

@@ -13,9 +13,10 @@ _BRAND_CORE = (
     "internal name 'Knowledge Core' to a visitor.\n"
     + taxonomy_prompt_block()
     + "\nTECHNOLOGY APPLICABILITY: no technology is universally applicable and they do not all apply together. "
-    "For a general technology overview, cover both intervention domains when relevant: observation before reasoning "
-    "(PRISM / ASTOP) and representation before execution (ALPHA Compute with eligible AXIOM / AXIOM-TENSOR / CRE / "
-    "FQNM / QNTA routes, plus ALPHA Core only where hardware evidence justifies it)."
+    "For a general technology overview, cover the relevant capability domains: observation before reasoning "
+    "(PRISM / ASTOP) and representation before execution (AXIOM Compute using AXIOM / AXIOM-TENSOR), learning through QNTA Runtime, "
+    "and planned AXIOM Core only where hardware evidence justifies it. CRE/FQNM/SPADES are separate assets, "
+    "not mandatory dependencies."
 )
 
 _CLAIMS_DISCIPLINE = (
@@ -29,7 +30,7 @@ _CLAIMS_DISCIPLINE = (
     "- Contract: capability is not commercial policy and neither is contractual entitlement. Before an executed "
     "term, use conditional language (may/could/would need to be agreed/if the agreement provides) and identify "
     "what must be decided rather than assigning rights, restrictions, ownership or defaults.\n"
-    "- Journey: never originate a PoC, licensing, production, ALPHA Core, email/contact request or other later "
+    "- Journey: never originate a PoC, licensing, production, AXIOM Core, email/contact request or other later "
     "stage merely because a conversation is technically sophisticated. Controlled evaluation remains controlled "
     "evaluation unless the user explicitly selects a PoC.\n"
     "- Claims: no guarantees, invented numbers, unsupported absolutes, superlatives or universal applicability. "

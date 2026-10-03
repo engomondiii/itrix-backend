@@ -53,11 +53,11 @@ def test_route_distribution_keys_are_display_strings():
     LeadFactory(product_route="both")
     dist = route_distribution()
     assert set(dist.keys()) == {
-        "Not yet assessed", "ASTOP", "ALPHA Compute", "ALPHA Core", "Multiple products"
+        "Not yet assessed", "ASTOP", "AXIOM Compute", "AXIOM Core", "Multiple products"
     }
     assert dist["Not yet assessed"] >= 1
     assert dist["ASTOP"] >= 1
-    assert dist["ALPHA Compute"] >= 1
+    assert dist["AXIOM Compute"] >= 1
 
 
 def test_submission_trend_is_continuous():

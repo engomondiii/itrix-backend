@@ -10,8 +10,8 @@ from apps.knowledge_core.models import HardFact, KnowledgeDocument
 
 def test_verify_ai_answer_accepts_current_hard_fact_grounding(db, monkeypatch):
     document = KnowledgeDocument.objects.create(
-        title="itrix product canonical v3 5",
-        file_path="knowledge_docs/public/itrix_product_canonical_v3_5.md",
+        title="itrix product portfolio v1 4",
+        file_path="knowledge_docs/public/itrix_product_portfolio_v1_4.md",
         namespace="company",
         disclosure_level="public",
         source_authority="authoritative",
@@ -23,10 +23,10 @@ def test_verify_ai_answer_accepts_current_hard_fact_grounding(db, monkeypatch):
         key="test-current-product-catalogue",
         category=HardFact.Category.CORPORATE,
         public_statement=(
-            "itriX currently has three products: ASTOP, ALPHA Compute and ALPHA Core."
+            "itriX currently has four offerings: ASTOP, AXIOM Compute, AXIOM Core and QNTA Runtime."
         ),
         source_reference=(
-            "knowledge_docs/public/itrix_product_canonical_v3_5.md"
+            "knowledge_docs/public/itrix_product_portfolio_v1_4.md"
         ),
         source_document=document,
         source_authority="authoritative",
@@ -80,7 +80,7 @@ def test_verify_rag_grounding_uses_arrived_public_context(monkeypatch):
                     "itriX currently has three products: "
                     "ASTOP, ALPHA Compute and ALPHA Core."
                 ),
-                "document_title": "itrix product canonical v3 5",
+                "document_title": "itrix product portfolio v1 4",
                 "heading": "Current product catalogue",
                 "namespace": "company",
                 "canonical_priority": 100,

@@ -2,8 +2,8 @@
 
 The ten-state relationship journey remains authoritative. This module owns the
 commercial gates layered on top of it: verified-counterparty resolution, controlled
-ASTOP progression/proof, ALPHA Compute assessment eligibility and fee treatment, and
-the later ALPHA Core evidence gate.
+ASTOP progression/proof, AXIOM Compute assessment eligibility and fee treatment, and
+the later AXIOM Core evidence gate.
 """
 from __future__ import annotations
 
@@ -414,16 +414,11 @@ def alpha_compute_gate(
 ) -> GateDecision:
     """Fail closed on substantive ALPHA gates; fee treatment is never a substitute."""
     reasons: list[str] = list(verified_counterparty_gate(lead).reasons)
-    astop = ASTOPEngagement.objects.filter(lead=lead).first()
     resolution = resolve_verified_counterparty(lead)
 
     if not _nda_is_signed(lead, resolution.client):
         reasons.append("signed_nda_required")
-    if astop is None or not astop.has_verified_value:
-        reasons.append("astop_verified_value_required")
-    else:
-        reasons.extend(controlled_evaluation_proof_gate(astop).reasons)
-        reasons.extend(_production_entitlement_reasons(astop))
+    # Portfolio v1.4: capability families are not a mandatory sales sequence.
 
     if not _truthy_text(separate_workload):
         reasons.append("separate_workload_required")

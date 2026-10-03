@@ -48,7 +48,7 @@ _DEFAULT_ACK = (
 )
 
 _NEXT_LINE = (
-    "A few short questions will let us map this to ALPHA Compute, ALPHA Core, or both, "
+    "A few short questions will let us map this to AXIOM Compute, AXIOM Core, or both, "
     "and prepare a personalized review."
 )
 

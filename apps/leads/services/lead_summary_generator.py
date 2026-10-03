@@ -40,9 +40,9 @@ _PRESSURE_PHRASE = {
 _ROUTE_PHRASE = {
     "undetermined": "No product route has been assessed yet.",
     "astop": "ASTOP relevance has been established as a hypothesis; controlled product qualification remains separate.",
-    "alpha_compute": "Representation-level diagnosis (ALPHA Compute) is the natural entry point.",
-    "alpha_core": "Execution/runtime work (ALPHA Core) is the natural entry point.",
-    "both": "Both representation (ALPHA Compute) and execution (ALPHA Core) are relevant.",
+    "alpha_compute": "Representation-level diagnosis (AXIOM Compute) is the natural entry point.",
+    "alpha_core": "Execution/runtime work (AXIOM Core) is the natural entry point.",
+    "both": "Both representation (AXIOM Compute) and execution (AXIOM Core) are relevant.",
     "general": "No product route has been assessed yet.",
 }
 

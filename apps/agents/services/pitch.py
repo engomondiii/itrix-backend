@@ -233,9 +233,9 @@ class PitchAgent(BaseAgent):
         """Deterministic, claims-disciplined 6-slide room built from the lead's signals."""
         pitch_type = select_pitch_type(ctx)
         route_label = {
-            "alpha_compute": "ALPHA Compute",
-            "alpha_core": "ALPHA Core",
-            "both": "ALPHA Compute + Core",
+            "alpha_compute": "AXIOM Compute",
+            "alpha_core": "AXIOM Core",
+            "both": "AXIOM Compute + Core",
         }.get(ctx.product_route, "ALPHA")
 
         slides = [

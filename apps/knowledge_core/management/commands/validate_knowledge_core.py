@@ -27,7 +27,7 @@ from apps.knowledge_core.management.commands.register_knowledge_docs import FOLD
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NEGATION = re.compile(r"\b(?:not|never|no|does\s+not|do\s+not|is\s+not|isn't|cannot|can't|without)\b", re.I)
-_TECH_ENTITY = r"(?:PRISM|AXIOM(?:-TENSOR)?|CRE|FQNM|QNTA)"
+_TECH_ENTITY = r"(?:PRISM|AXIOM(?:-TENSOR)?(?![-\w]|\s+(?:Compute|Core))|CRE|FQNM|QNTA(?!\s+Runtime))"
 
 
 def current_public_conflicts(text: str) -> list[str]:
@@ -45,29 +45,25 @@ def current_public_conflicts(text: str) -> list[str]:
         problems.append("two-product public catalogue")
     if re.search(r"\bitrix\s+(?:currently\s+)?has\s+(?:only\s+)?two\s+products\b", value, re.I):
         problems.append("two-product public catalogue")
-    if re.search(rf"\bproducts?\s+(?:are|include|consist of|comprise)\b.{{0,120}}\b{_TECH_ENTITY}\b", value, re.I | re.S):
+    if any(re.search(rf"\bproducts?\s+(?:are|include|consist of|comprise)\b.{{0,120}}\b{_TECH_ENTITY}\b", sentence, re.I)
+           for sentence in _SENTENCE_SPLIT.split(value)):
         problems.append("technology classified as sold product")
 
     if re.search(r"(?:complete|current|all)\s+(?:itrix\s+)?products?|what does itrix actually sell", value, re.I | re.S):
-        if "ALPHA Compute" in value and "ALPHA Core" in value and "ASTOP" not in value:
+        if "AXIOM Compute" in value and "AXIOM Core" in value and "ASTOP" not in value:
             problems.append("complete product catalogue omits ASTOP")
 
     for sentence in _SENTENCE_SPLIT.split(value):
         sentence = sentence.strip()
         if not sentence or _NEGATION.search(sentence):
             continue
-        if re.search(r"\bASTOP\b.{0,80}\bself[- ]service\b|\bself[- ]service\b.{0,80}\bASTOP\b", sentence, re.I):
-            problems.append("ASTOP self-service claim")
         if re.search(r"\bASTOP\s+(?:Team|Pro|Business|Enterprise)\b", sentence, re.I):
             problems.append("obsolete ASTOP tier model")
         if re.search(r"\$(?:99|499|12(?:,?000)|100(?:,?000))\b", sentence) and re.search(r"\b(?:ASTOP|Team|Pro|Business|Enterprise|price|pricing|plan|tier)\b", sentence, re.I):
             problems.append("obsolete public ASTOP pricing")
-        if re.search(r"\b(?:buy|purchase|checkout)\b.{0,100}\bASTOP\b|\bASTOP\b.{0,100}\b(?:buy|purchase|checkout)\b", sentence, re.I):
-            problems.append("ASTOP public checkout")
         if re.search(r"\b(?:public|anonymous|anyone|visitor)\b.{0,120}\b(?:executable|binary|download|installer)\b", sentence, re.I):
             problems.append("public unrestricted executable access")
-        if re.search(r"\b(?:money[- ]back|refund)\s+guarantee\b", sentence, re.I):
-            problems.append("obsolete money-back guarantee")
+
 
     # Stable order and no duplicate labels when one chunk repeats the same doctrine.
     return list(dict.fromkeys(problems))
@@ -142,7 +138,7 @@ class Command(BaseCommand):
         # ── Current product doctrine ─────────────────────────────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("Canonical product source"))
         canonical = KnowledgeDocument.objects.filter(
-            file_path__icontains="itrix_product_canonical_v3_5.md",
+            file_path__icontains="itrix_product_portfolio_v1_4.md",
             is_current=True,
             source_authority="authoritative",
             ingestion_status=IngestionStatus.COMPLETE,
@@ -152,12 +148,14 @@ class Command(BaseCommand):
             doc = canonical.first()
             self.stdout.write(self.style.SUCCESS(f"  current: {doc.title} ({doc.chunk_count} chunks)"))
         else:
-            self.stdout.write(self.style.ERROR("  ! Current September v3.5 product canonical is not authoritative/current/COMPLETE + public."))
+            self.stdout.write(self.style.ERROR("  ! Current October portfolio v1.4 is not authoritative/current/COMPLETE + public."))
             problems += 1
 
         old_current = KnowledgeDocument.objects.filter(is_current=True).filter(
             Q(file_path__icontains="itrix_product_canonical_v2_4.md")
             | Q(file_path__icontains="WP_ALPHA_Compute_Core_v2.4.docx")
+            | Q(file_path__icontains="itrix_product_canonical_v3_5.md")
+            | Q(file_path__icontains="astop_prism_public_safe_v2_3.md")
         )
         if old_current.exists():
             problems += old_current.count()
@@ -178,15 +176,19 @@ class Command(BaseCommand):
                     f"  ! current public conflict ({label}): {chunk.document.file_path} chunk {chunk.chunk_index}"
                 ))
 
-        # ── September 2026 ASTOP / Sales Platform authority ─────────────────
-        self.stdout.write(self.style.MIGRATE_HEADING("September 2026 governing sources"))
+        # ── October 2026 domain authority ─────────────────
+        self.stdout.write(self.style.MIGRATE_HEADING("October 2026 governing sources"))
         required_sources = (
-            ("ASTOP_Productization_GTM_Plan_v2.3", "internal_only", "authoritative"),
-            ("itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5", "internal_only", "authoritative"),
-            ("itriX_White_Paper_v3.5", "internal_only", "authoritative"),
-            ("prism-paper-current_v2", "controlled_public", "authoritative"),
-            ("astop_prism_public_safe_v2_3", "public", "governing"),
-            ("itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel", "internal_only", "governing"),
+            ("itrix_product_portfolio_v1_4.md", "public", "authoritative"),
+            ("astop_product_and_access_20261002.md", "public", "authoritative"),
+            ("research_portfolio_summary_20261002.md", "public", "governing"),
+            ("platform_governance_current_20261003.md", "internal_only", "governing"),
+            ("astop_customer_journey_20261003.md", "public", "governing"),
+            ("astop_license_order_summary_v2_6.md", "public", "governing"),
+            ("astop_branch_program_summary_v1_4.md", "public", "governing"),
+            ("astop_comparison_current_20261003.md", "public", "authoritative"),
+            ("astop_software_protection_v1_5.md", "internal_only", "governing"),
+            ("research_evidence_register_20261003.md", "controlled_public", "governing"),
         )
         for filename, level, authority in required_sources:
             row = KnowledgeDocument.objects.filter(

@@ -1,0 +1,711 @@
+{
+  "date": "2026-10-03",
+  "records": [
+    {
+      "group": "old",
+      "source": "itriX Website Build Execution Plan_V2.0.docx",
+      "sha256": "03a9541b7be29190e5600c6e5ab94f24cd6dbd84398517f8ac63b849e5c08576",
+      "bytes": 38388,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "itriX Homepage Wireframe v0.3.docx",
+      "sha256": "b45684863365e69dc3466c922515bbf5afd9ad2da860e406824d36f3d08c8ae4",
+      "bytes": 34494,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "itriX Website Personas v0.1.docx",
+      "sha256": "18dbf3ecde000d7eb7c7f5a94b0c1975642801bac54559796e431bcb882d5626",
+      "bytes": 32899,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itriX AI Sales Engine MVP Functional Specification_V1.0.docx",
+      "sha256": "f5da3aded58cf79668508cbbe322368e85b1c01ed68fdef75f88ee1ed64a436a",
+      "bytes": 46044,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "Master_Thesis_2026_Feb.pdf",
+      "sha256": "e2625b7b0f9d037cbd8bb9ef1d751b24e485ba0e83780fc0e28533fe2cd5150d",
+      "bytes": 3418423,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX Compute Bottleneck Review Briefing Template v0.3.docx",
+      "sha256": "6eab88e31bd38d4f0dc47b3bd3c77a673f95238a16fa86ace837e5f67ed4524a",
+      "bytes": 26324,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "iTrix Website Build Package_V1.0.docx",
+      "sha256": "99493336d7ac942debdb4a0d23d457c22c463e4569f699ecbaee1a66bfb60b9b",
+      "bytes": 45688,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "FQNM_arXiv.pdf",
+      "sha256": "8e660bc442e4b420a2c1454e62c23e534d266df2deb313eed1655a2bd35da5ff",
+      "bytes": 587789,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "Brand Story of itriX.docx",
+      "sha256": "99a2e53e995d3feef38d5130ce768a7b968db66d47794a7a9dc4ea3e13b43d92",
+      "bytes": 17571,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "Project Playbook_Ai Sales Platform for ITrix.docx",
+      "sha256": "7f503806beaac872bf9f0b79b9e65beadde9f803a9656c64a718f45e91610ab1",
+      "bytes": 60404,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "TurboQuant_vs_FQNM_Comparison_Paper_V1.0.docx",
+      "sha256": "ecdf2c7c80375356cf78e5302b96f2ea4ee47bc6388528cfcd6e96647636a49d",
+      "bytes": 39269,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "Brand Story of itriX_short version.docx",
+      "sha256": "23c2581a43530af6fcd16e511c164f62cb09bc27a540b27d2cd99e30697f9a31",
+      "bytes": 15611,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "iTrix Investor Data Room File List.docx",
+      "sha256": "c9d1677d65f12e437065be01c6af8cb388e9d1bcc94460e99f8ab2a19d4468d9",
+      "bytes": 58784,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "iTrix Website UX & Content Blueprint_V1.0.docx",
+      "sha256": "87c5f98db4bcfa07f5da4735fe29b1c62fd481e03055cf8f34bc9e085d8dbe84",
+      "bytes": 51854,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "Brand Story_itriX.ai",
+      "sha256": "6e317c27e5a0195fbb8a0772bca4cb02020612f92a0ca187676de78e87a861f0",
+      "bytes": 3213317,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "iTrix Website MVP Product Requirement Document_V1.0.docx",
+      "sha256": "9d410b4f8ad8ca1239b038e291de43d0e31b2e37a91eeebd49ee9372c0e61375",
+      "bytes": 140523,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "WP_Alpha Compute Core.docx",
+      "sha256": "79351c14509f73891dd402d239bb5204b38d5aeaf1e978c7fd461d49c99deeca",
+      "bytes": 51620,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "WP_Alpha Compute Core (1).docx",
+      "sha256": "79351c14509f73891dd402d239bb5204b38d5aeaf1e978c7fd461d49c99deeca",
+      "bytes": 51620,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "Brand Story of itriX_long version.docx",
+      "sha256": "b675b56f0fa07686bef14b0952fdcacbcadec83acb80a54ee6febaa6438bcebf",
+      "bytes": 16607,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "Kickoff Direction for the itriX Project.docx",
+      "sha256": "a5a62fe153d51d2acad8a8913273cd044ae27c9eb6cd7c43bb889ec5a4de8eaf",
+      "bytes": 24345,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "Redefining_Computation.docx",
+      "sha256": "d510e9a287e6c82b5cc6bd6f43af433cf956e194f157eb83dbded95283202e80",
+      "bytes": 30780,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX Website Building Guideline Book.docx",
+      "sha256": "c4737de240408e43f7d1cb1529b160346f27176e8e3c8bde261a33df3d5bd52e",
+      "bytes": 33964,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itriX Knowledge Core Input Request List v0.1.docx",
+      "sha256": "ec8f00d81f50f48368cc20b37886b5bd99218b153839e21a5c889dff996cc1cf",
+      "bytes": 32874,
+      "disposition": "Historical implementation checklist, source request, fundraising inventory or superseded wireframe; not current answer evidence. Applicable platform controls are retained in the revised operating reference; original remains in Git history.",
+      "current_replacement": null
+    },
+    {
+      "group": "old",
+      "source": "LO Patheway_Flowchart.ai",
+      "sha256": "c799e7063d2d7ed186a98d00bb83aee8e499b485ce54b6401f50565144c0d246",
+      "bytes": 216078,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX Visitor Journey Map v0.1.docx",
+      "sha256": "5708a404aa2186a285ad26c7b9b4ce3d9a428241197b299f1654c037326767e9",
+      "bytes": 34804,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_operating_reference_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Complete_Surface_1_Structure_v8.0.docx",
+      "sha256": "8de88fa79e855a8226bbcd9d54de2a8681a81f0c364f540b9713e3b1c45dd97b",
+      "bytes": 23704,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Complete_Backend_Structure_v7.2.docx",
+      "sha256": "a89fb9fd57203c6260a9f64b097ce92245bd0dc6cf6c2f9c22536e586e010099",
+      "bytes": 28878,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Public_Website_Content_and_Flow_Playbook_v1.9.docx",
+      "sha256": "e87b7cb5e433c7cc45776aaf160fc658cdaa07d7ec695e0a12b32a69380f6e5f",
+      "bytes": 19947,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "PRISM and ASTOP- Intelligent Observation for AI Systems.pdf",
+      "sha256": "5458695ba278a95ef77248cb3ec0275cac3263c00d21cc1e6201dc4df232c8b0",
+      "bytes": 96796,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Master_Technical_Architecture_v2.9.docx",
+      "sha256": "8b46b24eb05f7422e0f4d375a308a5c1cefb73bf5baea7ed157f99912e728411",
+      "bytes": 26367,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_White_Paper_v3.5.docx",
+      "sha256": "5d3d66bf31ed0c616ee1f0118a35b3dd03f758988ab356b289e5774b110dc699",
+      "bytes": 82117,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/itrix_product_portfolio_v1_4.md"
+    },
+    {
+      "group": "old",
+      "source": "PRISM_and_ASTOP_Explained.docx",
+      "sha256": "a391b06b52dcef8c15b5eab68468600213737c3641abfed78976fcde63a124bf",
+      "bytes": 34000,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_product_and_access_20261002.md"
+    },
+    {
+      "group": "old",
+      "source": "ßäÄßà¼ßäîßà⌐ßå╝ V.3.svg",
+      "sha256": "45b5299df4a33a69669ad1b21caf12021fecdacf0bb30d373944ce4ee53250b4",
+      "bytes": 1036,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "ASTOP_Consolidated_Feedback_24_September_2026.docx",
+      "sha256": "1d4e8d99b134cddd6beb6cbc568eb5c5c4500a163ffca2ef9b372414b2ff8b23",
+      "bytes": 52787,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_AI_Sales_Platform_MVP_Guide_for_Fidel_v3.5.docx",
+      "sha256": "6f6741fe173bcf260fa4a7054c72ca03ff05a01bad8acc566d219fea149dbfdd",
+      "bytes": 53084,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/platform_governance_current_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itrix_60_target_customer_personas_v2.xlsx",
+      "sha256": "3e934245e41eef62f76f9bb86ecd55c9e553ca6c8ded594ed16abb254e40548a",
+      "bytes": 91581,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Complete_Surface_2_Structure_v7.1.docx",
+      "sha256": "222bb66614d2a7030fdf698a9a81517fc337ada3fabfee6444ebad60da6b9392",
+      "bytes": 19647,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "ASTOP_Productization_GTM_Plan_v2.3.docx",
+      "sha256": "4d4eaae9e896465317f938246e365e719e48b7de2f89824c374bafe2ff413634",
+      "bytes": 45569,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_product_and_access_20261002.md"
+    },
+    {
+      "group": "old",
+      "source": "README_Astop.txt",
+      "sha256": "c08c3714686dfc630b980ee90cfc792617995c2d93de996e0a8ab765a62289ea",
+      "bytes": 55260,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_From_Token_Economy_to_Computation_Economy.docx",
+      "sha256": "98fd7e30db09b3c0929969c5eef304b909542bd6198297e948417539703e5d74",
+      "bytes": 35599,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Legal_Instruments_v1.2.docx",
+      "sha256": "7707e7835b56acf12f7e65b8259560fcee75a059080f9d8cb1e1c1430cf39593",
+      "bytes": 20400,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "PRISM and ASTOP- Intelligent Observation for AI Systems (1).pdf",
+      "sha256": "5458695ba278a95ef77248cb3ec0275cac3263c00d21cc1e6201dc4df232c8b0",
+      "bytes": 96796,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Brand_Manual_v3_1_Final.pdf",
+      "sha256": "ae48797f2f0ee92fa6559a7b9a6a6587d7516a30cf21be21eaab9e7c5f32f12d",
+      "bytes": 3333414,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "prism-paper-current_v2.pdf",
+      "sha256": "e57138093714c23e6e9143359bb8a4964a21635bd2bab1b5b4c37c0c4ef130f6",
+      "bytes": 599449,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/research_evidence_register_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Full_Visitor_Journey_v2_2.docx",
+      "sha256": "0581ae787002f2fe948c34fd7823e71efc4c020710c15cba554a3ffe1bfd9705",
+      "bytes": 8770544,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Investor_Partner_Visitor_Journey_v2_2.docx",
+      "sha256": "de95accab0173d59f1bfc16332fddf6e9766b02e907a6d2cdadd1e78646e9970",
+      "bytes": 1294437,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Media_Creator_Visitor_Journey_v2_2.docx",
+      "sha256": "2076241e50f06e036ad5d430a0141e7d614737d41b7f713fb5c64918a62dfbb8",
+      "bytes": 1283906,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Research_Public_Institution_Visitor_Journey_v2_2.docx",
+      "sha256": "57626d4f508f63efe9602ab720522ed4793640231e3ede7ac518891b6d14b181",
+      "bytes": 1218888,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Shareholder_Stakeholder_Visitor_Journey_v2_2.docx",
+      "sha256": "20d5132a9401c2582c15b2ba1deaba6c0b7670fba19c68c5da994b4d8891e708",
+      "bytes": 1058490,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Strategic_Customer_Journey_v2_2.docx",
+      "sha256": "21b65c9e40fadfff128d61b6a6787d8b76457e13b4c052809bc037e5974bcd24",
+      "bytes": 7357812,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Technical_Evaluator_Visitor_Journey_v2_2.docx",
+      "sha256": "a4f04cad5b5b9fa43bea881d200259509613bb7a6e9ff079d7d88db60bb02966",
+      "bytes": 1183342,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Thirteen_Room_Architecture_Standard_v2_2.docx",
+      "sha256": "ff3a60fee0b4e242c9a941e5217e11b79660a5c7d6acfa2461af1ab143f64889",
+      "bytes": 1745855,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Visitor_Feeling_and_Experience_Standard_v2_2.docx",
+      "sha256": "5f52cf760e16a8b0f3888cc1da49bbde75d2cfb3e95c61616d08b4e295a1157f",
+      "bytes": 890747,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Website_Experience_and_Governance_Standard_v2_2.docx",
+      "sha256": "214c0300b5a8f731ea6a68a038928f490a0e235292682574cd35b463daf9f703",
+      "bytes": 2294293,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "~$riX_Shareholder_Stakeholder_Visitor_Journey_v2_2.docx",
+      "sha256": "35a568116479d2dc13a8e24bf252a3d27bde85f5fb2f1cd86a5db3c95c891bc0",
+      "bytes": 162,
+      "disposition": "Ignore Office lock file; not an authoritative document"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Visitor_and_Customer_Journey_v2.2.zip",
+      "sha256": "9dc3c7190e413d1f33a8e039f5150e1fab0f373b6dae5104c32c0ae37d1e0760",
+      "bytes": 25836470,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Knowledge_Core_Kang_Myungjoo_v1.0.docx",
+      "sha256": "abc65cc135a0a50da98843cdb1185c9fd8c318381a88f94ba6af5032f0eafa3c",
+      "bytes": 60823,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "4_4_Unified Mathematical View_Inventor_V2.0.docx",
+      "sha256": "8e05e83e2291d1eb9e79e3b8ae1d0457b9f816b45bf21e2face2cee2f321a9be",
+      "bytes": 36742,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/representation_framework_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx",
+      "sha256": "a5c91a732e38e53a2dab57a3d43825b4a18b2b60407e21bff7040bf1ec6c4764",
+      "bytes": 49365,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/astop_comparison_current_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "5_1_ALPHA_Compute_Overview_v2.0.docx",
+      "sha256": "c6b83ce66eb1dea92c4f0a0fc0c44d9214437ffe41ac1602f80398937c8dd789",
+      "bytes": 43785,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "itriX_Knowledge_Core_Park_Junhu_v1.0.docx",
+      "sha256": "e7fd10d47e8050b5aabeff5204e7d770a1452ac6a7915fce8358d2289eab1c97",
+      "bytes": 61603,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "iTrix Pricing Policy Version 2.0.docx",
+      "sha256": "dac7cc4a893bd1a8ab15ae95d7b4a80aefa0c4e8d3acb5ee37c60310936d4488",
+      "bytes": 27244,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/internal_only/licensing_and_commercialization_internal.md"
+    },
+    {
+      "group": "old",
+      "source": "4_2_CRE_Overview_v2.0.docx",
+      "sha256": "7fd21b1e83b7a39ae96336073c0a6a67495224edd1e0a4fb5bbba20acfc9786d",
+      "bytes": 38629,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/cre_technology_overview_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "4_3_FQNM_Overview_v2.0.docx",
+      "sha256": "d961a4dc52f45997e41562082efcd6a969c0dca408b72d0f52392f82616116be",
+      "bytes": 44235,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/fqnm_technology_overview_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "7_AI-Aggravated Bottleneck Materials_V2.0.docx",
+      "sha256": "1c102e4d2e03c1447ae00c33aeee1b1c6e2b4fd81772f9fc8f7cddfd8ebcf7ce",
+      "bytes": 50964,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "5_2_ALPHA Core Product Overview_V2.0.docx",
+      "sha256": "5c8f6e43e93491a49754f951bea8c13e353417334164109cf63af1a5e1c63674",
+      "bytes": 53110,
+      "disposition": "Baseline reference; retain unchanged unless superseded in source_manifest.py"
+    },
+    {
+      "group": "old",
+      "source": "4_1_AXIOM_Overview_v2.0.docx",
+      "sha256": "1f3ef710ca72c2b71360bae3c3478450e3278d717e65418e11479b5a9093e01e",
+      "bytes": 40157,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/public/axiom_technology_overview_revised_20261003.md"
+    },
+    {
+      "group": "old",
+      "source": "6_Computational Workload and Platform Materials_V2.0.docx",
+      "sha256": "3075bb47d55b1c355a8df954a6ab414e90730d70c0f9c84b0f0f01e69e97ea9f",
+      "bytes": 38406,
+      "disposition": "Retain applicable subject matter in the linked current edition; remove obsolete product roles, access rules and private filing references where present. Original remains recoverable in Git history.",
+      "current_replacement": "knowledge_docs/controlled_public/workload_and_bottleneck_guide_revised_20261003.md"
+    },
+    {
+      "group": "new",
+      "source": "itriX_Product_Portfolio_and_Technology_Architecture_v1.4.docx",
+      "sha256": "d5c058080751276f65aac65eb6caa8416ac0845291bd43966f46ad02badbf169",
+      "bytes": 36905,
+      "disposition": "Current domain authority; sanitized public summaries and corresponding application rules"
+    },
+    {
+      "group": "new",
+      "source": "QNTA_SYSTEMS.pdf",
+      "sha256": "f957e41bb72879a9fb3473c8d74c6cdfd3be31e1f020c35fc4c2d4cf80c07813",
+      "bytes": 246530,
+      "disposition": "Restricted mechanisms; retain privately; bounded research/portfolio summary only"
+    },
+    {
+      "group": "new",
+      "source": "itriX_ASTOP_Branch_Agreement_v1.4.docx",
+      "sha256": "ec8377953cc5335d790e18fdc91ddc546c5e5ba86c5b1e2741129e6ef903f0b2",
+      "bytes": 46194,
+      "disposition": "Draft agreement with unresolved execution fields; private reviewed legal release required"
+    },
+    {
+      "group": "new",
+      "source": "ASTOP_Software_Protection_Policy_v1.5.docx",
+      "sha256": "160b287c9dc63ae5b840676dbea608ca61fb6da5451dcdb6a2aa0b93d42fb7fb",
+      "bytes": 37033,
+      "disposition": "Current domain authority; sanitized public summaries and corresponding application rules"
+    },
+    {
+      "group": "new",
+      "source": "ASTOP_White Paper_v2.3.pdf.pdf",
+      "sha256": "8d7ed5eaa34337ba79c3778a998d94691d777312fe796ec9b62601ceda36b35b",
+      "bytes": 8377736,
+      "disposition": "Current domain authority; sanitized public summaries and corresponding application rules"
+    },
+    {
+      "group": "new",
+      "source": "astop-sales-strategy.pptx",
+      "sha256": "cd821def9fd3aaca2b4ca9458dc92d4c6841236791211323146f8a8070125909",
+      "bytes": 140191,
+      "disposition": "Options for discussion; no freemium, trial, hosted service or installer distribution approved by this deck"
+    },
+    {
+      "group": "new",
+      "source": "ASTOP_Website_License_Order_Agreement.docx",
+      "sha256": "7930453bc95912260796bf622140e0093c2d837715a7efea719543ccc4bd3e67",
+      "bytes": 46656,
+      "disposition": "Version 2.6 controls retail prices and terms; private exact approved legal release required before checkout"
+    },
+    {
+      "group": "new",
+      "source": "QNTA_CONTRACT.pdf",
+      "sha256": "b621f70b74bfb8ac4ddae3510ad92daf485d22125e804041e8f0316a57b8ddcf",
+      "bytes": 286641,
+      "disposition": "Restricted mechanisms; retain privately; bounded research/portfolio summary only"
+    },
+    {
+      "group": "new",
+      "source": "R02_CRE-SPD_Cholesky-Inverse-Reconstruction.pdf",
+      "sha256": "689f93d64b21340a407ac88aac0c9bb3ff7fd65f0b445026c99fc8e4ebbbdb90",
+      "bytes": 253652,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R06_SPADES.pdf",
+      "sha256": "b5936e184d7a5a17b3d6b1e1c141b774c9609f41936360b1bfb306f65ef31ac1",
+      "bytes": 1107868,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R03_AXIOM_Signed-XOR_Table-Free-Multiplication.pdf",
+      "sha256": "69ff1d889f82af77eaad9d8ad441974b88adb761093b1baeb1aa14b03d54abf9",
+      "bytes": 412757,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R04_Judge-CIA_Anonymous.pdf",
+      "sha256": "05d5aff9d227a3f133f2c0dd253c20689e2ce6261b5ee6570faaba91cc9825b3",
+      "bytes": 2853725,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R01_FQNM_Continuum-Dynamics.pdf",
+      "sha256": "7ac32a833b0f79184cdfef01fac7863d4b63ab7bc191e5d9083af1c37bc9d940",
+      "bytes": 680194,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R07_PRISM.pdf",
+      "sha256": "ace2e1f56a96a103143eff79dac0c8a4cfadacfd0adae123172a85cf5afdf93b",
+      "bytes": 1386577,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "R05_AXIOM-TENSOR_Latest_2026-08-06.pdf",
+      "sha256": "4f456a0c9ce00578e8a5f96c90252b73f97f82eee24990d83d981152234fad22",
+      "bytes": 368159,
+      "disposition": "Bounded research evidence; summarized without converting test-specific findings into product guarantees"
+    },
+    {
+      "group": "new",
+      "source": "02_[restricted-reference]_CRE-SPD_Application-Specification.pdf",
+      "sha256": "5d38e5470139fb8a056fba9d6b09983a27375a8ffeed86ab4c7182be1d000272",
+      "bytes": 958458,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "06_[restricted-reference]_AXIOM-TENSOR_Application-Specification.pdf",
+      "sha256": "d2884b8064edb1521ce201236af9612d5d247bd2efcd75350a0fe7cf8a77cb8e",
+      "bytes": 737314,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "03_[restricted-reference]_AXIOM-Operation_Application-Specification.pdf",
+      "sha256": "594759d8dcb69fb8e5a751d688783cc7b15d3a9ee4ca1ecb5498e7bac6fff89d",
+      "bytes": 911034,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "07_[restricted-reference]_SPADES_Application-Specification.pdf",
+      "sha256": "46bf47d940fa2cb8ca0c317747ce213c13d9096097ff78c6ddd9e55d152d54ce",
+      "bytes": 955496,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "04_[restricted-reference]_Judge-CIA_R1_No-Filed-PDF.docx",
+      "sha256": "bb037a0ec4d8c772da2f8a4ae9ca027abacf127cfd74e7a62f5c7665748cc589",
+      "bytes": 2706726,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "08_[restricted-reference]_PRISM_Application-Specification.pdf",
+      "sha256": "c1e19d1468a5e64c0b16822b6f7cdae4664efd139b068c1b9db1ced006cf6e8a",
+      "bytes": 799190,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "05_[restricted-reference]_Hallucination-Monitoring_Application-Specification.pdf",
+      "sha256": "5ec49308912791836bec1307b79315e4c2d0a94d2483d9ff5beff19fccaa5f7b",
+      "bytes": 428059,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "01_[restricted-reference]_FQNM_Application-Specification.pdf",
+      "sha256": "74678e02c24b2895551d481e48701f4fb2d0e7b177549195d77bd6fec796c50a",
+      "bytes": 564040,
+      "disposition": "Restricted original; no public import; patent application does not establish a grant"
+    },
+    {
+      "group": "new",
+      "source": "Patent-Paper-Mapping.xlsx",
+      "sha256": "b196391df63784710155d13f70261a42dcfbc7e654355c266fba6b62baa0247d",
+      "bytes": 5843,
+      "disposition": "Package provenance and mapping; not public product claims"
+    },
+    {
+      "group": "new",
+      "source": "README_KO.txt",
+      "sha256": "3f0c533b7ded5f5123bce2154ef0a6ba2013af86f909f5f820e662e43ec45e2b",
+      "bytes": 881,
+      "disposition": "Package provenance and mapping; not public product claims"
+    },
+    {
+      "group": "new",
+      "source": "SHA256SUMS.txt",
+      "sha256": "ea98f8aa3af58db14223a91c67a22c6adc3b21571a25cc90244240f835b2b684",
+      "bytes": 2165,
+      "disposition": "Package provenance and mapping; not public product claims"
+    },
+    {
+      "group": "new",
+      "source": "iTrix_Patent_Research_Package_2026-09-11 (1).zip",
+      "sha256": "cc5d17f4c44f56cd0c029a3ef51dd087adcaf9a41a30db47831ad6a39d64adeb",
+      "bytes": 10818371,
+      "disposition": "Package provenance and mapping; not public product claims"
+    },
+    {
+      "group": "new",
+      "source": "IWL_Partners_Branching_Strategy_Framework_v2.1.docx",
+      "sha256": "85323a1cad50da89b327e6a3a1537b3642fec433d5410124874515faca51b875",
+      "bytes": 45324,
+      "disposition": "Confidential strategy; do not publish original; formal Branch agreement controls"
+    },
+    {
+      "group": "new",
+      "source": "ASTOP_Customer_Journey_v1.0.docx",
+      "sha256": "5b2b8d7714d08e8092dea83745bb6acf4c0e84059d537c62c41ffc186953f307",
+      "bytes": 288849,
+      "disposition": "Current domain authority; sanitized public summaries and corresponding application rules"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 """Deterministic ALPHA assessment fee-policy orchestration.
 
-This is the orchestration seam between a newly qualified ALPHA Compute assessment and the
+This is the orchestration seam between a newly qualified AXIOM Compute assessment and the
 existing governed fee-decision service. The model is never asked to invent policy
 criteria, percentages or amounts: only values explicitly present in configuration can be
 forwarded. When no automatic policy decision is configured, the result is an explicit

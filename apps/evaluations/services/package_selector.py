@@ -1,8 +1,8 @@
 """
 Package selector.
 
-Chooses the right evaluation package from a lead's product route: ALPHA Compute →
-Compute Bottleneck Assessment, ALPHA Core → Core Runtime Fit Assessment, both → Combined.
+Chooses the right evaluation package from a lead's product route: AXIOM Compute →
+Compute Bottleneck Assessment, AXIOM Core → Core Runtime Fit Assessment, both → Combined.
 """
 
 from __future__ import annotations

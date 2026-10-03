@@ -1,4 +1,4 @@
-"""Team-plane operation for opening a governed ALPHA Core opportunity."""
+"""Team-plane operation for opening a governed AXIOM Core opportunity."""
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated

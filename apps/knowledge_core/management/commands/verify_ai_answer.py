@@ -15,16 +15,16 @@ from apps.knowledge_core.models import HardFact, KnowledgeChunk
 
 
 DEFAULT_QUESTION = (
-    "What are ALPHA Compute and ALPHA Core, and can ALPHA Compute deploy in "
-    "production without ALPHA Core?"
+    "What are AXIOM Compute and AXIOM Core, and can AXIOM Compute deploy in "
+    "production without AXIOM Core?"
 )
 
 
 def _is_v35_canonical_reference(value: str) -> bool:
     blob = (value or "").replace("\\", "/").lower()
     return (
-        "itrix_product_canonical_v3_5" in blob
-        or "itrix product canonical v3 5" in blob
+        "itrix_product_portfolio_v1_4" in blob
+        or "itrix product portfolio v1 4" in blob
     )
 
 

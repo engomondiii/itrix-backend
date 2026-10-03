@@ -4,7 +4,7 @@ Lead filtering.
 Backs the dashboard's leads-table query params (``itrix-dashboard`` lead list):
 ``tier``, ``route``, ``status``, ``owner``, ``search``, plus score-range and sort. The
 ``route`` filter accepts both the canonical code (``alpha_compute``) and the dashboard's
-display string ("ALPHA Compute"); ``search`` spans company / name / email / industry /
+display string ("AXIOM Compute"); ``search`` spans company / name / email / industry /
 primary pain.
 """
 

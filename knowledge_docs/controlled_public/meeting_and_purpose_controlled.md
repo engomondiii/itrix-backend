@@ -1,8 +1,7 @@
 # iTrix Meeting & Purpose Guide — Controlled Public
 
 ## Purpose
-Every iTrix meeting serves the same purpose: confirm the real bottleneck and decide,
-honestly, whether a scoped evaluation is warranted. The point is durable capability, not a
+An enterprise discovery meeting confirms the real bottleneck and whether a scoped evaluation is warranted. Retail ASTOP discussions can instead explain fit, installation, LO pricing and verified purchase prerequisites without forcing an enterprise evaluation. The point is durable capability, not a
 persuasive demo.
 
 ## Product

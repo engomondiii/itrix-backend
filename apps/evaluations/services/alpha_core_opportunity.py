@@ -1,4 +1,4 @@
-"""Idempotent governed opening of a separate ALPHA Core opportunity."""
+"""Idempotent governed opening of a separate AXIOM Core opportunity."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,7 +22,7 @@ def _actor_name(by) -> str:
 
 @transaction.atomic
 def open_alpha_core_opportunity(compute_evaluation: Evaluation, *, by=None) -> AlphaCoreOpportunityResult:
-    """Open one ALPHA Core opportunity only after the existing evidence gate passes."""
+    """Open one AXIOM Core opportunity only after the existing evidence gate passes."""
     source = Evaluation.objects.select_for_update().select_related("lead").get(pk=compute_evaluation.pk)
     decision = alpha_core_gate(source)
     if not decision.allowed:
@@ -76,7 +76,7 @@ def open_alpha_core_opportunity(compute_evaluation: Evaluation, *, by=None) -> A
     LeadActivity.objects.create(
         lead=lead,
         type=LeadActivity.ActivityType.STATUS_CHANGE,
-        label="ALPHA Core opportunity opened from validated ALPHA Compute evidence.",
+        label="AXIOM Core opportunity opened from validated AXIOM Compute evidence.",
         by=by,
         by_name=_actor_name(by),
         meta={

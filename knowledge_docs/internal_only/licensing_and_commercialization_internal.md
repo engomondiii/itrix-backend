@@ -1,8 +1,7 @@
 # iTrix Licensing & Commercialization — Internal Only
 
 ## Commercialization
-Internal commercialization guidance: the sequence from qualified lead to evaluation to
-licensing, the commercial paths available (non-exclusive, field, exclusive, strategic),
+Internal enterprise commercialization guidance: the separately scoped sequence from qualified lead to evaluation to licensing, the commercial paths available (non-exclusive, field, exclusive, strategic),
 and the signals that move an account from one stage to the next. This is a team-plane
 document and never leaves the internal disclosure tier.
 
@@ -15,3 +14,5 @@ never exposed to a client or public payload.
 ## Buyer
 The internal buyer map goes further than the controlled-public version: named roles,
 likely approval paths, and the internal read on where a deal could stall.
+
+ASTOP retail follows October LO v2.6: verified identity/email, exact order acceptance, confirmed payment, license and protected delivery. Enterprise evaluation is not a universal retail prerequisite. Non-ASTOP enterprise fees, exclusivity and scope require separate written agreement; old generic pricing examples do not override the ASTOP LO.

@@ -100,6 +100,7 @@ LOCAL_APPS = [
     # dispute about what someone agreed to does not become moot because they closed their
     # workspace. The FK is SET_NULL for the same reason.
     "apps.legal",
+    "apps.commerce",
     # ── Phase 1 (v7.1) — cockpit ROW-LEVEL resources ─────────────────────────
     # No models and no migrations, deliberately: a cockpit resource that owned data would
     # be a second source of truth for something another app already owns. It exists as an
@@ -828,3 +829,9 @@ LOGGING = {
         "urllib3": {"handlers": ["console"], "level": "WARNING", "propagate": False},
     },
 }
+
+# ASTOP October commerce: never enable without reviewed legal releases and a verified adapter.
+ASTOP_COMMERCE_ENABLED = env_bool("ASTOP_COMMERCE_ENABLED", default=False)
+ASTOP_COMMERCE_ADAPTER = env("ASTOP_COMMERCE_ADAPTER", default="")
+ASTOP_MAX_ENVIRONMENTS = int(env("ASTOP_MAX_ENVIRONMENTS", "2"))
+ASTOP_VALIDATION_DAYS = int(env("ASTOP_VALIDATION_DAYS", "7"))

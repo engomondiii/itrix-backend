@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-05",
+  "input": {
+    "filename": "ASTOP_Customer_Journey_v1.5.docx",
+    "sha256": "cb64828d61dd3fa1cb4f5f94d9dbbf95f41b44051a6c46d402606644c83c9513",
+    "edition": "Version 1.5 Condensed",
+    "review": "All paragraph and table text; no embedded media."
+  },
+  "replacements": {
+    "public/astop_customer_journey_v1_2.md": "public/astop_customer_journey_v1_5.md"
+  },
+  "modified_or_added": [
+    {
+      "path": "knowledge_docs/public/astop_customer_journey_v1_5.md",
+      "sha256": "9c78d396f01c383ce559cef70f59fdcfe4aa6c5f1bd2c3a1cebf2c197658d805"
+    },
+    {
+      "path": "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+      "sha256": "7c628aa685049872f4582e9f7e7b44f80616092664f9500c7de26cd80eb2f021"
+    },
+    {
+      "path": "knowledge_docs/internal_only/astop_activation_policy_20261004.md",
+      "sha256": "98eef5befefeb2c30f7156e69f6e981eec8ae018dd8b21be1ec455c60a5c9334"
+    }
+  ],
+  "decisions": [
+    "Separate journey and protection/contract authority; no numerical replacement protection policy was supplied.",
+    "Add append-only customer-reported Decide records with measured and qualitative fields, not automatic proof certification or corpus ingestion.",
+    "Approved-advocate wording requires agreement-authorized eligibility review; do not bypass current qualifying-purchase controls.",
+    "Retain other current knowledge documents and October 4 scope."
+  ]
+}

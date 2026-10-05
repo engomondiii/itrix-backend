@@ -183,11 +183,11 @@ class Command(BaseCommand):
             ("astop_product_and_access_20261002.md", "public", "authoritative"),
             ("research_portfolio_summary_20261002.md", "public", "governing"),
             ("platform_governance_current_20261003.md", "internal_only", "governing"),
-            ("astop_customer_journey_20261003.md", "public", "governing"),
+            ("astop_customer_journey_v1_5.md", "public", "governing"),
             ("astop_license_order_summary_v2_6.md", "public", "governing"),
             ("astop_branch_program_summary_v1_4.md", "public", "governing"),
             ("astop_comparison_current_20261003.md", "public", "authoritative"),
-            ("astop_software_protection_v1_5.md", "internal_only", "governing"),
+            ("astop_activation_policy_20261004.md", "internal_only", "governing"),
             ("research_evidence_register_20261003.md", "controlled_public", "governing"),
         )
         for filename, level, authority in required_sources:

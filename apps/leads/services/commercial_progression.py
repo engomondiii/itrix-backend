@@ -8,6 +8,7 @@ the later AXIOM Core evidence gate.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -182,6 +183,14 @@ def _qualification_reasons(lead: Lead, record: ASTOPEngagement) -> list[str]:
     )
     if not _present(protection_fit):
         reasons.append("protection_fit_required")
+    # This record is the protected enterprise exception path, never retail checkout.
+    if not isinstance(context.get("enterprise_exception"), str) or context["enterprise_exception"] not in {
+        "security", "procurement", "private_deployment", "high_volume",
+        "extended_offline", "protected_scope", "technical_review", "scale_validation", "senior_sponsorship",
+    }:
+        reasons.append("concrete_enterprise_exception_required")
+    if not isinstance(context.get("why_self_service_insufficient"), str) or not context["why_self_service_insufficient"].strip():
+        reasons.append("self_service_insufficiency_required")
     return list(_unique_reasons(reasons))
 
 
@@ -211,6 +220,17 @@ def _controlled_entry_reasons(lead: Lead, record: ASTOPEngagement) -> list[str]:
         reasons.append("evaluation_agreement_required")
     if not isinstance(record.evaluation_scope, dict) or not record.evaluation_scope:
         reasons.append("evaluation_scope_required")
+    scope = record.evaluation_scope if isinstance(record.evaluation_scope, dict) else {}
+    # Require an explicit, bounded decision before allocating protected work.
+    for field in ("technical_owner", "decision_owner", "baseline_plan", "fidelity_criteria",
+                  "success_no_go", "effort_allowance", "next_decision", "decision_deadline",
+                  "security_data_authorization"):
+        if not isinstance(scope.get(field), str) or not scope[field].strip():
+            reasons.append(f"enterprise_{field}_required")
+    try:
+        date.fromisoformat(scope.get("decision_deadline", ""))
+    except (TypeError, ValueError):
+        reasons.append("enterprise_decision_deadline_iso_date_required")
     return list(_unique_reasons(reasons))
 
 

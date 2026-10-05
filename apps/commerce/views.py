@@ -1,6 +1,7 @@
 """Explicit client, public and operator planes; no caller may set payment/verification state."""
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import IntegrityError
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,7 +10,8 @@ from apps.clients.backends import ClientJWTAuthentication
 from apps.clients.permissions import IsAuthenticatedClient
 from apps.core.permissions import IsAdminRole
 from . import services as svc
-from .models import Branch, LegalRelease, License, Order, Refund, Reward
+from .serializers import JourneyDecisionInput
+from .models import Activation, Branch, LegalRelease, License, Order, Refund, Reward, Seat, JourneyDecision
 
 
 class SafeView(APIView):
@@ -31,6 +33,8 @@ class AvailabilityView(SafeView):
         return Response({'checkout_available': enabled, 'currency': 'USD', 'individual_seat_price': '20.00',
             'organization_seat_price': '16.00', 'organization_min_seats': 2, 'branch_discount_percent': 10,
             'discounts_stack': False, 'refund_request_days': 30,
+            'activation_policy': {'max_environments_per_seat': 3, 'renewal_days': 7, 'offline_validity_days': 14,
+                'session_continuity': 'finish_sessions_started_while_entitled'},
             'message': 'Verified identity and License Order required.' if enabled else 'Contact itriX for access; online checkout is not available.'})
 
 
@@ -81,19 +85,63 @@ class OrderActionView(ClientView):
 
 class LicensesView(ClientView):
     def get(self, request):
+        access = Q(order__client=request.user)
+        if request.user.is_active and request.user.email_verified_at:
+            access |= Q(assignments__email=request.user.email.strip().lower(), assignments__active=True)
+        licenses = License.objects.filter(access).select_related('order').distinct()[:100]
         return Response([{'id': str(l.pk), 'order_id': str(l.order_id), 'status': l.status,
-            'seats': l.order.seats, 'assignments': list(l.assignments.filter(active=True).values('id', 'email'))}
-            for l in License.objects.filter(order__client=request.user).select_related('order')[:100]])
+            'seats': l.order.seats, 'is_administrator': l.order.client_id == request.user.pk,
+            'assignments': list(l.assignments.filter(active=True).filter(
+                Q(license__order__client=request.user) | Q(email=request.user.email.strip().lower())
+            ).values('id', 'email'))} for l in licenses])
+
+
+class ActivationInput(serializers.Serializer):
+    environment_hash = serializers.RegexField(r'^[0-9a-f]{64}$')
+    replace_id = serializers.UUIDField(required=False)
+    confirm_replacement = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if set(self.initial_data) - set(self.fields):
+            raise serializers.ValidationError('Only licensing identifiers and replacement confirmation are accepted; do not send workload content.')
+        return attrs
+
+
+
+
+def decision_payload(row):
+    return {'id': str(row.pk), 'outcome': row.outcome, 'workload': row.workload,
+        'comparable': row.comparable, 'fidelity': row.fidelity, 'net_value': row.net_value,
+        'measured_results': row.measured_results, 'qualitative_feedback': row.qualitative_feedback,
+        'created_at': row.created_at, 'evidence_status': 'customer_reported'}
 
 
 class LicenseActionView(ClientView):
+    def get(self, request, license_id, action):
+        if action == 'decisions':
+            return Response([decision_payload(row) for row in JourneyDecision.objects.filter(
+                license_id=license_id, client=request.user).order_by('-created_at')[:100]])
+        if action != 'environments':
+            return Response(status=404)
+        svc.require(request.user.is_active and request.user.email_verified_at, 'Verified seat user required.')
+        seat = Seat.objects.get(license_id=license_id, email=request.user.email.strip().lower(), active=True)
+        return Response(list(Activation.objects.filter(seat=seat, revoked_at=None).values(
+            'id', 'environment_hash', 'last_validated_at', 'renewal_due_at', 'valid_until')))
+
     def post(self, request, license_id, action):
+        if action == 'decisions':
+            data = JourneyDecisionInput(data=request.data)
+            data.is_valid(raise_exception=True)
+            row = svc.record_journey_decision(license_id=license_id, client=request.user, **data.validated_data)
+            return Response(decision_payload(row), status=201)
         if action == 'download':
             return Response({'url': svc.deliver(license_id=license_id, client=request.user, platform=request.data.get('platform', ''))})
         if action == 'activate':
-            activation, token = svc.activate(license_id=license_id, client=request.user,
-                environment_hash=str(request.data.get('environment_hash', '')))
-            return Response({'token': token, 'expires_at': activation.valid_until})
+            data = ActivationInput(data=request.data)
+            data.is_valid(raise_exception=True)
+            activation, token = svc.activate(license_id=license_id, client=request.user, **data.validated_data)
+            return Response({'token': token, 'expires_at': activation.valid_until,
+                'renewal_due_at': activation.renewal_due_at, 'session_continuity': 'finish_sessions_started_while_entitled'})
         if action == 'seats':
             seat = svc.assign_seat(license_id=license_id, client=request.user,
                 email=str(request.data.get('email', '')), replace_id=request.data.get('replace_id'))

@@ -8,19 +8,29 @@ The active corpus contains 31 documents. This README is outside the disclosure f
 | --- | --- | --- |
 | Product catalogue and maturity | public/itrix_product_portfolio_v1_4.md | Four offerings; stages do not imply general availability |
 | ASTOP behavior, evidence and access | public/astop_product_and_access_20261002.md | New finite-panel evidence, separate retail/enterprise routes |
-| Discovery through install and feedback | public/astop_customer_journey_20261003.md | Journey reconciled to the specific LO |
+| Discovery through install and feedback | public/astop_customer_journey_v1_5.md | Journey reconciled to the specific LO |
 | Pricing, seats, acceptance, refunds | public/astop_license_order_summary_v2_6.md | Curated summary, never a substitute for the exact accepted order |
 | Referral eligibility and rewards | public/astop_branch_program_summary_v1_4.md | Separate approved agreement; incomplete draft cannot launch |
 | Comparison with caching/harness tools | public/astop_comparison_current_20261003.md | September comparison context, October evidence boundaries |
 | Research overview | public/research_portfolio_summary_20261002.md | Public-safe portfolio distinctions |
 | R01–R07 and QNTA evidence | controlled_public/research_evidence_register_20261003.md | Bounded results, negative evidence, application-not-grant language |
-| Software protection | internal_only/astop_software_protection_v1_5.md | Integration/enforcement requirements; no keys or identity data |
+| Software protection | internal_only/astop_activation_policy_20261004.md | Integration/enforcement requirements; no keys or identity data |
 | Platform governance | internal_only/platform_governance_current_20261003.md | Preserved acceptance controls and October commercial precedence |
 | People | Existing Kang and Park DOCX files in public/ | Original bytes unchanged; 8 September verification boundary retained |
 
 The older AXIOM, CRE and FQNM explanations, unified framework, workload/bottleneck material and platform operating guidance remain available in six revised editions. The Atelier Indigo DOCX and dated enterprise acceptance feedback DOCX remain unchanged, alongside the people profiles, research assets and other useful guides. Age alone is not a removal criterion.
 
 The technical ASTOP synthesis and five retained process guides were corrected where they conflicted with October access, product or disclosure rules. Other useful, dated research and general guidance remains. The research register qualifies current interpretation of older research assets; it does not silently rewrite their authors' original findings.
+
+## 5 October update
+
+The condensed Customer Journey v1.5 now replaces the v1.2 journey derivative. It preserves the six stages, adds explicit platform recording of the Decide outcome, and delegates detailed mechanics to protection and contract authorities. The two earlier input audits remain historical snapshots. See [latest source audit](../docs/source_alignment_20261005.json) and [v1.5 rollout](../docs/document_alignment_20261005.md). The 31-source corpus remains selective; no confidential raw operating plan or customer feedback is published.
+
+## 4 October update
+
+Customer Journey v1.2 replaces the older journey derivative and updates activation, refund continuity and ordinary/enterprise routing. The protection derivative is renamed to identify the actual supplied authority, without claiming to have read the referenced but absent full Protection v1.6.1. The confidential operating plan stays outside public Git; only necessary nonconfidential routing and execution safeguards are reflected. The corpus still has 31 active sources. All other original and retained sources stay in place.
+
+[Current change audit](../docs/source_alignment_20261004.json) records the two input hashes and changed corpus files. [Current rollout and limits](../docs/document_alignment_20261004.md) supersedes the earlier activation defaults. The 3 October cleanup audit below is a historical snapshot, not the hash inventory for this update.
 
 ## Physical cleanup and provenance
 

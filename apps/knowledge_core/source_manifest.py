@@ -406,7 +406,7 @@ for _old in RETIRED_OCTOBER_SOURCES:
         canonical_rule="Retired from the active folder; use the October domain sources. Historical evidence only.")
 
 SOURCE_MANIFEST.update({
-    "astop_customer_journey_20261003.md": SourcePolicy("governing", True,
+    "astop_customer_journey_v1_5.md": SourcePolicy("governing", True,
         "Curated journey reconciled to LO v2.6; retail and protected enterprise are separate routes. No claim that services are live.",
         (ClaimDomain.COMMERCIALIZATION, ClaimDomain.PUBLIC_EXPLANATION), namespace="astop"),
     "astop_license_order_summary_v2_6.md": SourcePolicy("governing", True,
@@ -415,7 +415,7 @@ SOURCE_MANIFEST.update({
     "astop_branch_program_summary_v1_4.md": SourcePolicy("governing", True,
         "Curated Branch v1.4 summary. Approval and separate complete agreement precede referral access. Five rates total 19.5%; 30-day period and settlement/fraud review precede payout eligibility.",
         (ClaimDomain.COMMERCIALIZATION, ClaimDomain.LEGAL), namespace="astop"),
-    "astop_software_protection_v1_5.md": SourcePolicy("governing", True,
+    "astop_activation_policy_20261004.md": SourcePolicy("governing", True,
         "Curated protection policy; identity, signed delivery, activation and refund revocation require actual service integrations. No secrets or raw identity in builds.",
         (ClaimDomain.INTERNAL_POLICY, ClaimDomain.TECHNICAL), namespace="astop"),
     "platform_governance_current_20261003.md": SourcePolicy("governing", True,
@@ -429,8 +429,8 @@ SOURCE_MANIFEST.update({
         verified_date="2026-10-03", canonical_rule=
         "Curated October comparison: request/model, harness/trajectory and observation/supervision are different layers. Competitor descriptions date to September; latest finite-panel evidence is not 24-hour or universal proof. Measure overhead and combined effects, preserve required events.")
 })
-for _name in ("astop_customer_journey_20261003.md", "astop_license_order_summary_v2_6.md",
-              "astop_branch_program_summary_v1_4.md", "astop_software_protection_v1_5.md",
+for _name in ("astop_customer_journey_v1_5.md", "astop_license_order_summary_v2_6.md",
+              "astop_branch_program_summary_v1_4.md", "astop_activation_policy_20261004.md",
               "platform_governance_current_20261003.md", "research_evidence_register_20261003.md"):
     SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-03", permitted_paraphrase="summary")
 
@@ -539,3 +539,37 @@ def people_sources_for(query: str) -> tuple[str, ...]:
     if re.search(r"who\s+is\s+behind\s+FQNM", text, re.I):
         names.extend((kang, park))
     return tuple(dict.fromkeys(names))
+
+
+# 4 October: selectively replace only superseded journey/protection derivatives.
+for _old, _new in (
+    ("astop_customer_journey_20261003.md", "astop_customer_journey_v1_5.md"),
+    ("astop_software_protection_v1_5.md", "astop_activation_policy_20261004.md"),
+):
+    SOURCE_MANIFEST[_old] = SourcePolicy("legacy", False,
+        "Superseded by the explicit Customer Journey v1.2 update; historical evidence only.",
+        superseded_by=_new, namespace="astop")
+    SOURCE_MANIFEST[_new] = _replace(SOURCE_MANIFEST[_new], verified_date="2026-10-04",
+        supersedes=tuple(dict.fromkeys((*SOURCE_MANIFEST[_new].supersedes, _old))))
+for _name in ("astop_product_and_access_20261002.md", "astop_license_order_summary_v2_6.md",
+              "platform_governance_current_20261003.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-04")
+SOURCE_MANIFEST["astop_customer_journey_v1_5.md"] = _replace(
+    SOURCE_MANIFEST["astop_customer_journey_v1_5.md"], canonical_rule=
+    "Journey v1.2: Discover/Acquire/Activate/Prove/Decide/Continue. Discovery is plausibility; proof follows activation. Two ordinary license types; enterprise is an exception. Three environments, 7-day renewal, 14-day offline expiry from validation; preserve entitled running jobs. No claim services are live.")
+SOURCE_MANIFEST["astop_activation_policy_20261004.md"] = _replace(
+    SOURCE_MANIFEST["astop_activation_policy_20261004.md"], canonical_rule=
+    "Explicit Journey v1.2 activation update with retained protection controls. Three environments; confirmed replacement; seven-day renewal, fourteen-day offline validity; preserve running jobs and block future issuance on revocation. Full referenced Protection v1.6.1 was not supplied.")
+
+RETIRED_OCTOBER_SOURCES += ("astop_customer_journey_20261003.md", "astop_software_protection_v1_5.md")
+
+
+# Condensed v1.5 controls the path; protection and contracts keep their own domains.
+SOURCE_MANIFEST["astop_customer_journey_v1_2.md"] = SourcePolicy("legacy", False,
+    "Journey path superseded by v1.5; explicit compatible protection controls are retained separately.",
+    superseded_by="astop_customer_journey_v1_5.md", namespace="astop")
+RETIRED_OCTOBER_SOURCES += ("astop_customer_journey_v1_2.md",)
+SOURCE_MANIFEST["astop_customer_journey_v1_5.md"] = _replace(
+    SOURCE_MANIFEST["astop_customer_journey_v1_5.md"], verified_date="2026-10-05",
+    supersedes=("astop_customer_journey_20261003.md", "astop_customer_journey_v1_2.md"),
+    canonical_rule="Journey v1.5: six-stage self-service path; plausibility before purchase, workload proof after activation, explicit recorded Decide outcome. Protection Policy controls activation/offline/revocation, LO controls legal use/payment, Branch Agreement controls participation/rewards. Enterprise is an exception, not an extra journey stage. Feedback is not verified proof or permission to publish customer data.")

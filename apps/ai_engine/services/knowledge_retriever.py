@@ -57,6 +57,41 @@ _LEGAL_QUERY = re.compile(r"\b(nda|contract|agreement|rights|entitlement|license
 _TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|compute|computation|observation|representation|execution|hardware|software)\b", re.I)
 
 
+# Exact current public terms must not disappear behind a higher-scoring overview.
+# These are candidate sources only: all disclosure and metadata gates still apply.
+_CUSTOMER_TERM_SOURCES = (
+    (re.compile(r"\b(price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
+     "astop_license_order_summary_v2_6.md"),
+    (re.compile(r"\b(journey|discover|acquire|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|여정|기업|추천|브랜치|수수료", re.I),
+     "astop_customer_journey_v1_5.md"),
+)
+
+
+def _customer_term_sources(query: str) -> tuple[str, ...]:
+    text = query or ""
+    # Do not substitute ASTOP's commercial policy for a different named product.
+    if re.search(r"\b(?:AXIOM|ALPHA|QNTA)\b", text, re.I) and not re.search(r"\bASTOP\b", text, re.I):
+        return ()
+    return tuple(name for pattern, name in _CUSTOMER_TERM_SOURCES if pattern.search(text))
+
+
+def _customer_term_candidates(query: str, *, namespaces: tuple[str, ...],
+                              candidate_levels: set[str], audience: str,
+                              journey_stage: str, claim_ceiling: int) -> list[dict]:
+    names = _customer_term_sources(query)
+    if not names:
+        return []
+    paths = [f"knowledge_docs/public/{name}" for name in names]
+    rows = KnowledgeChunk.objects.select_related("document").filter(
+        document__file_path__in=paths, document__is_current=True,
+        namespace__in=namespaces, disclosure_level__in=candidate_levels,
+    ).order_by("document__file_path", "chunk_index")
+    return [item for row in rows if _metadata_applicable(
+        item := _row_to_dict(row, retrieval_backend="current_customer_terms"),
+        audience=audience, journey_stage=journey_stage, claim_ceiling=claim_ceiling,
+    )]
+
+
 def _query_claim_domains(query: str) -> set[str]:
     text = query or ""
     out: set[str] = set()
@@ -326,6 +361,8 @@ def _apply_source_precedence(query: str, chunks: list[dict], *, top_k: int) -> l
         return []
     _record_same_authority_conflict(query, chunks)
     query_domains = _query_claim_domains(query)
+    customer_paths = {f"knowledge_docs/public/{name}" for name in _customer_term_sources(query)}
+    query_terms = {word for word in re.findall(r"\w+", (query or "").lower()) if len(word) > 3}
     hard = bool(_HARD_FACT_QUERY.search(query or ""))
     if hard:
         # Highest authority is meaningful only among sources applicable to the same claim
@@ -336,12 +373,17 @@ def _apply_source_precedence(query: str, chunks: list[dict], *, top_k: int) -> l
         highest = max(_AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) for c in applicable)
         chunks = [
             c for c in chunks
-            if _domain_rank(c, query_domains) == best_domain
-            and _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) == highest
+            if c.get("document_path") in customer_paths or (
+                _domain_rank(c, query_domains) == best_domain
+                and _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0) == highest
+            )
         ]
     chunks.sort(
         key=lambda c: (
             str(c.get("document_path") or "").rsplit("/", 1)[-1] in people_sources_for(query),
+            c.get("document_path") in customer_paths,
+            len(query_terms & set(re.findall(r"\w+", (str(c.get("heading") or "") + " " + str(c.get("text") or "")).lower())))
+            if c.get("document_path") in customer_paths else 0,
             _domain_rank(c, query_domains),
             _AUTHORITY_RANK.get(str(c.get("source_authority") or "working"), 0),
             int(c.get("canonical_priority") or 0),
@@ -496,6 +538,10 @@ class KnowledgeRetriever:
                 claim_ceiling=claim_ceiling,
             )
 
+        chunks = _customer_term_candidates(
+            query, namespaces=selected_namespaces, candidate_levels=candidate_levels,
+            audience=audience, journey_stage=journey_stage, claim_ceiling=claim_ceiling,
+        ) + chunks
         chunks = filter_chunks(
             chunks,
             context=context,

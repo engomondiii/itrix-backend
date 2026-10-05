@@ -573,3 +573,9 @@ SOURCE_MANIFEST["astop_customer_journey_v1_5.md"] = _replace(
     SOURCE_MANIFEST["astop_customer_journey_v1_5.md"], verified_date="2026-10-05",
     supersedes=("astop_customer_journey_20261003.md", "astop_customer_journey_v1_2.md"),
     canonical_rule="Journey v1.5: six-stage self-service path; plausibility before purchase, workload proof after activation, explicit recorded Decide outcome. Protection Policy controls activation/offline/revocation, LO controls legal use/payment, Branch Agreement controls participation/rewards. Enterprise is an exception, not an extra journey stage. Feedback is not verified proof or permission to publish customer data.")
+
+
+# Customer-chat corrections: current terms and public operational explanation only.
+for _name in ("astop_product_and_access_20261002.md", "astop_license_order_summary_v2_6.md",
+              "astop_customer_journey_v1_5.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-05")

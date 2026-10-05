@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-05",
+  "purpose": "Customer-facing sales response corrections; no new commercial terms",
+  "modified": [
+    {
+      "path": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "sha256": "f1b95de97afd9e4a81d13b7b784813427edce4780b91aa7e189b2562e1afe5eb"
+    },
+    {
+      "path": "knowledge_docs/public/astop_license_order_summary_v2_6.md",
+      "sha256": "ade536c448048c39fa0e0f4071cf70b096e7276eb7a54a6ebc12fc6d850ef8c5"
+    },
+    {
+      "path": "knowledge_docs/public/astop_customer_journey_v1_5.md",
+      "sha256": "e2645a5a25b6c561f2fb751d36e5d8e1a56c3ffbeb9564870d009de2a6027bd5"
+    }
+  ]
+}

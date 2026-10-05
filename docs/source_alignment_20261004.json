@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-04",
+  "inputs": [
+    {
+      "filename": "ASTOP_Customer_Journey_v1.2.docx",
+      "sha256": "d90d1359c2d153e0925f0a80628bc961183fa0da488c29e5b58524b7d5bcdead",
+      "treatment": "Curated journey and explicit activation rules; inspected text, tables and all 25 diagrams."
+    },
+    {
+      "filename": "itriX_Internal_Commercialization_Operating_Plan_v1.5.docx",
+      "sha256": "c0f02d4e06be6bcf3654b28603818ceae88c6b0bcb62b4ca468c13210807fb93",
+      "treatment": "Confidential original excluded from public Git; necessary general routing and execution safeguards only."
+    }
+  ],
+  "replacements": {
+    "public/astop_customer_journey_20261003.md": "public/astop_customer_journey_v1_2.md",
+    "internal_only/astop_software_protection_v1_5.md": "internal_only/astop_activation_policy_20261004.md"
+  },
+  "modified_or_added": [
+    {
+      "path": "knowledge_docs/public/astop_customer_journey_v1_2.md",
+      "sha256": "361332fe7dea4518f62402d78272e41980e8d7434099cbaf56726f21084a5705"
+    },
+    {
+      "path": "knowledge_docs/internal_only/astop_activation_policy_20261004.md",
+      "sha256": "977aba266d4cfaf07ba73851abee08755022e1685c25cdeb4f4a92a9eb51f2f2"
+    },
+    {
+      "path": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "sha256": "f49936d047e0281ada30a8bb86b72eb952bf152824a547915429ec093c115694"
+    },
+    {
+      "path": "knowledge_docs/public/astop_license_order_summary_v2_6.md",
+      "sha256": "b4cda7eede6913ae3d3f9b168b47155ce69b6200d13f67094c6d3dd814b711b1"
+    },
+    {
+      "path": "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+      "sha256": "3a8022e80847d47fac1bd0f9fcf9b6cb6ed46f0547e0479bf3ad747030c8347b"
+    }
+  ],
+  "decisions": [
+    "Retain all other useful older sources; no wholesale removal.",
+    "Portfolio table roles conflict with consistent surrounding prose. Preserve existing Core hardware and QNTA runtime definitions; seek source correction.",
+    "Referenced full Software Protection v1.6.1 absent; implement only explicit rules actually supplied.",
+    "Accepted legal releases remain immutable. Production providers, runtime enforcement and management approvals are separate launch prerequisites."
+  ]
+}

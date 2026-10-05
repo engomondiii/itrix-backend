@@ -53,11 +53,11 @@ def test_validator_requires_october_sources_and_rejects_reactivated_old_canonica
         ('astop_product_and_access_20261002.md','public','authoritative','astop'),
         ('research_portfolio_summary_20261002.md','public','governing','technology'),
         ('platform_governance_current_20261003.md','internal_only','governing','company'),
-        ('astop_customer_journey_20261003.md','public','governing','astop'),
+        ('astop_customer_journey_v1_5.md','public','governing','astop'),
         ('astop_license_order_summary_v2_6.md','public','governing','astop'),
         ('astop_branch_program_summary_v1_4.md','public','governing','astop'),
         ('astop_comparison_current_20261003.md','public','authoritative','astop'),
-        ('astop_software_protection_v1_5.md','internal_only','governing','astop'),
+        ('astop_activation_policy_20261004.md','internal_only','governing','astop'),
         ('research_evidence_register_20261003.md','controlled_public','governing','technology'),
     ):
         doc=KnowledgeDocument.objects.create(title=filename,file_path=f'knowledge_docs/{tier}/{filename}',

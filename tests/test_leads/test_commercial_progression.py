@@ -61,6 +61,8 @@ def _verified_lead(*, trust_status=TrustStatus.PASS, nda=True):
 
 def _qualification_context():
     return {
+        "enterprise_exception": "security",
+        "why_self_service_insufficient": "Customer requires a protected security review",
         "business_unit": "Observation platform",
         "observation_problem": "Decision-time observation cost",
         "candidate_workflow": "Agent observation workflow",
@@ -73,6 +75,15 @@ def _qualification_context():
 
 def _evaluation_scope():
     return {
+        "technical_owner": "Technical sponsor",
+        "decision_owner": "Decision owner",
+        "baseline_plan": "Comparable baseline version and measurement window",
+        "fidelity_criteria": "No missed required events",
+        "success_no_go": "Preserve fidelity and positive net value, otherwise stop",
+        "effort_allowance": "Approved bounded evaluation budget",
+        "next_decision": "Continue or stop after proof review",
+        "decision_deadline": "2026-11-01",
+        "security_data_authorization": "Approved scope and data handling reference",
         "workload": "Representative agent workload",
         "observation_behavior": "Observe decision-time token/tool usage",
         "model_or_controller": "Controlled controller A",
@@ -562,3 +573,23 @@ def test_alpha_core_gate_stays_closed_without_validated_software_hardware_case()
     assert decision.allowed is False
     assert "validated_software_proof_required" in decision.reasons
     assert "incremental_hardware_value_required" in decision.reasons
+
+
+def test_company_size_does_not_establish_enterprise_exception():
+    lead = _verified_lead()
+    context = _qualification_context()
+    context['enterprise_exception'] = 'large_company'
+    with pytest.raises(ValueError, match='concrete_enterprise_exception_required'):
+        apply_astop_progress(lead, stage=ASTOPStage.NDA_BRIEFING,
+                             values={'qualification_context': context})
+
+
+def test_protected_work_requires_bounded_decision_and_owner():
+    lead = _verified_lead()
+    apply_astop_progress(lead, stage=ASTOPStage.NDA_BRIEFING,
+                         values={'qualification_context': _qualification_context()})
+    scope = _evaluation_scope()
+    del scope['effort_allowance']
+    with pytest.raises(ValueError, match='enterprise_effort_allowance_required'):
+        apply_astop_progress(lead, stage=ASTOPStage.CONTROLLED_EVALUATION,
+            values={'evaluation_agreement': 'Agreement', 'evaluation_scope': scope})

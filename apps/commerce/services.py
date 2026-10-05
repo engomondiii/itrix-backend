@@ -14,7 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from .models import (Activation, Branch, CommerceAudit, Delivery, LegalRelease, License,
-                     Order, PaymentEvent, Refund, Reward, Seat, VerifiedIdentity)
+                     Order, PaymentEvent, Refund, Reward, Seat, VerifiedIdentity, JourneyDecision)
 
 RATES = tuple(map(Decimal, ('0.10', '0.05', '0.025', '0.0125', '0.0075')))
 
@@ -178,24 +178,54 @@ def assign_seat(*, license_id, client, email, replace_id=None):
     return seat
 
 
+def activation_policy():
+    policy = {
+        'max_environments_per_seat': getattr(settings, 'ASTOP_MAX_ENVIRONMENTS', 3),
+        'renewal_days': getattr(settings, 'ASTOP_VALIDATION_DAYS', 7),
+        'offline_validity_days': getattr(settings, 'ASTOP_OFFLINE_VALIDITY_DAYS', 14),
+        'session_continuity': 'finish_sessions_started_while_entitled',
+    }
+    # A stale deployment override must not silently change the ordinary offer.
+    require((policy['max_environments_per_seat'], policy['renewal_days'],
+             policy['offline_validity_days']) == (3, 7, 14),
+            'Activation policy configuration requires review: standard policy is 3 environments, 7-day renewal, 14-day offline validity.')
+    return policy
+
+
 @transaction.atomic
-def activate(*, license_id, client, environment_hash):
+def activate(*, license_id, client, environment_hash, replace_id=None, confirm_replacement=False):
     license = License.objects.select_for_update().get(pk=license_id)
     require(license.status == 'active' and client.email_verified_at and client.is_active, 'Active entitlement and verified seat user required.')
     seat = Seat.objects.filter(license=license, email=client.email.strip().lower(), active=True).first()
     require(seat, 'A named seat is required.')
-    require(len(environment_hash) == 64 and all(c in '0123456789abcdef' for c in environment_hash), 'Hashed environment identifier required.')
+    require(isinstance(environment_hash, str) and len(environment_hash) == 64 and all(c in '0123456789abcdef' for c in environment_hash), 'Hashed environment identifier required.')
+    policy = activation_policy()
     now = timezone.now()
-    live = Activation.objects.filter(seat=seat, revoked_at=None, valid_until__gt=now)
-    prior = live.filter(environment_hash=environment_hash).first()
-    require(prior or live.count() < getattr(settings, 'ASTOP_MAX_ENVIRONMENTS', 2), 'Environment limit reached.')
+    # Expiry does not silently unregister a device; a fourth registration needs replacement.
+    registered = Activation.objects.filter(seat=seat, revoked_at=None)
+    prior = registered.filter(environment_hash=environment_hash).first()
+    if replace_id:
+        require(confirm_replacement is True and not prior, 'Explicit confirmation of a new environment replacement is required.')
+        replaced = registered.get(pk=replace_id)
+        replaced.revoked_at = now
+        replaced.save(update_fields=['revoked_at', 'updated_at'])
+        audit('environment_replaced', replaced, client)
+    else:
+        require(not confirm_replacement, 'Select the environment to replace.')
+    require(prior or registered.count() < policy['max_environments_per_seat'], 'Three environments are already registered. Confirm which existing environment to replace.')
     activation = prior or Activation(seat=seat, environment_hash=environment_hash)
     activation.token_version = license.token_version
-    activation.valid_until = now + timedelta(days=getattr(settings, 'ASTOP_VALIDATION_DAYS', 7))
+    activation.last_validated_at = now
+    activation.renewal_due_at = now + timedelta(days=policy['renewal_days'])
+    activation.valid_until = now + timedelta(days=policy['offline_validity_days'])
     activation.save()
-    # Adapter signs opaque IDs only. It MUST enforce expiry offline and consult revocation on renewal.
+    # Only opaque licensing/security data: never workload content. The runtime must
+    # gate NEW sessions at expiry and let entitled sessions finish. Revocation stops
+    # renewal, not a running job or the previously issued offline validity window.
     token = adapter().sign_activation({'license_id': str(license.pk), 'activation_id': str(activation.pk),
-        'environment_hash': environment_hash, 'version': license.token_version, 'expires_at': activation.valid_until.isoformat()})
+        'environment_hash': environment_hash, 'version': license.token_version,
+        'validated_at': now.isoformat(), 'renewal_due_at': activation.renewal_due_at.isoformat(),
+        'expires_at': activation.valid_until.isoformat(), 'session_continuity': policy['session_continuity']})
     require(token, 'Activation signer unavailable.')
     audit('activated', activation, client)
     return activation, token
@@ -203,7 +233,10 @@ def activate(*, license_id, client, environment_hash):
 
 @transaction.atomic
 def deliver(*, license_id, client, platform):
-    license = License.objects.select_for_update().get(pk=license_id, order__client=client)
+    license = License.objects.select_for_update().select_related('order').get(pk=license_id)
+    require(client.is_active and client.email_verified_at and (license.order.client_id == client.pk or
+            license.assignments.filter(email=client.email.strip().lower(), active=True).exists()),
+            'Purchaser or verified named seat user required.')
     require(license.status == 'active', 'An active license is required.')
     require(platform in ('macos-arm64', 'linux-x86_64', 'linux-aarch64'), 'Unsupported platform.')
     artifact = adapter().delivery(license_id=str(license.pk), platform=platform)
@@ -234,6 +267,7 @@ def revoke_order(*, order, reason):
         license.status, license.revoked_at = 'revoked', timezone.now()
         license.token_version += 1
         license.save()
+    # Preserve signed offline expiry and job continuity; block future issuance/renewal.
     Activation.objects.filter(seat__license=license, revoked_at=None).update(revoked_at=timezone.now())
     Seat.objects.filter(license=license, active=True).update(active=False)
     Reward.objects.filter(order=order, status='paid').update(status='clawback_due')
@@ -352,6 +386,7 @@ def review_license(*, license_id, actor, action, review_reference):
         license.status = 'suspended'
         license.token_version += 1
         license.save()
+        # Preserve signed offline expiry and job continuity; block future issuance/renewal.
         Activation.objects.filter(seat__license=license, revoked_at=None).update(revoked_at=timezone.now())
     else:
         require(license.status == 'suspended' and license.order.status == 'paid', 'Only a paid suspended license can be restored.')
@@ -359,3 +394,27 @@ def review_license(*, license_id, actor, action, review_reference):
         license.save()
     audit('license_' + action, license, actor, review=review_reference)
     return license
+
+
+@transaction.atomic
+def record_journey_decision(*, license_id, client, **values):
+    license = License.objects.select_for_update().select_related('order').get(pk=license_id)
+    require(client.is_active and client.email_verified_at and (license.order.client_id == client.pk or
+            license.assignments.filter(email=client.email.strip().lower(), active=True).exists()),
+            'Purchaser or verified named seat user required.')
+    # Use the same bounded validation for API and service callers.
+    from .serializers import JourneyDecisionInput
+    data = JourneyDecisionInput(data=values)
+    data.is_valid(raise_exception=True)
+    values = data.validated_data
+    if values['outcome'] in ('continue', 'expand'):
+        require(license.status == 'active' and values['comparable'] and
+                values['fidelity'] == 'preserved' and values['net_value'] == 'positive' and
+                values.get('measured_results', '').strip() and
+                Activation.objects.filter(seat__license=license).exists(),
+                'Continue or expand requires activation, comparable measured evidence, preserved decisions and positive net value. Otherwise record tune, another workload or stop.')
+    decision = JourneyDecision.objects.create(license=license, client=client, **values)
+    audit('journey_decision_recorded', decision, client, outcome=decision.outcome,
+          license_id=str(license.pk), evidence='customer_reported')
+    # This is not a refund request, license change or automatic knowledge ingestion.
+    return decision

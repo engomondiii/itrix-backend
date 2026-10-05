@@ -77,6 +77,8 @@ class Activation(BaseModel):
     environment_hash = models.CharField(max_length=64)
     token_version = models.PositiveIntegerField()
     valid_until = models.DateTimeField()
+    last_validated_at = models.DateTimeField(null=True)
+    renewal_due_at = models.DateTimeField(null=True)
     revoked_at = models.DateTimeField(null=True)
 
 
@@ -140,3 +142,18 @@ class CommerceAudit(BaseModel):
     actor_id = models.UUIDField(null=True)
     # Identifiers/status only. No private identities, legal text or payment secrets.
     detail = models.JSONField(default=dict)
+
+
+class JourneyDecision(BaseModel):
+    """Append-only customer feedback, never verified proof or shared knowledge."""
+    OUTCOMES = [('continue', 'Continue'), ('tune', 'Tune'), ('another_workload', 'Try another workload'),
+                ('expand', 'Expand'), ('stop', 'Stop'), ('refund', 'Refund')]
+    license = models.ForeignKey(License, on_delete=models.PROTECT)
+    client = models.ForeignKey('clients.Client', on_delete=models.PROTECT)
+    outcome = models.CharField(max_length=24, choices=OUTCOMES)
+    workload = models.CharField(max_length=200)
+    comparable = models.BooleanField(default=False)
+    fidelity = models.CharField(max_length=16, choices=[('preserved', 'Preserved'), ('failed', 'Failed'), ('unknown', 'Unknown')])
+    net_value = models.CharField(max_length=16, choices=[('positive', 'Positive'), ('nonpositive', 'Nonpositive'), ('unknown', 'Unknown')])
+    measured_results = models.TextField(blank=True)
+    qualitative_feedback = models.TextField()

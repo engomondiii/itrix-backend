@@ -165,3 +165,143 @@ def test_suspension_blocks_delivery_and_activation_then_restores(setup):
     with pytest.raises(ValidationError):s.activate(license_id=l.pk,client=c,environment_hash='d'*64)
     s.review_license(license_id=l.pk,actor=setup,action='restore',review_reference='review-2')
     assert s.deliver(license_id=l.pk,client=c,platform='macos-arm64').startswith('https:')
+
+
+def test_activation_windows_replacement_and_signed_continuity(setup, monkeypatch):
+    c, o = purchase(setup)
+    license = License.objects.get(order=o)
+    captured = []
+    monkeypatch.setattr(Adapter, 'sign_activation', lambda self, claims: captured.append(claims) or 'signed')
+    first, _ = s.activate(license_id=license.pk, client=c, environment_hash='a'*64)
+    assert first.renewal_due_at - first.last_validated_at == timedelta(days=7)
+    assert first.valid_until - first.last_validated_at == timedelta(days=14)
+    assert captured[-1]['session_continuity'] == 'finish_sessions_started_while_entitled'
+    assert set(captured[-1]) == {'license_id', 'activation_id', 'environment_hash', 'version',
+                               'validated_at', 'renewal_due_at', 'expires_at', 'session_continuity'}
+    for char in 'bc':
+        s.activate(license_id=license.pk, client=c, environment_hash=char*64)
+    with pytest.raises(ValidationError):
+        s.activate(license_id=license.pk, client=c, environment_hash='d'*64)
+    with pytest.raises(ValidationError):
+        s.activate(license_id=license.pk, client=c, environment_hash='d'*64, replace_id=first.pk)
+    # Renewal consumes no additional environment.
+    s.activate(license_id=license.pk, client=c, environment_hash='b'*64)
+    replacement, _ = s.activate(license_id=license.pk, client=c, environment_hash='d'*64,
+                              replace_id=first.pk, confirm_replacement=True)
+    first.refresh_from_db()
+    assert first.revoked_at and replacement.pk != first.pk
+    assert Activation.objects.filter(revoked_at=None).count() == 3
+
+
+def test_replacement_cannot_take_another_seat_and_signer_failure_rolls_back(setup, monkeypatch):
+    from django.core.exceptions import ObjectDoesNotExist
+    c, o = purchase(setup)
+    other, other_order = purchase(setup)
+    foreign, _ = s.activate(license_id=other_order.license.pk, client=other, environment_hash='a'*64)
+    with pytest.raises(ObjectDoesNotExist):
+        s.activate(license_id=o.license.pk, client=c, environment_hash='b'*64,
+                   replace_id=foreign.pk, confirm_replacement=True)
+    own, _ = s.activate(license_id=o.license.pk, client=c, environment_hash='c'*64)
+    monkeypatch.setattr(Adapter, 'sign_activation', lambda self, claims: None)
+    with pytest.raises(ValidationError):
+        s.activate(license_id=o.license.pk, client=c, environment_hash='d'*64,
+                   replace_id=own.pk, confirm_replacement=True)
+    own.refresh_from_db()
+    assert own.revoked_at is None
+    assert Activation.objects.filter(seat=own.seat).count() == 1
+
+
+def test_refund_preserves_existing_offline_expiry_but_blocks_renewal(setup):
+    c, o = purchase(setup)
+    activation, _ = s.activate(license_id=o.license.pk, client=c, environment_hash='e'*64)
+    expires = activation.valid_until
+    refund = s.request_refund(order_id=o.pk, client=c, reason='No fit')
+    s.approve_refund(refund_id=refund.pk, actor=setup)
+    activation.refresh_from_db()
+    assert activation.valid_until == expires and activation.revoked_at
+    with pytest.raises(ValidationError):
+        s.activate(license_id=o.license.pk, client=c, environment_hash='e'*64)
+
+
+def test_activation_api_rejects_workload_and_bad_replacement_identifier(setup, api_client):
+    c, o = purchase(setup)
+    api_client.force_authenticate(user=c)
+    url = f'/api/v1/commerce/licenses/{o.license.pk}/activate/'
+    for extra in ({'workload': 'private prompt'}, {'replace_id': 'bad'}):
+        assert api_client.post(url, {'environment_hash': 'a'*64, **extra}, format='json').status_code == 400
+    assert not Activation.objects.exists()
+
+
+def test_named_seat_can_find_license_without_seeing_peer_emails(setup, api_client):
+    owner, order = purchase(setup, 'organization', 2)
+    member = buyer(setup)
+    s.assign_seat(license_id=order.license.pk, client=owner, email=member.email)
+    s.assign_seat(license_id=order.license.pk, client=owner, email=owner.email)
+    api_client.force_authenticate(user=member)
+    rows = api_client.get('/api/v1/commerce/licenses/').json()
+    assert len(rows) == 1 and rows[0]['is_administrator'] is False
+    assert [r['email'] for r in rows[0]['assignments']] == [member.email.lower()]
+    assert s.deliver(license_id=order.license.pk, client=member, platform='macos-arm64')
+    with pytest.raises(License.DoesNotExist):
+        s.assign_seat(license_id=order.license.pk, client=member, email='outsider@example.test')
+
+
+def test_stale_activation_configuration_fails_closed(setup, settings):
+    c, o = purchase(setup)
+    settings.ASTOP_MAX_ENVIRONMENTS = 2
+    with pytest.raises(ValidationError, match='configuration requires review'):
+        s.activate(license_id=o.license.pk, client=c, environment_hash='a'*64)
+    assert not Activation.objects.exists()
+
+
+def test_decision_outcomes_are_private_reported_feedback_not_refunds_or_knowledge(setup, api_client):
+    from apps.commerce.models import JourneyDecision
+    from apps.knowledge_core.models import KnowledgeDocument
+    c, order = purchase(setup)
+    other = buyer(setup)
+    url = f'/api/v1/commerce/licenses/{order.license.pk}/decisions/'
+    payload = {'outcome': 'refund', 'workload': 'Approved workload label', 'comparable': False,
+               'fidelity': 'unknown', 'net_value': 'unknown', 'measured_results': '',
+               'qualitative_feedback': 'Not suitable; approved summary only.'}
+    documents_before = KnowledgeDocument.objects.count()
+    api_client.force_authenticate(user=other)
+    assert api_client.post(url, payload, format='json').status_code == 400
+    api_client.force_authenticate(user=c)
+    response = api_client.post(url, payload, format='json')
+    assert response.status_code == 201
+    assert response.json()['evidence_status'] == 'customer_reported'
+    assert response.json()['measured_results'] == ''
+    assert len(api_client.get(url).json()) == 1
+    assert not Refund.objects.filter(order=order).exists()
+    assert KnowledgeDocument.objects.count() == documents_before
+    assert order.license.status == 'active'
+    api_client.force_authenticate(user=other)
+    assert api_client.get(url).json() == []
+    assert JourneyDecision.objects.count() == 1
+
+
+def test_continue_and_expand_need_activation_and_comparable_positive_proof(setup):
+    c, order = purchase(setup)
+    values = {'outcome': 'continue', 'workload': 'Task A', 'comparable': True,
+              'fidelity': 'preserved', 'net_value': 'positive',
+              'measured_results': 'Baseline 100 calls; ASTOP 60 under equivalent conditions.',
+              'qualitative_feedback': 'No required decisions missed; observer cost included.'}
+    with pytest.raises(ValidationError):
+        s.record_journey_decision(license_id=order.license.pk, client=c, **values)
+    s.activate(license_id=order.license.pk, client=c, environment_hash='f'*64)
+    for change in ({'comparable': False}, {'fidelity': 'failed'}, {'net_value': 'unknown'}, {'measured_results': ''}):
+        with pytest.raises(ValidationError):
+            s.record_journey_decision(license_id=order.license.pk, client=c, **{**values, **change})
+    for outcome in ('continue', 'expand'):
+        row = s.record_journey_decision(license_id=order.license.pk, client=c, **{**values, 'outcome': outcome})
+        assert row.outcome == outcome
+
+
+def test_decision_schema_rejects_unbounded_or_forged_fields(setup, api_client):
+    c, order = purchase(setup)
+    api_client.force_authenticate(user=c)
+    url = f'/api/v1/commerce/licenses/{order.license.pk}/decisions/'
+    payload = {'outcome': 'stop', 'workload': 'Task', 'fidelity': 'unknown',
+               'net_value': 'unknown', 'qualitative_feedback': 'No fit.'}
+    for change in ({'verified': True}, {'outcome': 'approved'}, {'qualitative_feedback': 'x'*4001}):
+        assert api_client.post(url, {**payload, **change}, format='json').status_code == 400

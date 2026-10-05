@@ -49,6 +49,8 @@ def _verified_lead():
 
 def _qualification_context():
     return {
+        "enterprise_exception": "security",
+        "why_self_service_insufficient": "Protected security review required",
         "business_unit": "Observation platform",
         "observation_problem": "Decision-time observation cost",
         "candidate_workflow": "Agent observation workflow",
@@ -61,6 +63,15 @@ def _qualification_context():
 
 def _evaluation_scope():
     return {
+        "technical_owner": "Technical sponsor",
+        "decision_owner": "Decision owner",
+        "baseline_plan": "Comparable baseline and measurement window",
+        "fidelity_criteria": "No missed required events",
+        "success_no_go": "Preserve fidelity and net value, otherwise stop",
+        "effort_allowance": "Reviewed bounded effort",
+        "next_decision": "Continue or stop",
+        "decision_deadline": "2026-11-01",
+        "security_data_authorization": "Reviewed scope and data authorization",
         "workload": "Representative agent workload",
         "observation_behavior": "Observe decision-time token/tool usage",
         "model_or_controller": "Controlled controller A",

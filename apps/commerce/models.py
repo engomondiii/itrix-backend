@@ -5,7 +5,8 @@ from apps.core.models import BaseModel
 
 class LegalRelease(BaseModel):
     """An immutable, reviewed document, stored privately rather than in public Git."""
-    kind = models.CharField(max_length=16, choices=[('lo', 'License Order'), ('branch', 'Branch Agreement')])
+    kind = models.CharField(max_length=16, choices=[('lo', 'License Order'), ('branch', 'Branch Agreement'), ('trial', 'Trial terms')])
+    policy = models.CharField(max_length=24, default='legacy')
     version = models.CharField(max_length=40)
     body = models.TextField()
     sha256 = models.CharField(max_length=64)
@@ -16,7 +17,7 @@ class LegalRelease(BaseModel):
     def save(self, *args, **kwargs):
         if not self._state.adding:
             original = type(self).objects.get(pk=self.pk)
-            fields = ('kind', 'version', 'body', 'sha256', 'approved_at', 'approved_by_id')
+            fields = ('kind', 'policy', 'version', 'body', 'sha256', 'approved_at', 'approved_by_id')
             if any(getattr(self, key) != getattr(original, key) for key in fields):
                 raise ValidationError('Published legal evidence is immutable; publish a new version.')
         return super().save(*args, **kwargs)
@@ -36,6 +37,10 @@ class VerifiedIdentity(BaseModel):
 
 
 class Order(BaseModel):
+    purpose = models.CharField(max_length=16, default='legacy')
+    refund_days = models.PositiveSmallIntegerField(default=30)
+    trial = models.ForeignKey('TrialEnrollment', null=True, on_delete=models.PROTECT, related_name='orders')
+    recurring_authorized_at = models.DateTimeField(null=True)
     client = models.ForeignKey('clients.Client', on_delete=models.PROTECT)
     kind = models.CharField(max_length=16)
     seats = models.PositiveIntegerField()
@@ -57,6 +62,11 @@ class Order(BaseModel):
 
 
 class License(BaseModel):
+    entitlement_kind = models.CharField(max_length=16, default='legacy')
+    starts_at = models.DateTimeField(null=True)
+    ends_at = models.DateTimeField(null=True)
+    auto_renew = models.BooleanField(default=False)
+    cancelled_at = models.DateTimeField(null=True)
     order = models.OneToOneField(Order, on_delete=models.PROTECT)
     status = models.CharField(max_length=16, default='active')
     token_version = models.PositiveIntegerField(default=0)
@@ -157,3 +167,27 @@ class JourneyDecision(BaseModel):
     net_value = models.CharField(max_length=16, choices=[('positive', 'Positive'), ('nonpositive', 'Nonpositive'), ('unknown', 'Unknown')])
     measured_results = models.TextField(blank=True)
     qualitative_feedback = models.TextField()
+
+
+class TrialEnrollment(BaseModel):
+    """One trial per verified account; identity-level duplicate checks in the service."""
+    client = models.OneToOneField('clients.Client', on_delete=models.PROTECT)
+    identity_key = models.CharField(max_length=64, unique=True)
+    license = models.OneToOneField(License, on_delete=models.PROTECT)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    joined_order = models.OneToOneField(Order, on_delete=models.PROTECT, null=True, related_name='converted_trial')
+
+
+class RenewalRecord(BaseModel):
+    """Verified recurring captures; original order evidence is never rewritten."""
+    license = models.ForeignKey(License, on_delete=models.PROTECT, related_name='renewals')
+    provider_id = models.CharField(max_length=200, unique=True)
+    payment_reference = models.CharField(max_length=200, unique=True)
+    payload_hash = models.CharField(max_length=64)
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    refund_status = models.CharField(max_length=24, blank=True)
+    refund_reason = models.TextField(blank=True)
+    paid_at = models.DateTimeField()

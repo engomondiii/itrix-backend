@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-07",
+  "inputs": [
+    {
+      "filename": "ASTOP_Customer_Journey_v1.6.docx",
+      "sha256": "ae6b384c3a2e0c8a4855fb15153a9e65630d963f0cc0a7c9ccd50ac2b409234b",
+      "raw_published": false
+    },
+    {
+      "filename": "itriX_Internal_Commercialization_Operating_Plan_v1.6.docx",
+      "sha256": "7a21ff03e72b3094d97a777df6fca358d6c8a2923a06abdca950d16038b66810",
+      "raw_published": false
+    },
+    {
+      "filename": "IWL_Proposal_ASTOP_AI_Led_Sales_IP_Control_v1.1_Condensed.docx",
+      "sha256": "8c95765200790d8f2285dd3cd2aeb00d38064313d8690f38ba13ed51c88bd0b6",
+      "raw_published": false
+    }
+  ],
+  "updated_sources": [
+    {
+      "path": "knowledge_docs/README.md",
+      "sha256": "804cbd39825668abbc4667cef7a075aa8b4465ecfb01c5e22726b16c803f267b"
+    },
+    {
+      "path": "knowledge_docs/internal_only/ASTOP_Technical_Capabilities_Current_v0.3.1.md",
+      "sha256": "052bdf343787dd2df7a8b4c5fd2da1057f3790b65d691cd3a4940f5f7037102e"
+    },
+    {
+      "path": "knowledge_docs/internal_only/astop_activation_policy_20261004.md",
+      "sha256": "ba548481cc853f836fe7e20f5f9c4eda6144c058bbe79f9f2a5f24ae72d04aaf"
+    },
+    {
+      "path": "knowledge_docs/internal_only/licensing_and_commercialization_internal.md",
+      "sha256": "a04c0c45c83f6d1d93efb8fe9db052a0f0563b770894954dea0f4873d09d831d"
+    },
+    {
+      "path": "knowledge_docs/internal_only/platform_governance_current_20261003.md",
+      "sha256": "7605e2210b818f3049bb5c214779f8c0891ce5b67715ca622b1bfe0ba190ee87"
+    },
+    {
+      "path": "knowledge_docs/public/astop_branch_program_summary_v1_4.md",
+      "sha256": "b044c71a1df0bf872610e469f8293784973f238b09d16bba73fe5a106387440d"
+    },
+    {
+      "path": "knowledge_docs/public/astop_product_and_access_20261002.md",
+      "sha256": "4db3b2e6d8bd60892bc2b8e51d86af48a0ca86d8dbe45bc23db10a7f019f6f9f"
+    },
+    {
+      "path": "knowledge_docs/public/astop_customer_journey_v1_6.md",
+      "sha256": "ec78b0120153561f868a80a98f7d43e1d5e7030cb56934c5cf6f3f213af29c8d"
+    },
+    {
+      "path": "knowledge_docs/public/astop_membership_terms_20261007.md",
+      "sha256": "bc3f54e84f3e83ff540e555840b4493b10f6cfe1d2d602f76ee28f5895df3077"
+    }
+  ],
+  "removed": [
+    "knowledge_docs/public/astop_customer_journey_v1_5.md",
+    "knowledge_docs/public/astop_license_order_summary_v2_6.md"
+  ]
+}

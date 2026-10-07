@@ -60,10 +60,10 @@ _TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|comp
 # Exact current public terms must not disappear behind a higher-scoring overview.
 # These are candidate sources only: all disclosure and metadata gates still apply.
 _CUSTOMER_TERM_SOURCES = (
-    (re.compile(r"\b(price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
-     "astop_license_order_summary_v2_6.md"),
-    (re.compile(r"\b(journey|discover|acquire|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|여정|기업|추천|브랜치|수수료", re.I),
-     "astop_customer_journey_v1_5.md"),
+    (re.compile(r"\b(trial|membership|annual|cancel|cancellation|price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
+     "astop_membership_terms_20261007.md"),
+    (re.compile(r"\b(journey|discover|enroll|join|renew|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|여정|기업|추천|브랜치|수수료", re.I),
+     "astop_customer_journey_v1_6.md"),
 )
 
 

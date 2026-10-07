@@ -20,7 +20,7 @@ def test_sales_prompt_keeps_gates_and_adds_customer_specific_next_steps():
     for rule in ('ONE useful next step', 'never repeat a seat-count',
                  'never bypass identity', 'Do not request identity/contact on your own',
                  'Respect no-fit, stop, refusal', 'Never hide a material unresolved term',
-                 'Activation renewal is not subscription', 'Signing keys are never customer deliverables'):
+                 'Activation renewal is not annual billing', 'Signing keys are never customer deliverables'):
         assert rule in prompt
 
 
@@ -28,8 +28,8 @@ def test_public_terms_remove_obsolete_prices_and_explain_correct_discount():
     root = Path(__file__).resolve().parents[2] / 'knowledge_docs/public'
     access = (root / 'astop_product_and_access_20261002.md').read_text()
     assert 'USD 19' not in access and 'twelve-download' not in access
-    terms = (root / 'astop_license_order_summary_v2_6.md').read_text()
+    terms = (root / 'astop_membership_terms_20261007.md').read_text()
     assert 'Five organization seats cost USD 80' in terms
-    assert 'USD 18 with an eligible Branch referral' in terms
-    assert 'three' in terms.lower() and 'seven days' in terms and 'fourteen days' in terms
-    assert 'not workload content' in terms
+    assert 'USD 18 per year for an individual' in terms
+    assert 'three' in terms.lower() and 'seven-day' in terms and 'fourteen-day' in terms
+    assert 'do not include workload content' in terms

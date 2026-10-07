@@ -836,3 +836,5 @@ ASTOP_COMMERCE_ADAPTER = env("ASTOP_COMMERCE_ADAPTER", default="")
 ASTOP_MAX_ENVIRONMENTS = int(env("ASTOP_MAX_ENVIRONMENTS", "3"))
 ASTOP_OFFLINE_VALIDITY_DAYS = int(env("ASTOP_OFFLINE_VALIDITY_DAYS", "14"))
 ASTOP_VALIDATION_DAYS = int(env("ASTOP_VALIDATION_DAYS", "7"))
+# Requires approved v1.6 trial/LO texts, tested signed builds/runtime and provider lifecycle.
+ASTOP_MEMBERSHIP_LAUNCH_APPROVED = env_bool("ASTOP_MEMBERSHIP_LAUNCH_APPROVED", default=False)

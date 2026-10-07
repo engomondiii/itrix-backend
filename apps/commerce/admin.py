@@ -17,5 +17,5 @@ class LedgerAdmin(ItrixModelAdmin):
 
 for model in (models.LegalRelease, models.VerifiedIdentity, models.Order, models.License,
               models.Seat, models.Activation, models.Delivery, models.Refund, models.Branch,
-              models.Reward, models.PaymentEvent, models.CommerceAudit, models.JourneyDecision):
+              models.Reward, models.PaymentEvent, models.CommerceAudit, models.JourneyDecision, models.TrialEnrollment, models.RenewalRecord):
     admin.site.register(model, LedgerAdmin)

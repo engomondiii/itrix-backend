@@ -1,0 +1,25 @@
+# ASTOP customer journey v1.6
+Source: ASTOP Customer Journey v1.6, supplied 7 October 2026. Public-safe summary of the current intended offer; service availability must be verified. It is not an accepted agreement.
+
+## Discover → Enroll → 7-Day Trial & Prove → Join → Continue → Renew
+Discover checks plausibility, not proven fit: repeated observation, sparse meaningful change, accessible evidence and a feasible comparable baseline. ASTOP separates low-level sensing from expensive reasoning and does not replace the runtime or scheduler. A one-shot task, cheap checks or sufficient existing webhooks may offer little incremental value. No fit and leaving are legitimate outcomes.
+
+## Enroll without payment
+Create a verified account, verify required identity and accept the exact approved trial terms. Create a protected seven-day trial entitlement and release authenticated controlled delivery. No payment is taken during the trial; starting a trial is not authorization to charge or automatically convert to membership. Collect identity only through approved verification processes, never public chat. Display membership pricing and applicable referral discounts before enrollment. Installer possession alone grants no continuing right to use ASTOP.
+
+## Seven-day trial and proof
+Install, activate, connect a representative workload and compare it with a meaningful baseline during seven days of real use before the first payment. Record workload, model, hardware, software and baseline version. Define required decisions and events; examine success, missed events, false wakeups and latency before interpreting observation tokens, model calls, bytes and observer CPU, memory, I/O or classification cost. Missing metrics are unknown, not zero. Separate measured results, estimates and qualitative feedback. Published finite-panel benchmarks are not customer proof or a 24-hour endurance result.
+Record proof and the customer's decision, including tune, another workload or stop. A report is customer feedback, not independent certification, a payment authorization or permission to publish raw workload data. The six current stages do not include a separate Decide stage.
+
+## Join after the full trial
+Only after the full seven-day trial may the customer explicitly elect paid membership, accept the applicable License Order and authorize annual automatic renewal. Successful first payment creates annual entitlement. Individual Membership is USD 20 per year for one verified Authorized User. Organization Membership is USD 16 per Authorized User per year with two or more named users under one verified entity. An eligible 10% Branch referral gives an individual USD 18 per year; discounts do not stack. Five organization seats remain USD 80 per year with or without eligible referral attribution. Taxes and final totals must be shown in the actual order.
+
+## Continue and renew
+Keep entitlement, applicable updates/support, deployment health and workload value visible. Reprove materially different workloads before expansion. Annual renewal occurs only under the authorized recurring terms, with appropriate notice and accessible cancellation. Annual billing renewal is distinct from periodic technical license validation. A cancelled auto-renewal must not be described as an automatic refund. Refund requests may be made within fourteen calendar days after the applicable membership payment, including renewal payments, subject to the License Order and mandatory law. A request is not approved repayment. Existing customers retain their accepted agreement; new terms are not silently imposed on old orders.
+
+## Protection and exceptions
+Protection Policy governs signed builds, trial and membership entitlements, periodic validation, offline validity, authorized environments and revocation. Do not promise a trial offline window extending beyond the seven-day trial. Never distribute private signing keys, raw identity, public reusable installer links or unapproved builds. Service and installer readiness cannot be inferred from this journey.
+Strategic Enterprise Validation is an exception route for a concrete protected review, security, procurement, unusual deployment, scale or senior-sponsorship need. It is not a third membership tier. Large organizations may use ordinary self-service. Agree workload, baseline, owners, fidelity/no-go criteria, authorized scope, effort allowance and next decision before protected work.
+
+## Optional advocacy and Branch participation
+After successful paid use a Member may voluntarily advocate without creating reward rights or needing Branch enrollment. An eligible Member or approved advocate may apply separately; itriX approval and an executed Branch Agreement precede Branch status. Branches introduce customers; customers contract directly with and pay itriX. Rewards require qualified paid memberships and agreement-controlled checks, never trial starts, clicks or recruitment. Sub-Branch status requires separate enrollment. Branch settlement rules are distinct from the customer's refund window.

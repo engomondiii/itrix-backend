@@ -257,6 +257,10 @@ class ConciergeAgent(BaseAgent):
             # deterministically outside the model, so an injected instruction has
             # nothing to subvert.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
+            from apps.commerce.membership import conversation_state
+            membership_state = conversation_state(ctx)
+            if membership_state:
+                system += "\nVERIFIED ACCOUNT ASTOP STATE (do not infer additional rights):\n" + membership_state
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_INSTRUCTION)
             completion = ClaudeClient().complete_with_meta(
                 system=system, user=user, max_tokens=_max_tokens()
@@ -353,6 +357,10 @@ class ConciergeAgent(BaseAgent):
             # see the same documents, or an answer's content would depend on whether
             # realtime happened to be on.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
+            from apps.commerce.membership import conversation_state
+            membership_state = conversation_state(ctx)
+            if membership_state:
+                system += "\nVERIFIED ACCOUNT ASTOP STATE (do not infer additional rights):\n" + membership_state
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
             yield from ClaudeClient().stream(system=system, user=user, max_tokens=_max_tokens())
         except AIEngineDisabled:

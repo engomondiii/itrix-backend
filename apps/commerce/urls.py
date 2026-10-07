@@ -1,7 +1,9 @@
 from django.urls import path
 from .views import (AvailabilityView, BranchView, LicensesView, LicenseActionView,
-                    OperatorView, OrderActionView, OrdersView, PaymentWebhookView)
+                    TrialView, RenewalsView, OperatorView, OrderActionView, OrdersView, PaymentWebhookView)
 urlpatterns = [
+    path('trial/', TrialView.as_view()),
+    path('renewals/', RenewalsView.as_view()),
     path('availability/', AvailabilityView.as_view()),
     path('orders/', OrdersView.as_view()),
     path('orders/<uuid:order_id>/<str:action>/', OrderActionView.as_view()),

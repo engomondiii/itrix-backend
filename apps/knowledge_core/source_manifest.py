@@ -579,3 +579,18 @@ SOURCE_MANIFEST["astop_customer_journey_v1_5.md"] = _replace(
 for _name in ("astop_product_and_access_20261002.md", "astop_license_order_summary_v2_6.md",
               "astop_customer_journey_v1_5.md"):
     SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-05")
+
+
+# 7 October: replace current acquisition summaries, retain historical metadata only.
+for _old, _new in (("astop_customer_journey_v1_5.md", "astop_customer_journey_v1_6.md"),
+                   ("astop_license_order_summary_v2_6.md", "astop_membership_terms_20261007.md")):
+    SOURCE_MANIFEST[_new] = _replace(SOURCE_MANIFEST[_old], current=True, authority="governing",
+        supersedes=(_old,), superseded_by="", verified_date="2026-10-07",
+        canonical_rule="Journey v1.6: seven-day free trial without payment; explicit Join after full trial; USD20/year individual or USD16/user/year organization (2+); annual renewal only with consent; fourteen-day post-payment refund request. Approved revised terms and services required. Preserve existing accepted orders.")
+    SOURCE_MANIFEST[_old] = _replace(SOURCE_MANIFEST[_old], current=False, authority="legacy", superseded_by=_new)
+    RETIRED_OCTOBER_SOURCES += (_old,)
+for _name in ("astop_product_and_access_20261002.md", "astop_activation_policy_20261004.md",
+              "platform_governance_current_20261003.md", "astop_branch_program_summary_v1_4.md",
+              "ASTOP_Technical_Capabilities_Current_v0.3.1.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-07",
+        canonical_rule="Current v1.6 trial-first annual membership governs new offers; no claim services are live. Historical accepted agreements remain immutable. Trial/annual entitlement, asymmetric signing and revocation need approved current policy and tested implementation. Branch rewards require approved paid-membership terms, never trial enrollment.")

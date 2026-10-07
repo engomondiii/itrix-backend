@@ -15,4 +15,4 @@ never exposed to a client or public payload.
 The internal buyer map goes further than the controlled-public version: named roles,
 likely approval paths, and the internal read on where a deal could stall.
 
-ASTOP retail follows October LO v2.6: verified identity/email, exact order acceptance, confirmed payment, license and protected delivery. Enterprise evaluation is not a universal retail prerequisite. Non-ASTOP enterprise fees, exclusivity and scope require separate written agreement; old generic pricing examples do not override the ASTOP LO.
+ASTOP follows Journey v1.6: verified identity/email and trial acceptance before seven-day protected trial delivery without payment, then explicit Join after the full trial, recurring consent and payment for annual membership. Revised approved LO/protection terms must align before launch; legacy accepted orders remain unchanged. Enterprise evaluation is not a universal retail prerequisite. Non-ASTOP enterprise fees, exclusivity and scope require separate written agreement; old generic pricing examples do not override the ASTOP LO.

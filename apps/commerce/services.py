@@ -47,13 +47,14 @@ def active_legal(kind):
 
 
 @transaction.atomic
-def publish_legal(*, kind, version, body, actor):
-    require(kind in ('lo', 'branch') and body.strip() and version.strip(), 'Invalid agreement.')
+def publish_legal(*, kind, version, body, actor, policy="legacy"):
+    require(policy in ('legacy', 'annual_v1_6'), 'Unknown commercial policy.')
+    require(kind in ('lo', 'branch', 'trial') and body.strip() and version.strip(), 'Invalid agreement.')
     # Final text must be reviewed outside code; the provided Branch draft is not executable.
     require(not any(marker in body.lower() for marker in ('[insert', '[●]', '[to be', 'tbd', '{{', '_____')),
             'Resolve agreement placeholders before approval.')
     LegalRelease.objects.filter(kind=kind, active=True).update(active=False)
-    release = LegalRelease.objects.create(kind=kind, version=version, body=body,
+    release = LegalRelease.objects.create(kind=kind, policy=policy, version=version, body=body,
         sha256=digest(body), approved_at=timezone.now(), approved_by=actor, active=True)
     audit('legal_published', release, actor, kind=kind, version=version)
     return release
@@ -84,12 +85,20 @@ def current_identity(client, kind):
 
 
 @transaction.atomic
-def quote(*, client, kind, seats, referral_code=''):
+def quote(*, client, kind, seats, referral_code='', trial=None):
+    from .membership import require_join
+    if trial is not None:
+        require_join(trial, client)
     adapter()  # No order can be offered while integrations are unavailable.
     require(type(seats) is int and ((kind == 'individual' and seats == 1) or
             (kind == 'organization' and 2 <= seats <= 10000)), 'Individual: one seat; organization: 2–10,000 seats.')
     identity = current_identity(client, kind)
     legal = active_legal('lo')
+    if trial is not None:
+        require(legal.policy == 'annual_v1_6', 'Approved annual membership terms required.')
+        require(kind == trial.license.order.kind and seats == trial.license.order.seats, 'Membership scope must match the verified trial; contact support for scope changes.')
+    else:
+        require(legal.policy == 'legacy', 'Annual membership requires the trial-first path.')
     referral = None
     if referral_code:
         referral = Branch.objects.select_for_update().filter(code=referral_code, status='active').first()
@@ -116,6 +125,7 @@ def quote(*, client, kind, seats, referral_code=''):
             f'Type: {kind}\nSeats: {seats}\nLicense fee: USD {amount}\nDiscount: {discount}%\n'
             f'Agreement version: {legal.version}\n\n{legal.body}')
     order = Order.objects.create(client=client, kind=kind, seats=seats, amount=amount,
+        purpose='annual' if trial else 'legacy', refund_days=14 if trial else 30, trial=trial,
         discount=discount, identity_snapshot=snapshot, legal=legal, legal_body=body,
         legal_hash=digest(body), referral=referral, lineage=lineage)
     audit('order_quoted', order, client)
@@ -123,12 +133,17 @@ def quote(*, client, kind, seats, referral_code=''):
 
 
 @transaction.atomic
-def accept_order(*, order_id, client, legal_hash, session):
+def accept_order(*, order_id, client, legal_hash, session, authorize_renewal=False):
     order = Order.objects.select_for_update().get(pk=order_id, client=client)
     require(order.status == 'quoted' and order.legal.active, 'Order is no longer available for acceptance.')
     identity = current_identity(client, order.kind)
     require(identity.verified_at.isoformat() == order.identity_snapshot['verified_at'], 'Identity changed; request a new order.')
     require(legal_hash == order.legal_hash and session, 'Accept the exact displayed agreement in an authenticated session.')
+    if order.purpose == 'annual':
+        from .membership import require_join
+        require_join(order.trial, client)
+        require(authorize_renewal is True, 'Explicit annual automatic-renewal authorization required.')
+        order.recurring_authorized_at = timezone.now()
     order.accepted_at = timezone.now()
     order.acceptance_session_hash = digest(session)
     order.status = 'accepted'
@@ -150,7 +165,19 @@ def record_payment(*, order_id, provider_id, payment_reference, amount, currency
     PaymentEvent.objects.create(provider_id=provider_id, payload_hash=payload_hash, order=order, kind='capture')
     order.status, order.payment_reference, order.paid_at = 'paid', payment_reference, timezone.now()
     order.save()
-    license = License.objects.create(order=order)
+    if order.purpose == 'annual':
+        from .membership import require_join, next_year
+        from .models import TrialEnrollment
+        trial = TrialEnrollment.objects.select_for_update().get(pk=order.trial_id)
+        require_join(trial, order.client)
+        require(order.recurring_authorized_at, 'Recurring authorization required.')
+        license = License.objects.create(order=order, entitlement_kind='annual', starts_at=order.paid_at, ends_at=next_year(order.paid_at), auto_renew=True)
+        trial.joined_order = order
+        trial.save()
+        trial.license.status = 'converted'
+        trial.license.save()
+    else:
+        license = License.objects.create(order=order)
     if order.kind == 'individual':
         Seat.objects.create(license=license, email=order.identity_snapshot['email'])
     for level, branch_id in enumerate(order.lineage, 1):
@@ -163,7 +190,9 @@ def record_payment(*, order_id, provider_id, payment_reference, amount, currency
 @transaction.atomic
 def assign_seat(*, license_id, client, email, replace_id=None):
     license = License.objects.select_for_update().select_related('order').get(pk=license_id, order__client=client)
-    require(license.status == 'active' and license.order.kind == 'organization', 'Active organization license required.')
+    from .membership import require_entitlement
+    require_entitlement(license)
+    require(license.order.kind == 'organization', 'Organization license required.')
     from django.core.validators import validate_email
     email = email.strip().lower()
     validate_email(email)
@@ -199,6 +228,8 @@ def activate(*, license_id, client, environment_hash, replace_id=None, confirm_r
     seat = Seat.objects.filter(license=license, email=client.email.strip().lower(), active=True).first()
     require(seat, 'A named seat is required.')
     require(isinstance(environment_hash, str) and len(environment_hash) == 64 and all(c in '0123456789abcdef' for c in environment_hash), 'Hashed environment identifier required.')
+    from .membership import require_entitlement
+    require_entitlement(license)
     policy = activation_policy()
     now = timezone.now()
     # Expiry does not silently unregister a device; a fourth registration needs replacement.
@@ -218,14 +249,21 @@ def activate(*, license_id, client, environment_hash, replace_id=None, confirm_r
     activation.last_validated_at = now
     activation.renewal_due_at = now + timedelta(days=policy['renewal_days'])
     activation.valid_until = now + timedelta(days=policy['offline_validity_days'])
+    if license.ends_at:
+        activation.valid_until = min(activation.valid_until, license.ends_at)
+        activation.renewal_due_at = min(activation.renewal_due_at, license.ends_at)
     activation.save()
     # Only opaque licensing/security data: never workload content. The runtime must
     # gate NEW sessions at expiry and let entitled sessions finish. Revocation stops
     # renewal, not a running job or the previously issued offline validity window.
-    token = adapter().sign_activation({'license_id': str(license.pk), 'activation_id': str(activation.pk),
+    claims = {'license_id': str(license.pk), 'activation_id': str(activation.pk),
         'environment_hash': environment_hash, 'version': license.token_version,
         'validated_at': now.isoformat(), 'renewal_due_at': activation.renewal_due_at.isoformat(),
-        'expires_at': activation.valid_until.isoformat(), 'session_continuity': policy['session_continuity']})
+        'expires_at': activation.valid_until.isoformat(), 'session_continuity': policy['session_continuity']}
+    if license.entitlement_kind != 'legacy':
+        claims.update(entitlement_kind=license.entitlement_kind, entitlement_starts_at=license.starts_at.isoformat(),
+                      entitlement_ends_at=license.ends_at.isoformat(), entitlement_status=license.status)
+    token = adapter().sign_activation(claims)
     require(token, 'Activation signer unavailable.')
     audit('activated', activation, client)
     return activation, token
@@ -237,7 +275,8 @@ def deliver(*, license_id, client, platform):
     require(client.is_active and client.email_verified_at and (license.order.client_id == client.pk or
             license.assignments.filter(email=client.email.strip().lower(), active=True).exists()),
             'Purchaser or verified named seat user required.')
-    require(license.status == 'active', 'An active license is required.')
+    from .membership import require_entitlement
+    require_entitlement(license)
     require(platform in ('macos-arm64', 'linux-x86_64', 'linux-aarch64'), 'Unsupported platform.')
     artifact = adapter().delivery(license_id=str(license.pk), platform=platform)
     # Adapter must return a short-lived authenticated production-build delivery, never raw debug assets.
@@ -252,8 +291,8 @@ def deliver(*, license_id, client, platform):
 @transaction.atomic
 def request_refund(*, order_id, client, reason):
     order = Order.objects.select_for_update().get(pk=order_id, client=client)
-    require(order.status == 'paid' and order.paid_at and timezone.now() <= order.paid_at + timedelta(days=30),
-            'The standard 30-day request window is unavailable. Contact itriX for any mandatory statutory rights.')
+    require(order.status == 'paid' and order.paid_at and timezone.now() <= order.paid_at + timedelta(days=order.refund_days),
+            'The applicable refund request window is unavailable. Contact itriX for any mandatory statutory rights.')
     require(bool(reason.strip()), 'Refund reason required.')
     refund, _ = Refund.objects.get_or_create(order=order, defaults={'reason': reason.strip()[:4000]})
     audit('refund_requested', refund, client)
@@ -265,6 +304,7 @@ def revoke_order(*, order, reason):
     license = License.objects.select_for_update().get(order=order)
     if license.status != 'revoked':
         license.status, license.revoked_at = 'revoked', timezone.now()
+        license.auto_renew = False
         license.token_version += 1
         license.save()
     # Preserve signed offline expiry and job continuity; block future issuance/renewal.
@@ -309,6 +349,10 @@ def repay_refund(refund_id):
 @transaction.atomic
 def apply_branch(*, client, order_id):
     order = Order.objects.select_for_update().get(pk=order_id, client=client, status='paid', license__status='active')
+    from .membership import require_entitlement
+    require_entitlement(order.license)
+    if order.purpose == 'annual':
+        require(active_legal('branch').policy == 'annual_v1_6', 'Approved membership Branch terms required.')
     require(client.email_verified_at, 'Verified email required.')
     branch, _ = Branch.objects.get_or_create(client=client, defaults={'qualifying_order': order})
     audit('branch_applied', branch, client)
@@ -320,6 +364,10 @@ def approve_branch(*, branch_id, actor):
     branch = Branch.objects.select_for_update().get(pk=branch_id)
     require(branch.status == 'applied' and License.objects.filter(order=branch.qualifying_order, status='active').exists(), 'Eligible licensee application required.')
     release = active_legal('branch')
+    if branch.qualifying_order.purpose == 'annual':
+        from .membership import require_entitlement
+        require_entitlement(branch.qualifying_order.license)
+        require(release.policy == 'annual_v1_6', 'Approved membership Branch terms required.')
     branch.status, branch.approved_by, branch.approved_at = 'approved', actor, timezone.now()
     branch.agreement, branch.agreement_body, branch.agreement_hash = release, release.body, release.sha256
     branch.save()
@@ -333,6 +381,10 @@ def accept_branch(*, client, legal_hash, session):
     current_identity(client, branch.qualifying_order.kind)
     require(branch.status == 'approved' and branch.agreement.active and legal_hash == branch.agreement_hash and session, 'Accept the approved Branch agreement.')
     require(License.objects.filter(order=branch.qualifying_order, status='active').exists(), 'Active qualifying license required.')
+    if branch.qualifying_order.purpose == 'annual':
+        from .membership import require_entitlement
+        require_entitlement(branch.qualifying_order.license)
+        require(branch.agreement.policy == 'annual_v1_6', 'Membership Branch terms required.')
     # Parent derives ONLY from this applicant's earlier qualifying paid purchase.
     branch.parent = branch.qualifying_order.referral
     if branch.parent:
@@ -347,6 +399,10 @@ def accept_branch(*, client, legal_hash, session):
 @transaction.atomic
 def release_reward(*, reward_id, actor, settlement_reference, fraud_review_reference):
     reward = Reward.objects.select_for_update().select_related('order', 'branch').get(pk=reward_id)
+    if reward.order.purpose == 'annual':
+        from .membership import require_entitlement
+        require_entitlement(reward.order.license)
+        require(reward.branch.agreement and reward.branch.agreement.policy == 'annual_v1_6', 'Membership reward terms require approval.')
     require(reward.status == 'pending' and timezone.now() >= reward.eligible_at and
             reward.order.status == 'paid' and reward.branch.status == 'active' and
             License.objects.filter(order=reward.order, status='active').exists() and
@@ -384,6 +440,7 @@ def review_license(*, license_id, actor, action, review_reference):
     elif action == 'suspend':
         require(license.status == 'active', 'Active license required.')
         license.status = 'suspended'
+        license.auto_renew = False
         license.token_version += 1
         license.save()
         # Preserve signed offline expiry and job continuity; block future issuance/renewal.

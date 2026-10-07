@@ -8,8 +8,8 @@ The active corpus contains 31 documents. This README is outside the disclosure f
 | --- | --- | --- |
 | Product catalogue and maturity | public/itrix_product_portfolio_v1_4.md | Four offerings; stages do not imply general availability |
 | ASTOP behavior, evidence and access | public/astop_product_and_access_20261002.md | New finite-panel evidence, separate retail/enterprise routes |
-| Discovery through install and feedback | public/astop_customer_journey_v1_5.md | Journey reconciled to the specific LO |
-| Pricing, seats, acceptance, refunds | public/astop_license_order_summary_v2_6.md | Curated summary, never a substitute for the exact accepted order |
+| Discovery through install and feedback | public/astop_customer_journey_v1_6.md | Seven-day trial, annual membership and renewal; approved LO required |
+| Pricing, seats, acceptance, refunds | public/astop_membership_terms_20261007.md | Curated summary, never a substitute for the exact accepted order |
 | Referral eligibility and rewards | public/astop_branch_program_summary_v1_4.md | Separate approved agreement; incomplete draft cannot launch |
 | Comparison with caching/harness tools | public/astop_comparison_current_20261003.md | September comparison context, October evidence boundaries |
 | Research overview | public/research_portfolio_summary_20261002.md | Public-safe portfolio distinctions |
@@ -57,3 +57,6 @@ python manage.py validate_knowledge_core
 Use all-namespace reconciliation because retired sources occupied several namespaces, including historical/general ones. Merely ingesting new documents will not prove obsolete remote vectors are removed. Registration deactivates missing sources and removes their SQL chunks; retrieval rejects noncurrent rows even before remote cleanup. Run the grounding/answer checks described in the rollout guide afterwards. No production ingestion was performed while preparing this branch.
 
 Merging is not permission to enable commercial services. Payment/tax, verification, signed builds/runtime activation, final legal releases and real payout operations require configuration and end-to-end validation; commerce remains disabled by default.
+
+## 7 October update
+Current journey is Discover → Enroll → 7-Day Trial & Prove → Join → Continue → Renew. The two old public journey/LO summaries are physically replaced; other sources are retained and only conflicting ASTOP access wording is amended. Prior audit sections describe historical snapshots. Confidential originals are not published. See docs/document_alignment_20261007.md for launch prerequisites and preserved legacy rights.

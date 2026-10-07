@@ -4,7 +4,7 @@ from apps.ai_engine.services import knowledge_retriever as retriever
 from apps.knowledge_core.models import KnowledgeChunk, KnowledgeDocument
 
 pytestmark = pytest.mark.django_db
-NAME = 'astop_license_order_summary_v2_6.md'
+NAME = 'astop_membership_terms_20261007.md'
 
 
 def make_chunk(name=NAME, text='Three environments; seven-day renewal; fourteen-day offline validity.', **metadata):
@@ -69,7 +69,7 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
     from apps.knowledge_core.services.chunker import chunk_text
     settings.ENABLE_AI_ENGINE = False
     root = Path(__file__).resolve().parents[2] / 'knowledge_docs/public'
-    for name in (NAME, 'astop_customer_journey_v1_5.md'):
+    for name in (NAME, 'astop_customer_journey_v1_6.md'):
         first = make_chunk(name)
         doc = first.document
         first.delete()
@@ -79,10 +79,10 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
                 vector_id=f'{doc.id}:{chunk.index}')
     activation = ' '.join(c['text'] for c in retrieve(
         'ASTOP three computers fourth environment replacement renewal interval offline validity expiry workload content', top_k=5))
-    assert 'seven days' in activation
-    assert 'fourteen days' in activation
-    assert 'not workload content' in activation
+    assert 'seven-day' in activation
+    assert 'fourteen-day' in activation
+    assert 'do not include workload content' in activation
     pricing = ' '.join(c['text'] for c in retrieve(
         'ASTOP individual and organization five named users price total Branch referral discounts stack customer license', top_k=5))
     assert 'Five organization seats cost USD 80' in pricing
-    assert 'USD 18 with an eligible Branch referral' in pricing
+    assert 'USD 18 per year for an individual' in pricing

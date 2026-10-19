@@ -164,21 +164,25 @@ def deliver_outbox(limit=100):
     ids = Outbox.objects.filter(sent_at__isnull=True, submission__deleted_at__isnull=True).order_by('pk').values_list('pk', flat=True)[:limit]
     for pk in list(ids):
         with transaction.atomic():
-            item = Outbox.objects.select_for_update().select_related('submission').get(pk=pk)
-            if item.sent_at:
+            item = Outbox.objects.select_for_update().select_related('submission').filter(pk=pk).first()
+            if not item or item.sent_at or item.submission.deleted_at:
                 continue
             s = item.submission
             item.attempts += 1
             ko = s.language == 'ko'
             base = settings.WEBSITE_PUBLIC_URL.rstrip('/')
             if item.role == 'admin':
-                paragraphs = [f'{s.reference} · {s.kind}', s.company, s.created_at.isoformat(), 'A new submission is ready for review.']
-                button = ('Dashboard', base + '/itx-console-7k2m')
+                recipient_language = AdminIdentity.objects.filter(email=item.recipient).values_list('language', flat=True).first() or 'ko'
+                ko = recipient_language == 'ko'
+                kind = {'poc': 'PoC 신청', 'contact': '문의', 'interest': '출시 알림 신청'}.get(s.kind, s.kind) if ko else s.kind
+                paragraphs = [f'{s.reference} · {kind}', s.company, s.created_at.isoformat(),
+                    '새 접수가 검토를 기다리고 있습니다.' if ko else 'A new submission is ready for review.']
+                button = ('관리자 페이지' if ko else 'Dashboard', base + '/itx-console-7k2m' + ('?lang=en' if not ko else ''))
                 subject = f'itriX · {s.reference}'
             else:
                 subject = ('itriX 접수 확인 · ' if ko else 'itriX request received · ') + s.reference
-                paragraphs = [subject, s.company, s.fields.get('use') or s.fields.get('message') or 'ASTOP Store availability',
-                    ('접수 검토 → 담당자 확인 → 다음 단계 안내' if ko else 'We will review your request, confirm the right contact, and agree the next step.') if s.kind == 'poc' else
+                paragraphs = [subject, s.company, s.fields.get('topic', ''), s.fields.get('use') or s.fields.get('message') or 'ASTOP Store availability',
+                    ('1. 영업일 기준 3일 이내 적합성 검토\n2. 워크로드와 기준선 확인\n3. 검증 범위와 다음 단계 협의' if ko else '1. Review fit within three business days.\n2. Confirm the workload and baseline.\n3. Agree the validation scope and next step.') if s.kind == 'poc' else
                     ('영업일 기준 2일 이내에 회신드리겠습니다.' if ko else 'We aim to reply within two business days.')]
                 button = ('Ask X', base + ('/' if ko else '/en') + '#ask-chat')
             try:

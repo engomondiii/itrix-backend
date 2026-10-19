@@ -159,3 +159,25 @@ def test_csv_export_is_scoped_escaped_and_audited():
     assert "'=2+2" in text and 'other@example.invalid' not in text
     assert response.content.startswith(b'\xef\xbb\xbf')
     assert Audit.objects.filter(action='csv_export',actor='admin@itrix.co.kr').exists()
+
+
+def test_admin_alert_does_not_include_applicant_contact_or_message():
+    from apps.website.services import deliver_outbox
+    obj=Submission.objects.create(kind='contact',name='Private Person',email='private@example.invalid',company='Example Company',fields={'message':'Private inquiry text'},privacy_at=timezone.now(),privacy_version='test')
+    Outbox.objects.create(submission=obj,recipient='admin@itrix.co.kr',role='admin')
+    with patch('apps.website.services.send_mail') as mail:
+        deliver_outbox()
+    text=' '.join(mail.call_args.args[2])
+    assert 'Example Company' in text and obj.reference in text
+    assert 'Private Person' not in text and obj.email not in text and 'Private inquiry text' not in text
+    assert Outbox.objects.get().sent_at
+
+
+def test_mail_failure_remains_retryable():
+    from apps.website.services import deliver_outbox
+    obj=Submission.objects.create(kind='contact',name='Test',email='test@example.invalid',privacy_at=timezone.now(),privacy_version='test')
+    Outbox.objects.create(submission=obj,recipient=obj.email,role='applicant')
+    with patch('apps.website.services.send_mail',side_effect=RuntimeError('test outage')):deliver_outbox()
+    assert Outbox.objects.get().sent_at is None and Outbox.objects.get().attempts==1
+    with patch('apps.website.services.send_mail'):deliver_outbox()
+    assert Outbox.objects.get().sent_at and Outbox.objects.get().attempts==2

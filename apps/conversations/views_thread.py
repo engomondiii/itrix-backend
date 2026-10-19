@@ -204,6 +204,7 @@ def _creation_idempotency(request, data) -> tuple[str | None, str]:
             "body": data.get("body", "") or "",
             "example_key": data.get("example_key", "") or "",
             "attachment_ids": list(data.get("attachment_ids") or []),
+            **({"locale": data["locale"]} if "locale" in data else {}),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -334,6 +335,10 @@ class ThreadListCreateView(APIView):
             creation_idempotency_hash=idempotency_hash,
             creation_payload_hash=payload_hash,
         )
+
+        if "locale" in data:
+            thread.locale = data["locale"]
+            thread.save(update_fields=["locale"])
 
         # ── THE HAND-OFF THIS SERIALIZER WAS ALWAYS FOR (2026-08-13) ──────────
         # `attachment_ids` has been declared on ThreadCreateSerializer since v6.0 and was
@@ -539,6 +544,10 @@ class ThreadTurnsView(APIView):
 
         ser = TurnSubmitSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+
+        if "locale" in ser.validated_data:
+            thread.locale = ser.validated_data["locale"]
+            thread.save(update_fields=["locale"])
 
         from apps.conversations.services import ingest
 

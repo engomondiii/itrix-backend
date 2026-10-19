@@ -68,7 +68,7 @@ def request_code(request, email, language):
     identity = AdminIdentity.objects.select_for_update().get(email=email)
     now = timezone.now()
     if identity.locked_until and identity.locked_until > now:
-        raise Throttled(detail='Please try again in 15 minutes.')
+        raise Throttled(detail={'detail': 'Please try again in 15 minutes.', 'reason': 'locked'})
     if identity.last_sent and now - identity.last_sent < timedelta(minutes=1):
         raise Throttled(detail='Wait one minute before requesting another code.')
     if not identity.window_start or now - identity.window_start >= timedelta(hours=1):
@@ -98,7 +98,7 @@ def verify_code(request, email, code):
         if email not in allowed() or not identity:
             raise PermissionDenied('Invalid or expired code.')
         if identity.locked_until and identity.locked_until > now:
-            raise Throttled(detail='Please try again in 15 minutes.')
+            raise Throttled(detail={'detail': 'Please try again in 15 minutes.', 'reason': 'locked'})
         valid = bool(identity.code_hash and identity.code_expires and identity.code_expires > now and
                      len(code) == 6 and code.isdigit() and check_password(code, identity.code_hash))
         if not valid:
@@ -117,7 +117,9 @@ def verify_code(request, email, code):
             audit(request, email, 'sign_in')
     # Raise outside atomic: incorrect attempts and lockouts must persist.
     if not token:
-        raise PermissionDenied('Invalid or expired code.')
+        raise PermissionDenied({'detail': 'Invalid or expired code.',
+                                'reason': 'locked' if identity.locked_until and identity.locked_until > now else 'invalid_code',
+                                'remaining_attempts': 0 if identity.locked_until and identity.locked_until > now else max(0, 5 - identity.failures)})
     return token
 
 

@@ -43,8 +43,13 @@ def test_otp_single_use_hash_lock_and_expiry():
         assert c.post('/api/v1/website/auth/request/', {'email':'admin@itrix.co.kr'}).status_code == 429
         response = c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'321987'})
         assert response.status_code == 200
-        assert c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'321987'}).status_code == 403
-        for _ in range(4): c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'000000'})
+        failed = c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'321987'})
+        assert failed.status_code == 403
+        assert int(failed.data['error']['fields']['remaining_attempts']) == 4
+        for _ in range(4):
+            failed = c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'000000'})
+        assert failed.data['error']['fields']['reason'] == 'locked'
+        assert int(failed.data['error']['fields']['remaining_attempts']) == 0
         identity.refresh_from_db()
         assert identity.locked_until > timezone.now()
         assert c.post('/api/v1/website/auth/verify/', {'email':'admin@itrix.co.kr','code':'321987'}).status_code == 429

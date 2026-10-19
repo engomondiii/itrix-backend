@@ -1,14 +1,11 @@
 # Current platform and commercial governance
 
-Sources: October Portfolio v1.4, ASTOP Customer Journey v1.6, LO v2.6, retained Software Protection v1.5 with the previously supplied explicit activation update and Branch Agreement v1.4. Retains applicable controls from the earlier MVP acceptance feedback while superseding its historical product names. Implementation plans, theme guides, wireframes and old source requests are not current client-answer evidence.
 
 Maintain public-safe discovery without forcing a product, collecting identity documents in chat or creating a later commercial stage from technical sophistication. ASTOP, AXIOM Compute and QNTA Runtime have distinct relevance and readiness; AXIOM Core remains planned hardware/IP. Observe/represent/learn/execute is not a mandatory sales sequence. A separately qualified AXIOM workload does not require prior ASTOP value. A generic keyword or questionnaire hypothesis never establishes commercial qualification.
 
-Ordinary ASTOP is trial-first with individual/organization annual membership, not a perpetual software sale. Protected enterprise evaluation remains separately scoped. Confidentiality agreement, consent to an evaluation, permission for a PoC, content disclosure authorization and production entitlement are distinct. NDA signatures never automatically unlock restricted documents. Avoid forcing a PoC label when a controlled evaluation is the selected stage. Keep customer-facing outputs free of internal scores, fee-delegation logic and confidential strategy.
 
 Define workload, baseline, task quality, scope, relevant hardware and success/failure criteria before evaluation. An evaluation may end with no fit or no further action. Confirm monetary benefits only from measured scope, and distinguish published research from a client's own proof. Record negative results and costs, not just favorable percentages.
 
-Current intended ASTOP annual membership follows Journey v1.6; existing accepted orders retain their exact terms. The new LO and Protection Policy must be approved consistently before launch. Non-ASTOP enterprise fees and rights remain separately negotiated and explicitly agreed; no research capability grants a license, exclusive rights, perpetual term, ownership or support bundle. Existing assessment fee review/delegation cannot waive substantive identity, scope and authorization gates.
 
 For workload transfer, establish permitted use, authorized recipients, security/access controls, data handling and evaluation scope as appropriate. Protect internal mechanisms and personal information. Preserve exact executed agreement evidence; do not silently edit accepted platform terms to rename products. Explain historical names with separate current terminology guidance.
 
@@ -21,8 +18,9 @@ Keep each active opportunity assigned to an owner and next decision, with a dead
 
 Company rollout priorities are not customer product prerequisites. Mathematical or PDE keywords do not establish a commercial product fit; route unvalidated research assets to research review. AXIOM Core remains planned hardware/IP following validated software evidence; QNTA Runtime remains a supported-runtime feasibility offering. Any ambiguous table does not override consistent portfolio definitions. Negotiated non-ASTOP economics remain deal-specific and outside public default pricing.
 
-Customer Journey v1.6 delegates detailed protection mechanics to the Protection Policy and legal terms to the applicable agreement. Record trial proof and membership decisions with separate customer-reported measurements and qualitative feedback. Review reusable learning before shared-knowledge publication. Journey references to approved advocates do not independently authorize bypassing the current Branch Agreement.
 
 
-## Current trial-first execution
-Discover → Enroll → 7-Day Trial & Prove → Join → Continue → Renew. No trial charge and no payment before the full seven days. Require explicit Join and recurring consent. USD 20/year individual; USD 16/user/year organization with two or more users; 14-day post-payment refund request window. Do not apply negotiated non-ASTOP value-participation economics to ordinary ASTOP. AI may automate authorized reversible work, never change binding rights or technical truth. Appoint an accountable knowledge owner; review trial friction, proof, payment, support, refund and renewal learning before approving shared knowledge. Portfolio maturity and product-specific gates remain independent.
+
+## Current October 19 website boundary
+Website/AI explains, qualifies and collects voluntary interest. No new retail website trial, checkout, licensing issuance or installer delivery. USD10/month and USD100/year are working Store prices. Gate each Store link on explicit confirmed availability; default pre-launch. Strategic Enterprise Validation remains separately scoped. Preserve historical customer agreements and necessary support/refund records. Staff website operations use the configured two-address email-code administrator plane; public submissions never grant staff or customer access.
+Do not infer publication approval for internal strategy, patent identifiers, raw uploaded documents or private customer information. Updated website content does not authorize bulk public disclosure.

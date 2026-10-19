@@ -4,10 +4,10 @@ from apps.ai_engine.services import knowledge_retriever as retriever
 from apps.knowledge_core.models import KnowledgeChunk, KnowledgeDocument
 
 pytestmark = pytest.mark.django_db
-NAME = 'astop_membership_terms_20261007.md'
+NAME = 'astop_store_terms_20261019.md'
 
 
-def make_chunk(name=NAME, text='Three environments; seven-day renewal; fourteen-day offline validity.', **metadata):
+def make_chunk(name=NAME, text='USD 10 per month or USD 100 per year; Store availability requires confirmation.', **metadata):
     values = dict(title=name, file_path=f'knowledge_docs/public/{name}', namespace='astop',
                   disclosure_level='public', source_authority='governing', is_current=True,
                   permitted_paraphrase='summary', approved_audience=['public', 'visitor'],
@@ -32,12 +32,12 @@ def test_current_terms_reach_context_even_when_vector_results_omit_them(settings
         {'id': overview.vector_id, 'score': 0.99}])
     result = retrieve(top_k=1)
     assert result[0]['document_id'] == str(term.document_id)
-    assert 'seven-day' in result[0]['text']
+    assert 'Store availability' in result[0]['text']
 
 
 def test_pricing_survives_customer_hard_fact_authority_filter(settings):
     settings.ENABLE_AI_ENGINE = False
-    term = make_chunk(text='Five named seats cost USD 80, including with a referral.')
+    term = make_chunk(text='Annual working Store price is USD 100. No website checkout.')
     make_chunk('overview.md', 'ASTOP customer purchase license.', source_authority='authoritative')
     assert retrieve('ASTOP customer license pricing', top_k=1)[0]['document_id'] == str(term.document_id)
 
@@ -69,7 +69,7 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
     from apps.knowledge_core.services.chunker import chunk_text
     settings.ENABLE_AI_ENGINE = False
     root = Path(__file__).resolve().parents[2] / 'knowledge_docs/public'
-    for name in (NAME, 'astop_customer_journey_v1_6.md'):
+    for name in (NAME, 'astop_store_journey_20261019.md'):
         first = make_chunk(name)
         doc = first.document
         first.delete()
@@ -77,12 +77,14 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
             KnowledgeChunk.objects.create(document=doc, namespace='astop', disclosure_level='public',
                 chunk_index=chunk.index, heading=chunk.heading, text=chunk.text,
                 vector_id=f'{doc.id}:{chunk.index}')
-    activation = ' '.join(c['text'] for c in retrieve(
-        'ASTOP three computers fourth environment replacement renewal interval offline validity expiry workload content', top_k=5))
-    assert 'seven-day' in activation
-    assert 'fourteen-day' in activation
-    assert 'do not include workload content' in activation
-    pricing = ' '.join(c['text'] for c in retrieve(
-        'ASTOP individual and organization five named users price total Branch referral discounts stack customer license', top_k=5))
-    assert 'Five organization seats cost USD 80' in pricing
-    assert 'USD 18 per year for an individual' in pricing
+    terms = ' '.join(c['text'] for c in retrieve('ASTOP price purchase Store release trial refund', top_k=5))
+    assert 'USD 10 per month' in terms
+    assert 'USD 100 per year' in terms
+    assert 'not sell or distribute ASTOP directly' in terms
+    assert 'Store trial length' in terms
+    assert 'applicable approved Store listing and terms' in terms
+
+
+@pytest.mark.parametrize('query', ['ASTOP Store launch', 'Notify me about ASTOP availability', 'ASTOP 출시 알림'])
+def test_store_interest_queries_include_current_journey(query):
+    assert 'astop_store_journey_20261019.md' in retriever._customer_term_sources(query)

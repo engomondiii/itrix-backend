@@ -257,6 +257,9 @@ class ConciergeAgent(BaseAgent):
             # deterministically outside the model, so an injected instruction has
             # nothing to subvert.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
+            from apps.website.policy import store_policy
+            import json as _policy_json
+            system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())
             from apps.commerce.membership import conversation_state
             membership_state = conversation_state(ctx)
             if membership_state:
@@ -357,6 +360,9 @@ class ConciergeAgent(BaseAgent):
             # see the same documents, or an answer's content would depend on whether
             # realtime happened to be on.
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
+            from apps.website.policy import store_policy
+            import json as _policy_json
+            system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())
             from apps.commerce.membership import conversation_state
             membership_state = conversation_state(ctx)
             if membership_state:

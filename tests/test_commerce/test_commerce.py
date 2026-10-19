@@ -228,7 +228,7 @@ def test_activation_api_rejects_workload_and_bad_replacement_identifier(setup, a
     api_client.force_authenticate(user=c)
     url = f'/api/v1/commerce/licenses/{o.license.pk}/activate/'
     for extra in ({'workload': 'private prompt'}, {'replace_id': 'bad'}):
-        assert api_client.post(url, {'environment_hash': 'a'*64, **extra}, format='json').status_code == 400
+        assert api_client.post(url, {'environment_hash': 'a'*64, **extra}, format='json').status_code == 410
     assert not Activation.objects.exists()
 
 

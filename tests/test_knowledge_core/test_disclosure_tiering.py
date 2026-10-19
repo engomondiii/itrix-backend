@@ -42,7 +42,7 @@ def test_operational_and_customer_material_are_not_public_by_default():
 
 
 def test_october_portfolio_replaces_alpha_sources():
-    assert (KNOWLEDGE_DOCS / "public" / "itrix_product_portfolio_v1_4.md").exists()
+    assert (KNOWLEDGE_DOCS / "public" / "itrix_product_portfolio_v1_7.md").exists()
     assert not (KNOWLEDGE_DOCS / "public" / "itrix_product_canonical_v2_4.md").exists()
 
 
@@ -66,7 +66,7 @@ def test_retired_october_sources_are_physically_absent_and_noncurrent():
     for name in RETIRED_OCTOBER_SOURCES:
         assert name not in present
         assert not policy_for(name).current
-    for name in ("astop_membership_terms_20261007.md", "astop_customer_journey_v1_6.md",
+    for name in ("astop_store_terms_20261019.md", "astop_store_journey_20261019.md",
                  "astop_branch_program_summary_v1_4.md", "astop_comparison_current_20261003.md",
                  "astop_activation_policy_20261004.md", "research_evidence_register_20261003.md",
                  "platform_governance_current_20261003.md"):

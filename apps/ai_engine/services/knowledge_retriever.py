@@ -51,7 +51,7 @@ _HARD_FACT_QUERY = re.compile(
     re.I,
 )
 _PATENT_QUERY = re.compile(r"\b(patent|filing|application|grant|prosecution)\b", re.I)
-_COMMERCIAL_QUERY = re.compile(r"\b(buy|purchase|price|pricing|license|licence|self[- ]service|download|installer|deployment|production rights|commercial)\b", re.I)
+_COMMERCIAL_QUERY = re.compile(r"\b(store|waitlist|launch|availability|notification|buy|purchase|price|pricing|license|licence|self[- ]service|download|installer|deployment|production rights|commercial)\b", re.I)
 _RESEARCH_QUERY = re.compile(r"\b(evidence|benchmark|paper|study|experiment|result|fidelity|reduction|validated|validation)\b", re.I)
 _LEGAL_QUERY = re.compile(r"\b(nda|contract|agreement|rights|entitlement|license-out|legal)\b", re.I)
 _TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|compute|computation|observation|representation|execution|hardware|software)\b", re.I)
@@ -60,10 +60,10 @@ _TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|comp
 # Exact current public terms must not disappear behind a higher-scoring overview.
 # These are candidate sources only: all disclosure and metadata gates still apply.
 _CUSTOMER_TERM_SOURCES = (
-    (re.compile(r"\b(trial|membership|annual|cancel|cancellation|price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
-     "astop_membership_terms_20261007.md"),
-    (re.compile(r"\b(journey|discover|enroll|join|renew|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|여정|기업|추천|브랜치|수수료", re.I),
-     "astop_customer_journey_v1_6.md"),
+    (re.compile(r"\b(store|waitlist|launch|availability|notification|trial|membership|annual|cancel|cancellation|price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
+     "astop_store_terms_20261019.md"),
+    (re.compile(r"\b(store|waitlist|notify|notification|launch|availability|register interest|journey|discover|enroll|join|renew|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|출시|알림|스토어|여정|기업|추천|브랜치|수수료", re.I),
+     "astop_store_journey_20261019.md"),
 )
 
 

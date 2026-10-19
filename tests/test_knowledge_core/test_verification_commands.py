@@ -11,7 +11,7 @@ from apps.knowledge_core.models import HardFact, KnowledgeDocument
 def test_verify_ai_answer_accepts_current_hard_fact_grounding(db, monkeypatch):
     document = KnowledgeDocument.objects.create(
         title="itrix product portfolio v1 4",
-        file_path="knowledge_docs/public/itrix_product_portfolio_v1_4.md",
+        file_path="knowledge_docs/public/itrix_product_portfolio_v1_7.md",
         namespace="company",
         disclosure_level="public",
         source_authority="authoritative",
@@ -26,7 +26,7 @@ def test_verify_ai_answer_accepts_current_hard_fact_grounding(db, monkeypatch):
             "itriX currently has four offerings: ASTOP, AXIOM Compute, AXIOM Core and QNTA Runtime."
         ),
         source_reference=(
-            "knowledge_docs/public/itrix_product_portfolio_v1_4.md"
+            "knowledge_docs/public/itrix_product_portfolio_v1_7.md"
         ),
         source_document=document,
         source_authority="authoritative",

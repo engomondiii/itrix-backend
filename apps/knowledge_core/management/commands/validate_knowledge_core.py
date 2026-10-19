@@ -138,7 +138,7 @@ class Command(BaseCommand):
         # ── Current product doctrine ─────────────────────────────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("Canonical product source"))
         canonical = KnowledgeDocument.objects.filter(
-            file_path__icontains="itrix_product_portfolio_v1_4.md",
+            file_path__icontains="itrix_product_portfolio_v1_7.md",
             is_current=True,
             source_authority="authoritative",
             ingestion_status=IngestionStatus.COMPLETE,
@@ -179,12 +179,12 @@ class Command(BaseCommand):
         # ── October 2026 domain authority ─────────────────
         self.stdout.write(self.style.MIGRATE_HEADING("October 2026 governing sources"))
         required_sources = (
-            ("itrix_product_portfolio_v1_4.md", "public", "authoritative"),
+            ("itrix_product_portfolio_v1_7.md", "public", "authoritative"),
             ("astop_product_and_access_20261002.md", "public", "authoritative"),
             ("research_portfolio_summary_20261002.md", "public", "governing"),
             ("platform_governance_current_20261003.md", "internal_only", "governing"),
-            ("astop_customer_journey_v1_6.md", "public", "governing"),
-            ("astop_membership_terms_20261007.md", "public", "governing"),
+            ("astop_store_journey_20261019.md", "public", "governing"),
+            ("astop_store_terms_20261019.md", "public", "governing"),
             ("astop_branch_program_summary_v1_4.md", "public", "governing"),
             ("astop_comparison_current_20261003.md", "public", "authoritative"),
             ("astop_activation_policy_20261004.md", "internal_only", "governing"),

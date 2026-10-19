@@ -53,6 +53,8 @@ for _related in (
 # These run only when a beat process is active (ENABLE_CELERY=True + a worker/beat).
 # With ENABLE_CELERY=False they simply never fire; the same work can be run manually.
 app.conf.beat_schedule = {
+    "website-mail-minute": {"task": "website.deliver_mail", "schedule": 60.0},
+    "website-retention-daily": {"task": "website.expire_data", "schedule": 86400.0},
     "check-sla-breaches-hourly": {
         "task": "notifications.check_sla_breaches",
         "schedule": 3600.0,  # every hour

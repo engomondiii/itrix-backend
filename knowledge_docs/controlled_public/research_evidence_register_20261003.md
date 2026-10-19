@@ -1,6 +1,6 @@
 # Research evidence register
 
-Sources: the supplied 11 September 2026 patent/research package, October Portfolio v1.4, QNTA Contract and QNTA Systems. Curated research descriptions omit patent-file identifiers, personal data and protected mechanisms. This register is not a finding of peer review, patent grant, inventorship or commercial release.
+Sources: the supplied 11 September 2026 patent/research package, October Portfolio v1.7, QNTA Contract and QNTA Systems. Curated research descriptions omit patent-file identifiers, personal data and protected mechanisms. This register is not a finding of peer review, patent grant, inventorship or commercial release.
 
 ## R01 FQNM
 The supplied continuum-dynamics paper studies quantised conservative transfer for supported conservation-law workloads. Interpret convergence and continuum reconstruction within the paper's assumptions and baseline. Its existence does not establish universal model training, every PDE, arbitrary backend speed or energy savings. FQNM is a research asset rather than a mandatory product dependency.
@@ -28,3 +28,5 @@ These describe the semantic contract and execution/state-management aspects of o
 
 ## Patent-package limits
 The mapping contains eight application/specification entries and seven research papers and excludes QNTA. This is not eight grants or eight independently verified filed PDFs. Verify legal status, authorship, inventorship, ownership and disclosure independently. The earlier three-application AXIOM/CRE/FQNM statement is a dated subset. Retain the people profiles'8 September verification boundary rather than extrapolating to all new research.
+
+October 16 portfolio update: QNTA application filed October 12; examination requested on filing date. No grant is established. Judge CIA and Hallucination Monitoring are distinct research technologies with separate applications. No application identifiers are included in this curated source.

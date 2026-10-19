@@ -17,6 +17,20 @@ from .models import Activation, Branch, LegalRelease, License, Order, Refund, Re
 
 
 class SafeView(APIView):
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        # October 8: stores transact/distribute. Retain historical account/refund APIs,
+        # but no old environment flag can reopen website retail enrollment or delivery.
+        blocked = request.method == 'POST' and (
+            self.__class__.__name__ in ('OrdersView', 'TrialView', 'BranchView') or
+            kwargs.get('action') in ('accept', 'checkout', 'download', 'activate'))
+        if blocked:
+            from rest_framework.exceptions import APIException
+            class RetiredRetailRoute(APIException):
+                status_code = 410
+                default_detail = 'Website retail sales and downloads have ended. Register interest for ASTOP Store availability or request enterprise validation.'
+            raise RetiredRetailRoute()
+
     def handle_exception(self, exc):
         if isinstance(exc, ValidationError):
             return Response({'detail': exc.messages}, status=400)
@@ -29,14 +43,8 @@ class AvailabilityView(SafeView):
     authentication_classes = []
     permission_classes = [AllowAny]
     def get(self, request):
-        from django.conf import settings
-        enabled = membership.ready()
-        return Response({'checkout_available': enabled, 'trial_available': enabled, 'trial_days': 7, 'billing_interval': 'year', 'automatic_renewal': True, 'currency': 'USD', 'individual_seat_price': '20.00',
-            'organization_seat_price': '16.00', 'organization_min_seats': 2, 'branch_discount_percent': 10,
-            'discounts_stack': False, 'refund_request_days': 14,
-            'activation_policy': {'max_environments_per_seat': 3, 'renewal_days': 7, 'offline_validity_days': 14,
-                'session_continuity': 'finish_sessions_started_while_entitled'},
-            'message': 'Verified identity and accepted trial terms required. No payment during the seven-day trial.' if enabled else 'Trial enrollment and annual membership are not available yet.'})
+        from apps.website.policy import store_policy
+        return Response(store_policy())
 
 
 class ClientView(SafeView):
@@ -239,8 +247,8 @@ class TrialView(ClientView):
         return Response({'trial': {'id': str(trial.pk), 'starts_at': trial.starts_at, 'ends_at': trial.ends_at,
             'joined': bool(trial.joined_order_id), 'license_id': str(trial.license_id),
             'kind': trial.license.order.kind, 'seats': trial.license.order.seats,
-            'can_join': not trial.joined_order_id and timezone.now() >= trial.ends_at and trial.license.status == 'active'} if trial else None,
-            'terms': membership.trial_terms() if membership.ready() and not trial else None})
+            'can_join': False} if trial else None,
+            'terms': None})
 
     def post(self, request):
         data = QuoteInput(data=request.data)

@@ -136,7 +136,7 @@ def test_api_cannot_bypass_trial_or_use_someone_elses_license(launch,api_client)
     api_client.force_authenticate(user=other)
     assert api_client.post(f'/api/v1/commerce/licenses/{t.license_id}/cancel-renewal/',{},format='json').status_code==409
     api_client.force_authenticate(user=c)
-    assert api_client.post('/api/v1/commerce/orders/',{'kind':'individual','seats':1},format='json').status_code==400
+    assert api_client.post('/api/v1/commerce/orders/',{'kind':'individual','seats':1},format='json').status_code==410
 
 
 def test_cancellation_failure_is_durable_and_retryable(launch, monkeypatch):

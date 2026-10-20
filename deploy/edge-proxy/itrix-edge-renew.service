@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew itriX edge TLS certificates and reload Nginx
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/itrix-edge
+ExecStart=/bin/sh /opt/itrix-edge/renew.sh
+TimeoutStartSec=30min

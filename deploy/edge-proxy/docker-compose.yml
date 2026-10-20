@@ -3,6 +3,8 @@ services:
   nginx-proxy:
     build: .
     restart: unless-stopped
+    mem_limit: 128m
+    pids_limit: 64
     environment:
       RAILWAY_WEB_HOST: ${RAILWAY_WEB_HOST:-itrix-web-production.up.railway.app}
     ports:
@@ -24,6 +26,8 @@ services:
   certbot:
     image: certbot/certbot:latest
     profiles: ["maintenance"]
+    mem_limit: 256m
+    pids_limit: 64
     volumes:
       - ./letsencrypt:/etc/letsencrypt
       - ./acme:/var/www/certbot

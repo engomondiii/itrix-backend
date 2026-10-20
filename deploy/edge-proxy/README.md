@@ -76,3 +76,58 @@ The earlier guide's claim that Gabia necessarily supports apex CNAME flattening 
 Existing form protection uses Turnstile, which is independent of Cloudflare DNS. This proxy does not require it, but the current intake implementation does. If no Cloudflare service is permitted at all, keep intake disabled until an approved alternative captcha is implemented; do not bypass verification.
 
 References: [Railway domain requirements](https://docs.railway.com/integrations/api/manage-domains), [Nginx HTTPS proxy directives](https://nginx.org/en/docs/http/ngx_http_proxy_module.html), [Certbot](https://eff-certbot.readthedocs.io/en/stable/using.html), [Turnstile independence](https://developers.cloudflare.com/turnstile/get-started/).
+
+
+## DigitalOcean Ubuntu quick start (standalone /opt/itrix-edge)
+
+Use Ubuntu 24.04 LTS or another Docker-supported Ubuntu release. Assign a DigitalOcean **Reserved IPv4** to the droplet if the address must survive droplet replacement, and give that IPv4 to Gabia. A $4 plan is a starting point for light proxy traffic, not a capacity guarantee: monitor memory, bandwidth and concurrent connections. This package caps Nginx at 128 MiB and the short-lived Certbot process at 256 MiB; the host and Docker also need memory. No database, backend or Node build runs here. Use a DigitalOcean Cloud Firewall for inbound 80/443 and SSH restricted to your administrative IPs. Docker-published ports can bypass UFW rules; UFW alone is not the perimeter.
+
+Install Docker Engine and the Compose plugin following the official [Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/). If Docker is already installed, confirm `docker compose version` succeeds rather than installing a second Docker distribution.
+
+Copy **the whole contents** of this directory to `/opt/itrix-edge` on the droplet (including Dockerfile, nginx.conf, bootstrap files and renewal scripts). From your Mac, after pulling the branch:
+
+```sh
+ssh root@YOUR_DROPLET_IP 'mkdir -p /opt/itrix-edge'
+scp -r deploy/edge-proxy/. root@YOUR_DROPLET_IP:/opt/itrix-edge/
+ssh root@YOUR_DROPLET_IP
+```
+
+Only copy a clean source directory: never copy local production `.env`, certificates or private keys accidentally. An alternative is to clone the repository on the VM and copy only its tracked `deploy/edge-proxy` files.
+
+On the droplet:
+
+```sh
+cd /opt/itrix-edge
+cp -n .env.example .env
+docker compose version
+docker compose config --quiet
+```
+
+The generated web domain `itrix-web-production.up.railway.app` returned **200** during the October 21 review; `plycm7lu.up.railway.app` returned **404** with `x-railway-fallback: true`. The latter is not currently a working HTTP origin, so the configuration deliberately keeps the verified web hostname. Both domains use upstream SNI and certificate verification when configured; a 404 is routing failure, not missing SNI. The preflight in `init-tls.sh` rejects an HTTP-error origin before starting certificate setup.
+
+After Gabia A records for `@` and `www` resolve to the reserved IPv4 and inbound 80/443 are open, run (replace the email; this accepts Let's Encrypt terms):
+
+```sh
+sh ./init-tls.sh YOUR_CERTIFICATE_OPERATIONS_EMAIL
+curl --fail --show-error --head https://itrix.co.kr/
+curl --show-error --head https://www.itrix.co.kr/itx-console-7k2m
+```
+
+Nginx terminates browser HTTPS on the droplet and opens independently verified HTTPS to Railway. `www` redirects to `itrix.co.kr` with its full path/query, avoiding duplicate website origins. The generated certificate covers both names. The admin path, API paths, Next assets, WebSocket upgrade and unbuffered chat streaming are preserved. The Railway backend remains hosted in Railway.
+
+Test renewal and enable the supplied Ubuntu systemd timer (use this **instead of** the cron option above):
+
+```sh
+cd /opt/itrix-edge
+docker compose run --rm certbot renew --dry-run --webroot -w /var/www/certbot
+sh ./renew.sh
+install -m 644 itrix-edge-renew.service itrix-edge-renew.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now itrix-edge-renew.timer
+systemctl list-timers itrix-edge-renew.timer
+journalctl -u itrix-edge-renew.service --no-pager -n 50
+```
+
+The timer checks twice daily, catches missed runs after reboot and logs to journald. Nginx reloads after successful renewal checks and syntax validation. Monitor timer failures and certificate expiry. No Cloudflare service is used by the proxy or certificate process. The application's separate captcha setup remains as documented in the application handoff.
+
+Rollback: restore the previously recorded website DNS values if necessary; keep Railway services and mail DNS unchanged. A static IP is supplied by DigitalOcean, not Railway. [DigitalOcean Reserved IP documentation](https://docs.digitalocean.com/products/networking/reserved-ips/).

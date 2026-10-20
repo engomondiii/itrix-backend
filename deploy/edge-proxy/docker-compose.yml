@@ -1,0 +1,29 @@
+# Run on a Linux VM with a RESERVED PUBLIC IPv4, not on Railway.
+services:
+  nginx-proxy:
+    build: .
+    restart: unless-stopped
+    environment:
+      RAILWAY_WEB_HOST: ${RAILWAY_WEB_HOST:-itrix-web-production.up.railway.app}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt:ro
+      - ./acme:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/edge-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["maintenance"]
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+      - ./acme:/var/www/certbot

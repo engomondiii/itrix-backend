@@ -1,0 +1,35 @@
+name: Edge proxy configuration
+on:
+  pull_request:
+    paths: ['deploy/edge-proxy/**', '.github/workflows/edge-proxy.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nginx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and Nginx with temporary certificates
+        working-directory: deploy/edge-proxy
+        run: |
+          set -eu
+          mkdir -p letsencrypt/live/itrix.co.kr acme
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=itrix.co.kr \
+            -keyout letsencrypt/live/itrix.co.kr/privkey.pem \
+            -out letsencrypt/live/itrix.co.kr/fullchain.pem
+          docker compose config --quiet
+          docker compose build nginx-proxy
+          docker compose run --rm nginx-proxy nginx -t
+          docker compose up -d nginx-proxy
+          for attempt in $(seq 1 20); do
+            if curl --fail http://localhost/edge-health; then break; fi
+            sleep 1
+          done
+          curl --fail http://localhost/edge-health
+          curl -sI -H 'Host: www.itrix.co.kr' 'http://localhost/itx-console-7k2m?tab=records' | tr -d '\r' | grep -F 'Location: https://itrix.co.kr/itx-console-7k2m?tab=records'
+          curl -ksI --resolve www.itrix.co.kr:443:127.0.0.1 'https://www.itrix.co.kr/itx-console-7k2m?tab=records' | tr -d '\r' | grep -F 'Location: https://itrix.co.kr/itx-console-7k2m?tab=records'
+      - name: Stop test containers
+        if: always()
+        working-directory: deploy/edge-proxy
+        run: docker compose down

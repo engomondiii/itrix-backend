@@ -192,11 +192,11 @@ def conversation_state(ctx):
     licenses = License.objects.filter(order__client_id=ctx.client_id, entitlement_kind='annual').order_by('-created_at')[:3]
     facts = []
     if trial:
-        state = 'joined' if trial.joined_order_id else ('trial in progress' if timezone.now() < trial.ends_at else 'trial complete; may review Join')
+        state = 'joined' if trial.joined_order_id else ('trial in progress' if timezone.now() < trial.ends_at else 'historical trial complete; website Join is retired')
         facts.append(f'Trial: {state}; expiry {trial.ends_at.isoformat()}.')
     for license in licenses:
         state = license.status if license.ends_at and timezone.now() < license.ends_at else 'expired'
         facts.append(f'Annual membership: {state}; paid-through {license.ends_at}; automatic renewal {license.auto_renew}.')
     if not facts:
         return 'No ASTOP trial or annual membership is recorded for this authenticated account.'
-    return ' '.join(facts) + ' These account facts do not establish workload proof or permit actions without user authorization.'
+    return 'Historical account records; not current acquisition offers. ' + ' '.join(facts) + ' These account facts do not establish workload proof or permit actions without user authorization.'

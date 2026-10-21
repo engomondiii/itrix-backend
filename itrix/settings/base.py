@@ -129,7 +129,7 @@ LOCAL_APPS = [
     "apps.settings",
 ]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS + ["apps.website"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -838,3 +838,21 @@ ASTOP_OFFLINE_VALIDITY_DAYS = int(env("ASTOP_OFFLINE_VALIDITY_DAYS", "14"))
 ASTOP_VALIDATION_DAYS = int(env("ASTOP_VALIDATION_DAYS", "7"))
 # Requires approved v1.6 trial/LO texts, tested signed builds/runtime and provider lifecycle.
 ASTOP_MEMBERSHIP_LAUNCH_APPROVED = env_bool("ASTOP_MEMBERSHIP_LAUNCH_APPROVED", default=False)
+
+# October 2026 website. Confirm legal text/captcha before opening intake.
+WEBSITE_ADMIN_EMAILS = env("WEBSITE_ADMIN_EMAILS", "admin@itrix.co.kr,associate@iwl.kr")
+WEBSITE_ALERT_EMAILS = env("WEBSITE_ALERT_EMAILS", "admin@itrix.co.kr,associate@iwl.kr")
+WEBSITE_FROM_EMAIL = env("WEBSITE_FROM_EMAIL", env("EMAIL_FROM", "no-reply@itrix.co.kr"))
+WEBSITE_PUBLIC_URL = env("WEBSITE_PUBLIC_URL", env("FRONTEND_WEB_URL", "https://itrix.co.kr"))
+WEBSITE_PROXY_KEY = env("WEBSITE_PROXY_KEY", "")
+WEBSITE_INTAKE_ENABLED = env_bool("WEBSITE_INTAKE_ENABLED", default=False)
+WEBSITE_PRIVACY_VERSION = env("WEBSITE_PRIVACY_VERSION", "draft-20261016")
+WEBSITE_RETENTION_DAYS = int(env("WEBSITE_RETENTION_DAYS", "365"))
+WEBSITE_AUDIT_RETENTION_DAYS = int(env("WEBSITE_AUDIT_RETENTION_DAYS", "366"))
+WEBSITE_TURNSTILE_SECRET = env("WEBSITE_TURNSTILE_SECRET", "")
+WEBSITE_TURNSTILE_SITE_KEY = env("WEBSITE_TURNSTILE_SITE_KEY", "")
+WEBSITE_CAPTCHA_HOSTS = env("WEBSITE_CAPTCHA_HOSTS", "itrix.co.kr,itrix-web-production.up.railway.app")
+ASTOP_APPLE_STORE_CONFIRMED = env_bool("ASTOP_APPLE_STORE_CONFIRMED", default=False)
+ASTOP_APPLE_STORE_URL = env("ASTOP_APPLE_STORE_URL", "")
+ASTOP_MICROSOFT_STORE_CONFIRMED = env_bool("ASTOP_MICROSOFT_STORE_CONFIRMED", default=False)
+ASTOP_MICROSOFT_STORE_URL = env("ASTOP_MICROSOFT_STORE_URL", "")

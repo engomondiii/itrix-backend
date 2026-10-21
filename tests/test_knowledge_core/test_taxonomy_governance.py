@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_canonical_entity_types_are_deterministic():
     assert PRODUCT_NAMES == ("ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime")
-    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES")
+    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
     block = prompt_block()
     assert "CANONICAL OCTOBER 2026 PORTFOLIO" in block
     assert "ASTOP" in block and "AXIOM Compute" in block and "AXIOM Core" in block
@@ -22,12 +22,12 @@ def test_canonical_entity_types_are_deterministic():
 
 
 def test_october_canonical_supersedes_both_old_product_canonicals():
-    current = policy_for("itrix_product_portfolio_v1_4.md")
+    current = policy_for("itrix_product_portfolio_v1_7.md")
     old = policy_for("itrix_product_canonical_v2_4.md")
     assert current is not None and current.current is True and current.authority == "authoritative"
     assert ClaimDomain.TAXONOMY in current.claim_domains
     assert old is not None and old.current is False and old.authority == "legacy"
-    assert old.superseded_by == "itrix_product_portfolio_v1_4.md"
+    assert old.superseded_by == "itrix_product_portfolio_v1_7.md"
 
 
 def test_filename_word_canonical_does_not_grant_authority():
@@ -46,7 +46,7 @@ def test_claim_domain_precedence_prefers_taxonomy_source_for_product_question():
 
 
 def test_current_public_canonical_contains_all_products_and_separates_technologies():
-    text = (ROOT / "knowledge_docs/public/itrix_product_portfolio_v1_4.md").read_text()
+    text = (ROOT / "knowledge_docs/public/itrix_product_portfolio_v1_7.md").read_text()
     for product in PRODUCT_NAMES:
         assert product in text
     for technology in TECHNOLOGIES:

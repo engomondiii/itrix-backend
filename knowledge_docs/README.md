@@ -2,19 +2,25 @@
 
 The active corpus contains 31 documents. This README is outside the disclosure folders and is not ingested. Folder names govern retrieval disclosure; they do not make a public Git repository private.
 
+## 19 October governing update
+
+The 8 October meeting and subsequent temporary Store-routing instruction supersede the earlier website trial/checkout/distribution model. Retail links remain disabled unless the individual Store listing is explicitly configured and confirmed live. Product Portfolio v1.7 is the current naming and maturity authority. Only three superseded current summaries were removed and replaced; retained people profiles, technical explanations and research sources were not removed merely because they are older.
+
+See [implementation and rollout](../docs/website_integration_20261019.md) and [source audit](../docs/source_alignment_20261019.json). The dated sections below describe earlier updates, not current commercial terms.
+
 ## Current sources
 
 | Subject | Active source | Scope |
 | --- | --- | --- |
-| Product catalogue and maturity | public/itrix_product_portfolio_v1_4.md | Four offerings; stages do not imply general availability |
+| Product catalogue and maturity | public/itrix_product_portfolio_v1_7.md | Four offerings; stages do not imply general availability |
 | ASTOP behavior, evidence and access | public/astop_product_and_access_20261002.md | New finite-panel evidence, separate retail/enterprise routes |
-| Discovery through install and feedback | public/astop_customer_journey_v1_6.md | Seven-day trial, annual membership and renewal; approved LO required |
-| Pricing, seats, acceptance, refunds | public/astop_membership_terms_20261007.md | Curated summary, never a substitute for the exact accepted order |
-| Referral eligibility and rewards | public/astop_branch_program_summary_v1_4.md | Separate approved agreement; incomplete draft cannot launch |
+| Discovery through install and feedback | public/astop_store_journey_20261019.md | Store pre-launch interest registration; enterprise validation remains separate |
+| Pricing, seats, acceptance, refunds | public/astop_store_terms_20261019.md | USD10/month and USD100/year working prices; no direct website retail |
+| Referral eligibility and rewards | public/astop_branch_program_summary_v1_4.md | Historical obligations only; no new Branch retail offer |
 | Comparison with caching/harness tools | public/astop_comparison_current_20261003.md | September comparison context, October evidence boundaries |
 | Research overview | public/research_portfolio_summary_20261002.md | Public-safe portfolio distinctions |
 | R01–R07 and QNTA evidence | controlled_public/research_evidence_register_20261003.md | Bounded results, negative evidence, application-not-grant language |
-| Software protection | internal_only/astop_activation_policy_20261004.md | Integration/enforcement requirements; no keys or identity data |
+| Software protection | internal_only/astop_activation_policy_20261004.md | Historical support boundaries; no new site distribution |
 | Platform governance | internal_only/platform_governance_current_20261003.md | Preserved acceptance controls and October commercial precedence |
 | People | Existing Kang and Park DOCX files in public/ | Original bytes unchanged; 8 September verification boundary retained |
 

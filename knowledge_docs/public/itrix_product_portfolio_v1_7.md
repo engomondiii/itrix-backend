@@ -1,5 +1,5 @@
-# itriX product portfolio and technology architecture v1.4
-Source: Product Portfolio and Technology Architecture v1.4, 2 October 2026. Public summary excludes application identifiers and protected mechanisms.
+# itriX product portfolio and technology architecture v1.7
+Source: Product Portfolio and Technology Architecture v1.7, 16 October 2026. Public summary excludes application identifiers and protected mechanisms.
 
 ## Products and development stages
 ASTOP is observation software based on PRISM; implementation is demonstrated.
@@ -14,4 +14,8 @@ CRE is an enabling technology; FQNM is a research asset; SPADES is a research pr
 Observe, represent, learn and execute describe capabilities, not a required sales or processing sequence. ASTOP proof is not a universal prerequisite for discussing a separately qualified AXIOM or QNTA workload.
 
 ## Evidence boundaries
-Stage basis is the technical reply of 14 September 2026, retained in the October portfolio. QNTA filing was in progress at that verification boundary; no confirmed application number is supplied. Do not infer a grant, release date or unrestricted technical disclosure. AXIOM-TENSOR parameter reduction is not proof of end-to-end speed or quality retention. QNTA feasibility is not universal acceleration or measured energy savings.
+Stage basis is the technical reply of 14 September 2026, retained in the October portfolio. QNTA application was filed on 12 October 2026; a priority-examination request was submitted on that date. An application and examination request are not a patent grant. Do not infer a grant, release date or unrestricted technical disclosure. AXIOM-TENSOR parameter reduction is not proof of end-to-end speed or quality retention. QNTA feasibility is not universal acceleration or measured energy savings.
+
+## Research technologies added in v1.7
+Judge CIA selects decision agents and uses their correlations to estimate effective ensemble size and accuracy. Suitable agents infer and validate results. Hallucination Monitoring generates candidate monitoring agents and selects them using suitability and correlation or similarity filters to assess a target model's outputs. They are research technologies with separate applications, not products, interchangeable names or guarantees of error-free output.
+SPADES is physics-guided probabilistic correction of discretized PDE solutions using residual-based inference. FQNM covers quantised conservative computation for physical and dynamical systems. Productization requires a defined validated offering, customer use case and owner.

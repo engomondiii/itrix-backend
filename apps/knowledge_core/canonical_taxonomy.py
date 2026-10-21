@@ -1,4 +1,4 @@
-"""Portfolio v1.4 (2 October 2026). Legacy wire codes remain compatible."""
+"""Portfolio v1.7 (16 October 2026). Legacy wire codes remain compatible."""
 from __future__ import annotations
 
 PRODUCTS = (
@@ -7,7 +7,7 @@ PRODUCTS = (
     {"code": "alpha_core", "name": "AXIOM Core", "kind": "product", "family": "AXIOM", "stage": "Planned offering", "description": "Proposed dedicated hardware or IP implementing validated AXIOM structures; delivery depends on development and validation.", "optional": True},
     {"code": "qnta_runtime", "name": "QNTA Runtime", "kind": "product", "family": "QNTA", "stage": "Feasibility demonstrated", "description": "Runtime software implementing QNTA Inference-Based Training Architecture on supported inference infrastructure with explicit numerical and state-transition control.", "optional": False},
 )
-TECHNOLOGIES = ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES")
+TECHNOLOGIES = ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
 PRODUCT_NAMES = tuple(item["name"] for item in PRODUCTS)
 PRODUCT_CODES = tuple(item["code"] for item in PRODUCTS)
 COMMERCIALIZATION_MECHANISM = "AI-Powered Sales Platform"
@@ -16,7 +16,7 @@ INTERNAL_KNOWLEDGE_COMPONENT = "Internal AI Knowledge Core"
 def prompt_block() -> str:
     lines = "\n".join(f"- {p['name']} ({p['stage']}): {p['description']}" for p in PRODUCTS)
     return (
-        "CANONICAL OCTOBER 2026 PORTFOLIO (v1.4):\n" + lines + "\n"
+        "CANONICAL OCTOBER 2026 PORTFOLIO (v1.7):\n" + lines + "\n"
         "Product families ASTOP, AXIOM and QNTA are group labels, not additional offerings. "
         "QNTA Runtime is a product; QNTA is the abbreviated technology name. QNTA Contract and "
         "QNTA Systems describe one technology, not separate products. QNTA Core is a future hardware "
@@ -26,9 +26,7 @@ def prompt_block() -> str:
         "a mandatory sequence. Assess each product independently; no universal speed, energy or quality claim. "
         "Availability, disclosure and commercial scope require separate confirmation. "
         "Never expose private application identifiers or infer granted patents. "
-        "ASTOP has individual and organization License Order routes plus protected enterprise evaluation. "
-        "Identity verification, exact LO acceptance, verified payment and entitlement must precede download. "
-        "Public Q&A stays open without identity collection. Current standard pricing is USD 20 individual "
-        "and USD 16 per seat for organizations with 2+ seats; eligible Branch discount is 10%, not stacked "
-        "with the organization discount. Production checkout availability is deployment state, not a document claim."
+        "ASTOP retail purchase and distribution belong to Apple App Store / Microsoft Store, not the website. "
+        "Working pricing: USD10/month or USD100/year. Before confirmed live Store availability, offer interest "
+        "registration or Strategic Enterprise Validation. Never invent a Store URL, launch date or entitlement."
     )

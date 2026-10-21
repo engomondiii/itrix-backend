@@ -594,3 +594,38 @@ for _name in ("astop_product_and_access_20261002.md", "astop_activation_policy_2
               "ASTOP_Technical_Capabilities_Current_v0.3.1.md"):
     SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-07",
         canonical_rule="Current v1.6 trial-first annual membership governs new offers; no claim services are live. Historical accepted agreements remain immutable. Trial/annual entitlement, asymmetric signing and revocation need approved current policy and tested implementation. Branch rewards require approved paid-membership terms, never trial enrollment.")
+
+
+# October 19: Store distribution and portfolio v1.7 supersede direct website retail.
+for _old, _new in (("itrix_product_portfolio_v1_4.md", "itrix_product_portfolio_v1_7.md"),
+                   ("astop_customer_journey_v1_6.md", "astop_store_journey_20261019.md"),
+                   ("astop_membership_terms_20261007.md", "astop_store_terms_20261019.md")):
+    SOURCE_MANIFEST[_new] = _replace(SOURCE_MANIFEST[_old], current=True, superseded_by="",
+        supersedes=(_old,), verified_date="2026-10-19", canonical_rule=
+        "Portfolio v1.7 names/stages; October 8 Store-only retail, USD10/month USD100/year working prices. Per-store confirmed-live gates; before launch register interest; enterprise validation remains. No direct website sales, trials or downloads. No patent grants or private identifiers.")
+    SOURCE_MANIFEST[_old] = _replace(SOURCE_MANIFEST[_old], current=False, authority="legacy", superseded_by=_new)
+    RETIRED_OCTOBER_SOURCES += (_old,)
+for _name in ("astop_product_and_access_20261002.md", "astop_branch_program_summary_v1_4.md",
+              "astop_activation_policy_20261004.md", "platform_governance_current_20261003.md",
+              "licensing_and_commercialization_internal.md", "ASTOP_Technical_Capabilities_Current_v0.3.1.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-10-19",
+        canonical_rule="Reconciled with Store-only retail and pre-launch interest registration. Historical accepted obligations are not new retail offers. No website purchase, trial issuance, installer or assumed Store entitlement.")
+
+# Resolve historical pointers to the current derivative; retain all predecessor identities.
+for _name, _policy in tuple(SOURCE_MANIFEST.items()):
+    _target = _policy.superseded_by
+    _seen = set()
+    while _target and _target not in _seen and _target in SOURCE_MANIFEST and SOURCE_MANIFEST[_target].superseded_by:
+        _seen.add(_target)
+        _target = SOURCE_MANIFEST[_target].superseded_by
+    if _target and _target != _policy.superseded_by:
+        SOURCE_MANIFEST[_name] = _replace(_policy, superseded_by=_target)
+
+SOURCE_MANIFEST['brand_story_company_public.md'] = SourcePolicy(
+    'authoritative', True,
+    'October client-supplied public website identity and professional leadership update. '
+    'Kang is president-elect with term from 2027, not sitting president in October 2026. '
+    'Later authorized statement qualifies the dated September candidacy boundary; '
+    'leadership remains distinct from inventorship. Portfolio v1.7 governs taxonomy.',
+    (ClaimDomain.PUBLIC_EXPLANATION,), namespace='company', verified_date='2026-10-19',
+    canonical_entities=('itriX', 'Myungjoo Kang'), permitted_paraphrase='summary')

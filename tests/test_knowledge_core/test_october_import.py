@@ -49,12 +49,12 @@ def test_validator_requires_october_sources_and_rejects_reactivated_old_canonica
     settings.ENABLE_AI_ENGINE=False
     settings.PINECONE_API_KEY=''
     for filename,tier,authority,namespace in (
-        ('itrix_product_portfolio_v1_4.md','public','authoritative','company'),
+        ('itrix_product_portfolio_v1_7.md','public','authoritative','company'),
         ('astop_product_and_access_20261002.md','public','authoritative','astop'),
         ('research_portfolio_summary_20261002.md','public','governing','technology'),
         ('platform_governance_current_20261003.md','internal_only','governing','company'),
-        ('astop_customer_journey_v1_6.md','public','governing','astop'),
-        ('astop_membership_terms_20261007.md','public','governing','astop'),
+        ('astop_store_journey_20261019.md','public','governing','astop'),
+        ('astop_store_terms_20261019.md','public','governing','astop'),
         ('astop_branch_program_summary_v1_4.md','public','governing','astop'),
         ('astop_comparison_current_20261003.md','public','authoritative','astop'),
         ('astop_activation_policy_20261004.md','internal_only','governing','astop'),

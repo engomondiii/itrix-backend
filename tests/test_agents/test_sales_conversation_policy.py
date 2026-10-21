@@ -18,18 +18,20 @@ def test_sales_prompt_keeps_gates_and_adds_customer_specific_next_steps():
     prompt = build_conversation_system_prompt(product_route='astop', license_pathway=None,
         tier=1, pressures=[], chunks=[])
     for rule in ('ONE useful next step', 'never repeat a seat-count',
-                 'never bypass identity', 'Do not request identity/contact on your own',
+                 'Do not request identity/contact on your own',
                  'Respect no-fit, stop, refusal', 'Never hide a material unresolved term',
-                 'Activation renewal is not annual billing', 'Signing keys are never customer deliverables'):
+                 'Never link a Store without verified live configuration',
+                 'implementation details are never customer deliverables'):
         assert rule in prompt
 
 
-def test_public_terms_remove_obsolete_prices_and_explain_correct_discount():
+def test_public_terms_use_current_store_prices_and_preserve_historical_rights():
     root = Path(__file__).resolve().parents[2] / 'knowledge_docs/public'
     access = (root / 'astop_product_and_access_20261002.md').read_text()
     assert 'USD 19' not in access and 'twelve-download' not in access
-    terms = (root / 'astop_membership_terms_20261007.md').read_text()
-    assert 'Five organization seats cost USD 80' in terms
-    assert 'USD 18 per year for an individual' in terms
-    assert 'three' in terms.lower() and 'seven-day' in terms and 'fourteen-day' in terms
-    assert 'do not include workload content' in terms
+    terms = (root / 'astop_store_terms_20261019.md').read_text()
+    assert 'USD 10 per month or USD 100 per year' in terms
+    assert 'does not sell or distribute ASTOP directly' in terms
+    assert 'confirms each relevant listing is live' in terms
+    assert "accepted terms and payment history must not be rewritten" in terms
+    assert not (root / 'astop_membership_terms_20261007.md').exists()

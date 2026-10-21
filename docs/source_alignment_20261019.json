@@ -1,0 +1,26 @@
+{
+  "archive_matches": 58,
+  "differences": [],
+  "sources": [
+    {
+      "name": "IWL Internal Meeting Report_Oct08.docx",
+      "sha256": "7e59ac9c2dfa49ec6a2073dc68a7d615c91a1b634b45b8a0ec818f6eadfce2ef"
+    },
+    {
+      "name": "itriX Web Development v1.0 Request 261016.docx",
+      "sha256": "c6b8f77da660400b32d77d369991b6569e955be2ca79e0995d9610abfacb7e28"
+    },
+    {
+      "name": "itriX_Brand_Manual_v3_1_Final.pdf",
+      "sha256": "ae48797f2f0ee92fa6559a7b9a6a6587d7516a30cf21be21eaab9e7c5f32f12d"
+    },
+    {
+      "name": "itriX_Product_Portfolio_and_Technology_Architecture_v1.7.docx",
+      "sha256": "5b5c0f671659242d33bfc74d94409ed2d704419bc868aab70334212015a8fc30"
+    },
+    {
+      "name": "itriX_Website_v1.0_2026.10.zip",
+      "sha256": "6d86991aba1cb82c343febb4e1218fc2ab77f6bce969fd3f682adfc1cc150f62"
+    }
+  ]
+}

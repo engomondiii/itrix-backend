@@ -34,7 +34,7 @@ def corpus(db, settings):
     settings.ENABLE_AI_ENGINE = False
     call_command('register_knowledge_docs', stdout=StringIO())
     docs = {}
-    for name in (*HASHES, ASTOP, 'itrix_product_portfolio_v1_4.md', 'astop_product_and_access_20261002.md'):
+    for name in (*HASHES, ASTOP, 'itrix_product_portfolio_v1_7.md', 'astop_product_and_access_20261002.md'):
         document = KnowledgeDocument.objects.get(file_path__endswith='/' + name)
         result = ingest_document(document)
         assert result.ok, result.error

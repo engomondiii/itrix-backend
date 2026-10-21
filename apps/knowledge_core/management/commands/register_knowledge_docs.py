@@ -186,7 +186,7 @@ def technology_family_for(filename: str) -> str:
 def entity_relationship_metadata_for(filename: str) -> dict:
     """Explicit entity/family/product relations for the current September sources."""
     policy = policy_for(filename)
-    if filename == "itrix_product_portfolio_v1_4.md":
+    if filename == "itrix_product_portfolio_v1_7.md":
         return {"canonical_entities": ["ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime"], "technology_families": ["prism", "axiom", "axiom_tensor", "qnta"], "related_products": ["ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime"]}
     if filename == "research_portfolio_summary_20261002.md":
         return {"canonical_entities": list(policy.canonical_entities), "technology_families": ["axiom", "axiom_tensor", "cre", "fqnm", "qnta"], "related_products": ["AXIOM Compute", "QNTA Runtime"]}

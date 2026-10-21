@@ -1,5 +1,5 @@
 # Research portfolio and publication boundaries
-Sources: supplied September patent/research mapping and papers; QNTA Contract and QNTA Systems; October portfolio v1.4. This public summary excludes filing identifiers and protected implementation detail. Papers are research evidence; peer review, patent grant and commercial readiness are not inferred.
+Sources: supplied September patent/research mapping and papers; QNTA Contract and QNTA Systems; October portfolio v1.7. This public summary excludes filing identifiers and protected implementation detail. Papers are research evidence; peer review, patent grant and commercial readiness are not inferred.
 
 AXIOM signed-XOR work separates basis support updates from algebra-specific signs. Table-free basis multiplication does not eliminate the usual bilinear dependence of sparse multiplication on stored terms. The supplied paper names Park Junhu and Myungjoo Kang; coauthorship is not patent inventorship.
 CRE concerns faithful real embedding and structured SPD reduction/inverse reconstruction on admissible operators. It retains cubic worst-case dense complexity; do not claim a subcubic general inverse.
@@ -11,3 +11,5 @@ QNTA Inference-Based Training Architecture separates prescribed-resolution train
 
 ## Patent status and scope
 The supplied mapping covers eight application/specification entries and seven distinct research papers, excluding QNTA. One mapped application lacks its filed specification PDF and has an R1 DOCX substitute. Do not represent eight entries as eight granted patents, eight independently verified filed PDFs or eight inventorship records. Application status, attribution, ownership and disclosure must be verified separately. The older three-application summary describes the earlier AXIOM/CRE/FQNM subset, not the complete current portfolio. Preserve the people profiles' own dated evidence boundaries; do not extrapolate their inventorship assertions to all new entries.
+
+The later Product Portfolio v1.7 lists nine Korean application entries including the QNTA application filed on 12 October 2026, with a priority-examination request on that date. This updates portfolio coverage; it does not turn any application into a grant or make protected filing identifiers public.

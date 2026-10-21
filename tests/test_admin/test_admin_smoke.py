@@ -134,11 +134,15 @@ def _url(model, view, *args):
 
 
 def test_every_local_model_is_registered():
-    """Every concrete model in an ``apps.*`` app has an admin. New models must opt in."""
+    """Operations models have a Django admin; website records use the separate OTP console.
+
+    Website identities/session hashes and consent records must not become editable
+    through the legacy staff admin, bypassing its allowlist and audited actions.
+    """
     missing = [
         m._meta.label
         for ac in apps.get_app_configs()
-        if ac.name.startswith("apps.")
+        if ac.name.startswith("apps.") and ac.name != "apps.website"
         for m in ac.get_models()
         if m not in admin.site._registry
     ]

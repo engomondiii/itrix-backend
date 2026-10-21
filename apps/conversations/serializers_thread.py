@@ -217,6 +217,7 @@ class TurnSubmitSerializer(serializers.Serializer):
     recoverable 413 rather than a validation error that discards what they wrote.
     """
 
+    locale = serializers.ChoiceField(choices=("en", "ko"), required=False)
     body = serializers.CharField(allow_blank=True, trim_whitespace=False)
     attachment_ids = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
@@ -226,6 +227,7 @@ class TurnSubmitSerializer(serializers.Serializer):
 class ThreadCreateSerializer(serializers.Serializer):
     """Body for ``POST threads/``. Everything optional — a bare POST is valid."""
 
+    locale = serializers.ChoiceField(choices=("en", "ko"), required=False)
     body = serializers.CharField(required=False, allow_blank=True, trim_whitespace=False)
     example_key = serializers.CharField(required=False, allow_blank=True)
     attachment_ids = serializers.ListField(

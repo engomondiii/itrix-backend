@@ -15,4 +15,7 @@ never exposed to a client or public payload.
 The internal buyer map goes further than the controlled-public version: named roles,
 likely approval paths, and the internal read on where a deal could stall.
 
-ASTOP follows Journey v1.6: verified identity/email and trial acceptance before seven-day protected trial delivery without payment, then explicit Join after the full trial, recurring consent and payment for annual membership. Revised approved LO/protection terms must align before launch; legacy accepted orders remain unchanged. Enterprise evaluation is not a universal retail prerequisite. Non-ASTOP enterprise fees, exclusivity and scope require separate written agreement; old generic pricing examples do not override the ASTOP LO.
+
+## Current October 19 website boundary
+Website/AI explains, qualifies and collects voluntary interest. No new retail website trial, checkout, licensing issuance or installer delivery. USD10/month and USD100/year are working Store prices. Gate each Store link on explicit confirmed availability; default pre-launch. Strategic Enterprise Validation remains separately scoped. Preserve historical customer agreements and necessary support/refund records. Staff website operations use the configured two-address email-code administrator plane; public submissions never grant staff or customer access.
+Do not infer publication approval for internal strategy, patent identifiers, raw uploaded documents or private customer information. Updated website content does not authorize bulk public disclosure.

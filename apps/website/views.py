@@ -64,7 +64,7 @@ class IntakeInput(serializers.Serializer):
             raise ValidationError({'company': 'Company and target workload are required.'})
         if value['kind'] == 'contact' and not value['fields'].get('message'):
             raise ValidationError({'message': 'A message is required.'})
-        permitted = {'role', 'phone', 'industry', 'tools', 'when', 'use', 'message', 'topic', 'platform'}
+        permitted = {'role', 'phone', 'industry', 'tools', 'when', 'use', 'message', 'topic', 'platform', 'inquiry_route', 'partnership_type'}
         if set(value['fields']) - permitted:
             raise ValidationError({'fields': 'Unknown fields.'})
         if value['newsletter'] and value['kind'] != 'poc':

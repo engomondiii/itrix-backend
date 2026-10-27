@@ -186,3 +186,25 @@ def test_mail_failure_remains_retryable():
     assert Outbox.objects.get().sent_at is None and Outbox.objects.get().attempts==1
     with patch('apps.website.services.send_mail'):deliver_outbox()
     assert Outbox.objects.get().sent_at and Outbox.objects.get().attempts==2
+
+
+@patch("apps.website.services.captcha", return_value=True)
+def test_partnership_inquiry_keeps_route_and_type(captcha):
+    import uuid
+    payload = {'kind': 'contact', 'language': 'en', 'name': 'Partner',
+               'company': 'Example', 'email': 'partner@example.com',
+               'fields': {'message': 'We need deployment across multiple teams.',
+                          'topic': 'Partnership / Large-scale deployment',
+                          'inquiry_route': 'partnership', 'partnership_type': 'Licensing'},
+               'privacy': True, 'privacy_version': 'draft-20261016',
+               'captcha': 'valid', 'request_id': str(uuid.uuid4())}
+    with override_settings(WEBSITE_INTAKE_ENABLED=True, WEBSITE_PRIVACY_VERSION='draft-20261016'):
+        response = api().post('/api/v1/website/intake/', payload, format='json')
+    assert response.status_code == 201
+    obj = Submission.objects.get(request_id=payload['request_id'])
+    assert obj.fields['inquiry_route'] == 'partnership'
+    assert obj.fields['partnership_type'] == 'Licensing'
+    staff = admin()
+    detail = staff.get(f'/api/v1/website/admin/records/{obj.id}/')
+    assert detail.status_code == 200
+    assert detail.data['fields']['topic'] == 'Partnership / Large-scale deployment'

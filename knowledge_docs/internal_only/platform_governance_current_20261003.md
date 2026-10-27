@@ -21,6 +21,6 @@ Company rollout priorities are not customer product prerequisites. Mathematical 
 
 
 
-## Current October 19 website boundary
-Website/AI explains, qualifies and collects voluntary interest. No new retail website trial, checkout, licensing issuance or installer delivery. USD10/month and USD100/year are working Store prices. Gate each Store link on explicit confirmed availability; default pre-launch. Strategic Enterprise Validation remains separately scoped. Preserve historical customer agreements and necessary support/refund records. Staff website operations use the configured two-address email-code administrator plane; public submissions never grant staff or customer access.
+## Current October 27 website boundary
+Website/AI explains, qualifies and collects voluntary interest. No new retail website trial, checkout, licensing issuance or installer delivery. USD10/month and USD100/year are working Store prices. Gate each Store link on explicit confirmed availability; default pre-launch. Strategic Enterprise Validation remains separately scoped. Preserve historical customer agreements and necessary support/refund records. Website PoC, contact and partnership applications now open the approved Google Forms. The website intake endpoints, website administrator email-code sign-in and website submission emails are retired. Staff review responses in the company Google Forms account. This does not change customer account authentication or the client portal.
 Do not infer publication approval for internal strategy, patent identifiers, raw uploaded documents or private customer information. Updated website content does not authorize bulk public disclosure.

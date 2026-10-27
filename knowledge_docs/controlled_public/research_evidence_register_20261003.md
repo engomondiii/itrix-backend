@@ -6,7 +6,7 @@ Sources: the supplied 11 September 2026 patent/research package, October Portfol
 The supplied continuum-dynamics paper studies quantised conservative transfer for supported conservation-law workloads. Interpret convergence and continuum reconstruction within the paper's assumptions and baseline. Its existence does not establish universal model training, every PDE, arbitrary backend speed or energy savings. FQNM is a research asset rather than a mandatory product dependency.
 
 ## R02 CRE
-The CRE-SPD paper concerns structured Cholesky/inverse reconstruction and faithful real representation for admissible operators. It does not remove cubic worst-case dense complexity. State which structure, dimensions, precision, numerical error and implementation are compared. CRE may enable a suitable representation without being a mandatory component of AXIOM-TENSOR or QNTA.
+The CRE-SPD paper concerns structured Cholesky/inverse reconstruction and faithful real representation for admissible operators. It does not remove cubic worst-case dense complexity. State which structure, dimensions, precision, numerical error and implementation are compared. CRE may enable a suitable representation without being a mandatory component of AXIOM Tensor or QNTA.
 
 ## R03 AXIOM
 The signed-XOR table-free multiplication paper distinguishes basis support updates from algebra-specific signs. Table-free basis operations do not remove the dependence of a sparse bilinear product on its stored terms. The paper names Park Junhu and Myungjoo Kang; coauthorship is not proof of patent inventorship or ownership.
@@ -14,7 +14,7 @@ The signed-XOR table-free multiplication paper distinguishes basis support updat
 ## R04 Judge-CIA and related monitoring
 The anonymous Judge-CIA paper is research evidence for its stated judge/monitoring setting. An anonymous manuscript does not identify an inventor. The package's mapping includes a related hallucination-monitoring specification, but that does not create an extra validated commercial product. One mapped application is represented by an R 1 DOCX because a filed specification PDF is missing; never label that substitute a verified filed PDF.
 
-## R05 AXIOM-TENSOR
+## R05 AXIOM Tensor
 The supplied latest paper is dated 6 August 2026. Structured tensor/operator representation must be evaluated for parameter budget, approximation, memory, execution and task quality separately. Smaller representations are not themselves measured whole-model speedups or energy savings. AXIOM Compute is the validation-stage software offering; AXIOM Core is planned dedicated hardware/IP, not an already delivered runtime executing every research route.
 
 ## R06 SPADES

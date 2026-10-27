@@ -10,6 +10,12 @@ from apps.website.services import digest
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def legacy_operations_for_archive_regressions(settings):
+    # Exercise retained legacy logic in isolation; production remains retired.
+    settings.WEBSITE_NATIVE_OPERATIONS_ENABLED = True
+
+
 def api():
     return APIClient()
 
@@ -208,3 +214,32 @@ def test_partnership_inquiry_keeps_route_and_type(captcha):
     detail = staff.get(f'/api/v1/website/admin/records/{obj.id}/')
     assert detail.status_code == 200
     assert detail.data['fields']['topic'] == 'Partnership / Large-scale deployment'
+
+
+@override_settings(WEBSITE_NATIVE_OPERATIONS_ENABLED=False, WEBSITE_INTAKE_ENABLED=True)
+@pytest.mark.parametrize('method,path', [
+    ('post', 'intake/'), ('post', 'auth/request/'), ('post', 'auth/verify/'),
+    ('get', 'admin/session/'), ('get', 'admin/records/'), ('get', 'admin/records/1/'),
+    ('get', 'admin/export/'), ('get', 'admin/logs/'), ('get', 'admin/accounts/'),
+    ('get', 'admin/notice/'),
+])
+def test_retired_operations_fail_closed(method, path):
+    with patch('apps.website.services.send_mail') as mail:
+        response = getattr(api(), method)('/api/v1/website/' + path)
+    assert response.status_code == 410
+    mail.assert_not_called()
+    assert not Submission.objects.exists()
+
+
+@override_settings(WEBSITE_NATIVE_OPERATIONS_ENABLED=False, WEBSITE_INTAKE_ENABLED=True)
+def test_google_forms_configuration():
+    data = api().get('/api/v1/website/config/').json()
+    assert data['intake_enabled'] is False
+    assert data['captcha_site_key'] == ''
+    assert data['intake_provider'] == 'google_forms'
+    assert data['forms']['poc'] == 'https://forms.gle/FoGcs7LHhoTbmhtf8'
+    from apps.website.services import deliver_outbox
+    with patch('apps.website.services.send_mail') as mail, patch('apps.website.services.Outbox.objects.filter') as query:
+        deliver_outbox()
+    query.assert_not_called()
+    mail.assert_not_called()

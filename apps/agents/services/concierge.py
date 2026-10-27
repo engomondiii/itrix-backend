@@ -259,6 +259,7 @@ class ConciergeAgent(BaseAgent):
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             reply_language = "Korean" if getattr(self._thread(ctx), "locale", "en") == "ko" else "English"
             system += f"\nReply in {reply_language}, unless the visitor explicitly requests another language."
+            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications now use Google Forms: PoC https://forms.gle/FoGcs7LHhoTbmhtf8 ; general contact https://forms.gle/PCW2J9SF4wjDcPtA6 ; partnership https://forms.gle/aACxKK1oggHiA8ueA . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
             from apps.website.policy import store_policy
             import json as _policy_json
             system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())
@@ -364,6 +365,7 @@ class ConciergeAgent(BaseAgent):
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             reply_language = "Korean" if getattr(self._thread(ctx), "locale", "en") == "ko" else "English"
             system += f"\nReply in {reply_language}, unless the visitor explicitly requests another language."
+            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications now use Google Forms: PoC https://forms.gle/FoGcs7LHhoTbmhtf8 ; general contact https://forms.gle/PCW2J9SF4wjDcPtA6 ; partnership https://forms.gle/aACxKK1oggHiA8ueA . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
             from apps.website.policy import store_policy
             import json as _policy_json
             system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())

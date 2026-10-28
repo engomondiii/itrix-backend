@@ -27,7 +27,7 @@ FACTS = (
     {
         "key": "itrix-current-technology-taxonomy",
         "category": HardFact.Category.CORPORATE,
-        "public_statement": f"PRISM, AXIOM, AXIOM-TENSOR and QNTA are technologies; QNTA Runtime is a product. CRE, FQNM and SPADES remain enabling or research assets.",
+        "public_statement": f"PRISM, AXIOM, AXIOM Tensor and QNTA are technologies; QNTA Runtime is a product. CRE, FQNM and SPADES remain enabling or research assets.",
         "publication_status": "current October 2026 technology taxonomy",
         "source_reference": "knowledge_docs/public/itrix_product_portfolio_v1_7.md",
         "disclosure_level": DisclosureLevel.PUBLIC,

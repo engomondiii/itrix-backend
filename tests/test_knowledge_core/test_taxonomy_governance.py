@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_canonical_entity_types_are_deterministic():
     assert PRODUCT_NAMES == ("ASTOP", "AXIOM Compute", "AXIOM Core", "QNTA Runtime")
-    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
+    assert TECHNOLOGIES == ("PRISM", "AXIOM", "AXIOM Tensor", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
     block = prompt_block()
     assert "CANONICAL OCTOBER 2026 PORTFOLIO" in block
     assert "ASTOP" in block and "AXIOM Compute" in block and "AXIOM Core" in block

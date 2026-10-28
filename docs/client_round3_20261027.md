@@ -20,7 +20,7 @@ The notice and three request HTML references contain Korean only despite the doc
 
 Merge and deploy backend plus worker first to retire native website intake and queued mail. Then deploy web and dashboard. Confirm each service runs the merged commit. Do not run an old deployment's code for ingestion.
 
-No new environment variables or database migrations are introduced. `WEBSITE_NATIVE_OPERATIONS_ENABLED` is deliberately false in application settings; old website intake and Turnstile settings cannot re-enable the retired workflows. Existing customer-authentication email settings remain required. The DigitalOcean proxy, DNS, certificates and renewal timer need no change.
+No new environment variables are introduced. Two label-only Django migrations update AXIOM Tensor display choices while preserving stored values and existing records. After deploying the new backend, run `python manage.py migrate --noinput` in its Railway container (or confirm the deployment startup already applied both migrations). `WEBSITE_NATIVE_OPERATIONS_ENABLED` is deliberately false in application settings; old website intake and Turnstile settings cannot re-enable the retired workflows. Existing customer-authentication email settings remain required. The DigitalOcean proxy, DNS, certificates and renewal timer need no change.
 
 Forms (same for Korean and English):
 - PoC: https://forms.gle/FoGcs7LHhoTbmhtf8

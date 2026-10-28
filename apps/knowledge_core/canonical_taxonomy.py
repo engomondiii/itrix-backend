@@ -3,11 +3,11 @@ from __future__ import annotations
 
 PRODUCTS = (
     {"code": "astop", "name": "ASTOP", "kind": "product", "family": "ASTOP", "stage": "Implementation demonstrated", "description": "Observation software using PRISM to invoke reasoning on decision-relevant state changes.", "optional": False},
-    {"code": "alpha_compute", "name": "AXIOM Compute", "kind": "product", "family": "AXIOM", "stage": "Validation stage", "description": "Software for suitable structured tensor/operator workloads using AXIOM and AXIOM-TENSOR; quality, memory and speed need workload-specific validation.", "optional": False},
+    {"code": "alpha_compute", "name": "AXIOM Compute", "kind": "product", "family": "AXIOM", "stage": "Validation stage", "description": "Software for suitable structured tensor/operator workloads using AXIOM and AXIOM Tensor; quality, memory and speed need workload-specific validation.", "optional": False},
     {"code": "alpha_core", "name": "AXIOM Core", "kind": "product", "family": "AXIOM", "stage": "Planned offering", "description": "Proposed dedicated hardware or IP implementing validated AXIOM structures; delivery depends on development and validation.", "optional": True},
     {"code": "qnta_runtime", "name": "QNTA Runtime", "kind": "product", "family": "QNTA", "stage": "Feasibility demonstrated", "description": "Runtime software implementing QNTA Inference-Based Training Architecture on supported inference infrastructure with explicit numerical and state-transition control.", "optional": False},
 )
-TECHNOLOGIES = ("PRISM", "AXIOM", "AXIOM-TENSOR", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
+TECHNOLOGIES = ("PRISM", "AXIOM", "AXIOM Tensor", "QNTA Inference-Based Training Architecture", "CRE", "FQNM", "SPADES", "Judge CIA", "Hallucination Monitoring")
 PRODUCT_NAMES = tuple(item["name"] for item in PRODUCTS)
 PRODUCT_CODES = tuple(item["code"] for item in PRODUCTS)
 COMMERCIALIZATION_MECHANISM = "AI-Powered Sales Platform"

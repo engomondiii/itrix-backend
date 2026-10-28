@@ -26,7 +26,7 @@ class EvaluationStatus(models.TextChoices):
 class TechnicalRoute(models.TextChoices):
     NONE = "none", "None / not yet selected"
     AXIOM = "axiom", "AXIOM"
-    AXIOM_TENSOR = "axiom_tensor", "AXIOM-TENSOR"
+    AXIOM_TENSOR = "axiom_tensor", "AXIOM Tensor"
     CRE = "cre", "CRE"
     FQNM = "fqnm", "FQNM"
     QNTA = "qnta", "QNTA"

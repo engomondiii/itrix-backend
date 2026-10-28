@@ -258,7 +258,7 @@ def test_governed_conversation_prompt_contains_cross_cutting_licensing_controls(
         "axiom core",
         "astop",
         "prism",
-        "axiom-tensor",
+        "axiom tensor",
         "qnta",
         "qnta runtime is a product",
         "binary labels, rankings, scores, thresholds",

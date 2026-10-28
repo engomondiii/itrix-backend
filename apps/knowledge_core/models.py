@@ -59,7 +59,7 @@ class TechnologyFamily(models.TextChoices):
     CROSS_CUTTING = "cross_cutting", "Boundary-aware / cross-cutting"
     ASTOP = "astop", "ASTOP"
     PRISM = "prism", "PRISM"
-    AXIOM_TENSOR = "axiom_tensor", "AXIOM-TENSOR"
+    AXIOM_TENSOR = "axiom_tensor", "AXIOM Tensor"
     QNTA = "qnta", "QNTA"
 
 

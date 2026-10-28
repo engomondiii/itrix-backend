@@ -163,6 +163,8 @@ def get_subscription(token):
 
 
 def deliver_outbox(limit=100):
+    if not settings.WEBSITE_NATIVE_OPERATIONS_ENABLED:
+        return  # Keep historical submissions/outbox; never send retired confirmations or alerts.
     ids = Outbox.objects.filter(sent_at__isnull=True, submission__deleted_at__isnull=True).order_by('pk').values_list('pk', flat=True)[:limit]
     for pk in list(ids):
         with transaction.atomic():

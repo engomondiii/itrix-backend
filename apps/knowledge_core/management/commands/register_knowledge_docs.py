@@ -199,7 +199,7 @@ def entity_relationship_metadata_for(filename: str) -> dict:
     n = filename.lower()
     if "axiom_tensor_qnta_current_controlled" in n:
         return {
-            "canonical_entities": ["AXIOM-TENSOR", "QNTA"],
+            "canonical_entities": ["AXIOM Tensor", "QNTA"],
             "technology_families": ["axiom_tensor", "qnta"],
             "related_products": ["AXIOM Compute"],
         }
@@ -243,7 +243,7 @@ def entity_relationship_metadata_for(filename: str) -> dict:
         return {
             "canonical_entities": [
                 "ASTOP", "AXIOM Compute", "AXIOM Core",
-                "PRISM", "AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "QNTA",
+                "PRISM", "AXIOM", "AXIOM Tensor", "CRE", "FQNM", "QNTA",
             ],
             "technology_families": [
                 "astop", "alpha_compute", "alpha_core", "prism", "axiom",

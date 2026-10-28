@@ -18,7 +18,7 @@ _BRAND_CORE = (
     + taxonomy_prompt_block()
     + "\nTECHNOLOGY APPLICABILITY: no technology is universally applicable and they do not all apply together. "
     "For a general technology overview, cover the relevant capability domains: observation before reasoning "
-    "(PRISM / ASTOP) and representation before execution (AXIOM Compute using AXIOM / AXIOM-TENSOR), learning through QNTA Runtime, "
+    "(PRISM / ASTOP) and representation before execution (AXIOM Compute using AXIOM / AXIOM Tensor), learning through QNTA Runtime, "
     "and planned AXIOM Core only where hardware evidence justifies it. CRE/FQNM/SPADES are separate assets, "
     "not mandatory dependencies."
 )

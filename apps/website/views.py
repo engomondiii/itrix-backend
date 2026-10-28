@@ -9,7 +9,7 @@ from django.db.models import Q, Count
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, APIException
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
@@ -26,7 +26,18 @@ class WebsiteThrottle(SimpleRateThrottle):
         return self.cache_format % {'scope': self.scope, 'ident': s.ip(request) or self.get_ident(request)}
 
 
+class WebsiteOperationsRetired(APIException):
+    status_code = 410
+    default_detail = 'Website submissions are now handled through Google Forms. The website administrator console is retired.'
+    default_code = 'website_operations_retired'
+
+
 class PublicView(APIView):
+    def initial(self, request, *args, **kwargs):
+        if not settings.WEBSITE_NATIVE_OPERATIONS_ENABLED and self.__class__.__name__ not in {'Configuration', 'Unsubscribe'}:
+            raise WebsiteOperationsRetired()
+        return super().initial(request, *args, **kwargs)
+
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [WebsiteThrottle]
@@ -38,11 +49,11 @@ class Configuration(PublicView):
         notice = Notice.objects.filter(pk=1, enabled=True).first()
         now = timezone.now()
         visible = notice and (not notice.starts_at or notice.starts_at <= now) and (not notice.ends_at or notice.ends_at > now)
-        return Response({'store': store_policy(), 'notice': notice.content if visible else None,
+        return Response({'store': store_policy(), 'notice': notice.content if visible and settings.WEBSITE_NATIVE_OPERATIONS_ENABLED else None,
                          'notice_ends_at': notice.ends_at if visible else None,
-                         'captcha_site_key': settings.WEBSITE_TURNSTILE_SITE_KEY,
+                         'captcha_site_key': settings.WEBSITE_TURNSTILE_SITE_KEY if settings.WEBSITE_NATIVE_OPERATIONS_ENABLED else '',
                          'privacy_version': settings.WEBSITE_PRIVACY_VERSION,
-                         'intake_enabled': settings.WEBSITE_INTAKE_ENABLED})
+                         'intake_enabled': settings.WEBSITE_NATIVE_OPERATIONS_ENABLED and settings.WEBSITE_INTAKE_ENABLED, 'intake_provider': 'google_forms', 'forms': {'poc': 'https://forms.gle/FoGcs7LHhoTbmhtf8', 'contact': 'https://forms.gle/PCW2J9SF4wjDcPtA6', 'partnership': 'https://forms.gle/aACxKK1oggHiA8ueA'}})
 
 
 class IntakeInput(serializers.Serializer):

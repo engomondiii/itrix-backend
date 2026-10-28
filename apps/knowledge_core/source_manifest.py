@@ -153,7 +153,7 @@ SOURCE_MANIFEST: dict[str, SourcePolicy] = {
     ),
     "AXIOM_TENSOR_QNTA_Current_Controlled.md": SourcePolicy(
         "governing", True,
-        "Current controlled AXIOM-TENSOR/QNTA technical synthesis",
+        "Current controlled AXIOM Tensor/QNTA technical synthesis",
         (ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH),
     ),
     "itriX_MVP_Acceptance_Rerun_Feedback_to_Fidel.docx": SourcePolicy(
@@ -352,7 +352,7 @@ SOURCE_MANIFEST.update({
     "research_portfolio_summary_20261002.md": SourcePolicy("governing", True,
         "Bounded research summary; no raw patent identifiers, protected QNTA mechanisms, grant or universal performance inference.",
         (ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH, ClaimDomain.LEGAL),
-        namespace="technology", canonical_entities=("AXIOM", "AXIOM-TENSOR", "CRE", "FQNM", "SPADES", "QNTA"), permitted_paraphrase="summary"),
+        namespace="technology", canonical_entities=("AXIOM", "AXIOM Tensor", "CRE", "FQNM", "SPADES", "QNTA"), permitted_paraphrase="summary"),
 })
 _comparative = "itriX_ASTOP_Comparative_Knowledge_Core_v1.1.docx"
 SOURCE_MANIFEST[_comparative] = _replace(SOURCE_MANIFEST[_comparative], canonical_rule=(

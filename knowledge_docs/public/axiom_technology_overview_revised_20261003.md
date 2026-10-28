@@ -8,7 +8,7 @@ AXIOM means Algebraic eXtension by Index-Ordered Multiplication. The earlier ove
 The useful assessment questions remain: what state exists, what transition occurs, which part is observed, what information is retained, and whether the original algebraic meaning can be reconstructed. Symptoms worth investigating include projection being mistaken for full state, early flattening into arrays/kernels that discards useful structure, reconstruction failure, and special-case arithmetic burden. These are hypotheses to investigate, not diagnoses established by a visitor using an algebra keyword.
 
 ## Distinct technology roles
-AXIOM addresses algebraic state and operations. CRE concerns structure-preserving real representation of eligible operators. FQNM concerns conservative transfer and continuum reconstruction. Their relationship does not prove that all three must be installed together or that every workload should follow them in sequence. AXIOM-TENSOR and QNTA have separate evidence scopes.
+AXIOM addresses algebraic state and operations. CRE concerns structure-preserving real representation of eligible operators. FQNM concerns conservative transfer and continuum reconstruction. Their relationship does not prove that all three must be installed together or that every workload should follow them in sequence. AXIOM Tensor and QNTA have separate evidence scopes.
 
 The new R03 paper provides bounded evidence about signed-XOR, table-free basis multiplication. That result is narrower than a claim to reconstruct arbitrary states or accelerate whole models. Report the operation and algebra involved, terms stored, sign conventions, precision and workload. Table-free basis support does not eliminate the scaling cost of a sparse bilinear product.
 

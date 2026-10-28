@@ -10,7 +10,7 @@ Representation costs may include repeated real/complex conversion, tensor layout
 Relevant properties depend on the route and conditions: multiplication relations, adjoints, invertibility, spectra, norms, conditioning and recoverability. Do not promise that every property is preserved for every operator. Execution cost, transformation/recovery overhead, precision, numerical error and data movement must all be measured against the actual baseline.
 
 ## Preserved distinctions and evidence limits
-AXIOM focuses on algebraic state and operations; CRE focuses on eligible operator representations; FQNM focuses on conservation-sensitive transfer. CRE is an enabling technology in the October portfolio, not an extra sold product or mandatory dependency for AXIOM-TENSOR/QNTA.
+AXIOM focuses on algebraic state and operations; CRE focuses on eligible operator representations; FQNM focuses on conservation-sensitive transfer. CRE is an enabling technology in the October portfolio, not an extra sold product or mandatory dependency for AXIOM Tensor/QNTA.
 
 R02 concerns structured Cholesky/inverse reconstruction for admissible operators. It does not remove worst-case cubic complexity of dense operations. Report admissibility, matrix dimensions, structure, precision, conditioning, reconstruction error and runtime separately. A smaller or real-valued representation does not establish net energy, whole-model or universal solver speed benefits.
 

@@ -60,10 +60,10 @@ _TECHNICAL_QUERY = re.compile(r"\b(how does|technical|architecture|workload|comp
 # Exact current public terms must not disappear behind a higher-scoring overview.
 # These are candidate sources only: all disclosure and metadata gates still apply.
 _CUSTOMER_TERM_SOURCES = (
-    (re.compile(r"\b(store|waitlist|launch|availability|notification|trial|membership|annual|cancel|cancellation|price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
-     "astop_store_terms_20261019.md"),
+    (re.compile(r"\b(download|installer|installation|windows|macos|mac|system requirements|store|waitlist|launch|availability|notification|trial|membership|annual|cancel|cancellation|price|pricing|cost|buy|buying|purchase|license|licence|seat|seats|discount|referral|refund|activation|activate|environment|environments|renewal|offline|expiry)\b|다운로드|설치|윈도우|맥|출시|가격|구매|라이선스|할인|환불|활성화|갱신|오프라인", re.I),
+     "astop_availability_20261105.md"),
     (re.compile(r"\b(store|waitlist|notify|notification|launch|availability|register interest|journey|discover|enroll|join|renew|prove|decide|continue|enterprise|advoca\w*|branch|commission)\b|출시|알림|스토어|여정|기업|추천|브랜치|수수료", re.I),
-     "astop_store_journey_20261019.md"),
+     "astop_availability_20261105.md"),
 )
 
 
@@ -72,7 +72,7 @@ def _customer_term_sources(query: str) -> tuple[str, ...]:
     # Do not substitute ASTOP's commercial policy for a different named product.
     if re.search(r"\b(?:AXIOM|ALPHA|QNTA)\b", text, re.I) and not re.search(r"\bASTOP\b", text, re.I):
         return ()
-    return tuple(name for pattern, name in _CUSTOMER_TERM_SOURCES if pattern.search(text))
+    return tuple(dict.fromkeys(name for pattern, name in _CUSTOMER_TERM_SOURCES if pattern.search(text)))
 
 
 def _customer_term_candidates(query: str, *, namespaces: tuple[str, ...],

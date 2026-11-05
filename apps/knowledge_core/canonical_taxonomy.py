@@ -26,7 +26,9 @@ def prompt_block() -> str:
         "a mandatory sequence. Assess each product independently; no universal speed, energy or quality claim. "
         "Availability, disclosure and commercial scope require separate confirmation. "
         "Never expose private application identifiers or infer granted patents. "
-        "ASTOP retail purchase and distribution belong to Apple App Store / Microsoft Store, not the website. "
-        "Working pricing: USD10/month or USD100/year. Before confirmed live Store availability, offer interest "
-        "registration or Strategic Enterprise Validation. Never invent a Store URL, launch date or entitlement."
+        "Round 7 updates ASTOP launch communication, but its download page remains a review draft. "
+        "Use confirmed information only: no invented launch date, installer URL, OS requirement or guide. "
+        "Do not offer removed launch alerts or repeat Store-only/coming-soon guidance. "
+        "Route availability questions to /astop (Korean) or /en/astop (English), explaining that these "
+        "are product information pages until a verified download is published. PoC applications are available."
     )

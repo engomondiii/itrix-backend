@@ -4,7 +4,7 @@ from apps.ai_engine.services import knowledge_retriever as retriever
 from apps.knowledge_core.models import KnowledgeChunk, KnowledgeDocument
 
 pytestmark = pytest.mark.django_db
-NAME = 'astop_store_terms_20261019.md'
+NAME = 'astop_availability_20261105.md'
 
 
 def make_chunk(name=NAME, text='USD 10 per month or USD 100 per year; Store availability requires confirmation.', **metadata):
@@ -69,7 +69,7 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
     from apps.knowledge_core.services.chunker import chunk_text
     settings.ENABLE_AI_ENGINE = False
     root = Path(__file__).resolve().parents[2] / 'knowledge_docs/public'
-    for name in (NAME, 'astop_store_journey_20261019.md'):
+    for name in (NAME,):
         first = make_chunk(name)
         doc = first.document
         first.delete()
@@ -78,13 +78,13 @@ def test_real_ingested_sections_keep_activation_and_pricing_in_small_context(set
                 chunk_index=chunk.index, heading=chunk.heading, text=chunk.text,
                 vector_id=f'{doc.id}:{chunk.index}')
     terms = ' '.join(c['text'] for c in retrieve('ASTOP price purchase Store release trial refund', top_k=5))
-    assert 'USD 10 per month' in terms
-    assert 'USD 100 per year' in terms
-    assert 'not sell or distribute ASTOP directly' in terms
-    assert 'Store trial length' in terms
-    assert 'applicable approved Store listing and terms' in terms
+    assert 'No confirmed launch date' in terms
+    assert 'review draft' in terms
+    assert 'not a verified current offer' in terms
+    assert 'No final download license' in terms
 
 
-@pytest.mark.parametrize('query', ['ASTOP Store launch', 'Notify me about ASTOP availability', 'ASTOP 출시 알림'])
+
+@pytest.mark.parametrize('query', ['ASTOP Store launch', 'Notify me about ASTOP availability', 'ASTOP 출시 알림', 'ASTOP 다운로드', 'Does ASTOP run on Mac?', 'ASTOP installation guide'])
 def test_store_interest_queries_include_current_journey(query):
-    assert 'astop_store_journey_20261019.md' in retriever._customer_term_sources(query)
+    assert 'astop_availability_20261105.md' in retriever._customer_term_sources(query)

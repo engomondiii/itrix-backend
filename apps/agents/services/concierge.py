@@ -259,10 +259,10 @@ class ConciergeAgent(BaseAgent):
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             reply_language = "Korean" if getattr(self._thread(ctx), "locale", "en") == "ko" else "English"
             system += f"\nReply in {reply_language}, unless the visitor explicitly requests another language."
-            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications now use Google Forms: PoC https://forms.gle/FoGcs7LHhoTbmhtf8 ; general contact https://forms.gle/PCW2J9SF4wjDcPtA6 ; partnership https://forms.gle/aACxKK1oggHiA8ueA . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
+            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications use language-specific Google Forms. Korean: PoC https://forms.gle/KrA7gzeC27V2mYRE9 ; general inquiry https://forms.gle/CFdqPQqv4vrzppED7 ; partnership https://forms.gle/Wm8571coNmX6Eyvj7 . English: PoC https://forms.gle/VMm7qx7fbzu1paiG6?hl=en ; general inquiry https://forms.gle/NszSppZycS5NGqyB9?hl=en ; partnership https://forms.gle/wsQEyAVgiNL2a4Hy8?hl=en . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
             from apps.website.policy import store_policy
             import json as _policy_json
-            system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())
+            system += "\nVERIFIED STORE FLAGS (pre_launch describes Store listings only, not overall product launch; use only available Store URLs):\n" + _policy_json.dumps(store_policy())
             from apps.commerce.membership import conversation_state
             membership_state = conversation_state(ctx)
             if membership_state:
@@ -365,10 +365,10 @@ class ConciergeAgent(BaseAgent):
             system = with_attachment_context(system, thread=self._thread(ctx), query=question)
             reply_language = "Korean" if getattr(self._thread(ctx), "locale", "en") == "ko" else "English"
             system += f"\nReply in {reply_language}, unless the visitor explicitly requests another language."
-            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications now use Google Forms: PoC https://forms.gle/FoGcs7LHhoTbmhtf8 ; general contact https://forms.gle/PCW2J9SF4wjDcPtA6 ; partnership https://forms.gle/aACxKK1oggHiA8ueA . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
+            system += "\nUse canonical product names ASTOP and AXIOM Tensor in your answers, even when older sources use variants. Website applications use language-specific Google Forms. Korean: PoC https://forms.gle/KrA7gzeC27V2mYRE9 ; general inquiry https://forms.gle/CFdqPQqv4vrzppED7 ; partnership https://forms.gle/Wm8571coNmX6Eyvj7 . English: PoC https://forms.gle/VMm7qx7fbzu1paiG6?hl=en ; general inquiry https://forms.gle/NszSppZycS5NGqyB9?hl=en ; partnership https://forms.gle/wsQEyAVgiNL2a4Hy8?hl=en . Do not promise website confirmation emails or website administrator review; review is in Google Forms."
             from apps.website.policy import store_policy
             import json as _policy_json
-            system += "\nVERIFIED RETAIL ROUTING (use only available Store URLs):\n" + _policy_json.dumps(store_policy())
+            system += "\nVERIFIED STORE FLAGS (pre_launch describes Store listings only, not overall product launch; use only available Store URLs):\n" + _policy_json.dumps(store_policy())
             from apps.commerce.membership import conversation_state
             membership_state = conversation_state(ctx)
             if membership_state:

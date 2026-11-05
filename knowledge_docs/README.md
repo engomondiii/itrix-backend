@@ -1,12 +1,12 @@
-# Knowledge Core — October 2026
+# Knowledge Core — November 2026
 
-The active corpus contains 31 documents. This README is outside the disclosure folders and is not ingested. Folder names govern retrieval disclosure; they do not make a public Git repository private.
+The active corpus is listed in the disclosure folders. This README is outside the disclosure folders and is not ingested. Folder names govern retrieval disclosure; they do not make a public Git repository private.
 
-## 19 October governing update
+## November 5 governing update
 
-The 8 October meeting and subsequent temporary Store-routing instruction supersede the earlier website trial/checkout/distribution model. Retail links remain disabled unless the individual Store listing is explicitly configured and confirmed live. Product Portfolio v1.7 is the current naming and maturity authority. Only three superseded current summaries were removed and replaced; retained people profiles, technical explanations and research sources were not removed merely because they are older.
+Round 7 replaces obsolete Store-only/launch-alert guidance with confirmed availability information and the current Korean/English PoC routes. The download HTML remains a review draft: no release date, installer URL, minimum OS or installation guide is invented. ASTOP White Paper v3.0 is the current technical explanation; the public introduction supplements the unchanged four-product taxonomy. The confidential investor deck is retained in private storage, internal-only, and is not a public claim source.
 
-See [implementation and rollout](../docs/website_integration_20261019.md) and [source audit](../docs/source_alignment_20261019.json). The dated sections below describe earlier updates, not current commercial terms.
+For this update, ingest only changed/new documents and remove the two retired Store summary vector sets before registration deletes their SQL identifiers. Unrelated sources remain unchanged. The dated October rollout instructions below describe earlier migrations, not a requirement to clear the entire index again.
 
 ## Current sources
 
@@ -14,8 +14,9 @@ See [implementation and rollout](../docs/website_integration_20261019.md) and [s
 | --- | --- | --- |
 | Product catalogue and maturity | public/itrix_product_portfolio_v1_7.md | Four offerings; stages do not imply general availability |
 | ASTOP behavior, evidence and access | public/astop_product_and_access_20261002.md | New finite-panel evidence, separate retail/enterprise routes |
-| Discovery through install and feedback | public/astop_store_journey_20261019.md | Store pre-launch interest registration; enterprise validation remains separate |
-| Pricing, seats, acceptance, refunds | public/astop_store_terms_20261019.md | USD10/month and USD100/year working prices; no direct website retail |
+| Availability and applications | public/astop_availability_20261105.md | Confirmed facts only; current bilingual Google Forms |
+| Technical explanation | public/astop_white_paper_v3_0_20261105.md | Semantic observation, bounded experiments and scientific limits |
+| Public company introduction | public/itrix_introduction_20261105.md | Mathematical Intelligence and unchanged maturity stages |
 | Referral eligibility and rewards | public/astop_branch_program_summary_v1_4.md | Historical obligations only; no new Branch retail offer |
 | Comparison with caching/harness tools | public/astop_comparison_current_20261003.md | September comparison context, October evidence boundaries |
 | Research overview | public/research_portfolio_summary_20261002.md | Public-safe portfolio distinctions |

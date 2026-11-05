@@ -18,6 +18,7 @@ def store_policy():
         stores.append({'store': key.lower(), 'available': live, 'url': url if live else None})
     return {'state': 'post_launch' if any(s['available'] for s in stores) else 'pre_launch',
             'checkout_available': False, 'trial_available': False, 'website_downloads': False,
-            'monthly_usd': '10.00', 'annual_usd': '100.00', 'pricing_status': 'working_standard',
-            'stores': stores, 'interest_path': '/contact?topic=interest', 'enterprise_path': '/poc',
-            'message': 'ASTOP is being prepared for Store release. Register interest or request Strategic Enterprise Validation.'}
+            'monthly_usd': None, 'annual_usd': None, 'pricing_status': 'unconfirmed',
+            'stores': stores, 'interest_path': None, 'enterprise_path': '/astop',
+            'information_path': '/astop', 'download_status': 'awaiting_confirmation',
+            'message': 'ASTOP information and PoC applications are available. Download, installation and system requirements need confirmed release information. Launch-alert registration is not offered.'}

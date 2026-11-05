@@ -1,6 +1,6 @@
 # ASTOP comparison and evidence boundaries
 
-Sources: itriX ASTOP Comparative Knowledge Core v1.1, 16 September 2026; newer ASTOP White Paper v2.3 and R07 PRISM. This curated edition preserves comparison distinctions and replaces unqualified older benchmark presentation. Competitor descriptions retain the comparative source's date; current availability or integrations require separate verification.
+Sources: itriX ASTOP Comparative Knowledge Core v1.1, 16 September 2026; newer ASTOP White Paper v3.0 and R07 PRISM. This curated edition preserves comparison distinctions and replaces unqualified older benchmark presentation. Competitor descriptions retain the comparative source's date; current availability or integrations require separate verification.
 
 ## Different layers of efficiency
 Anthropic request/model mechanisms, including prompt caching and request design, can affect the cost of model use. SoL-Pi concerns agent harness and trajectory behavior. ASTOP and PRISM concern observation and supervision: which state is collected, represented and delivered before reasoning is invoked. These layers overlap and may complement each other. Do not claim competitors never observe state, that ASTOP alone changes behavior, or that ASTOP inherently improves model intelligence.

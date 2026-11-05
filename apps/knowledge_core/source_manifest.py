@@ -629,3 +629,41 @@ SOURCE_MANIFEST['brand_story_company_public.md'] = SourcePolicy(
     'leadership remains distinct from inventorship. Portfolio v1.7 governs taxonomy.',
     (ClaimDomain.PUBLIC_EXPLANATION,), namespace='company', verified_date='2026-10-19',
     canonical_entities=('itriX', 'Myungjoo Kang'), permitted_paraphrase='summary')
+
+
+# November 5 / Round 7: only confirmed release details may become customer claims.
+_ROUND7_RULE = (
+    "ASTOP White Paper v3.0 governs technical explanation; Round 7 download design is review-only. "
+    "No confirmed date, binary URL, system requirements or guide. No Store-only/coming-soon/launch-alert "
+    "guidance. Product information and language-specific PoC applications are available. "
+    "Historical commercial obligations remain distinct from unconfirmed new offers."
+)
+for _name in (
+    "astop_product_and_access_20261002.md", "astop_branch_program_summary_v1_4.md",
+    "astop_activation_policy_20261004.md", "platform_governance_current_20261003.md",
+    "platform_operating_reference_revised_20261003.md", "licensing_and_commercialization_internal.md",
+    "ASTOP_Technical_Capabilities_Current_v0.3.1.md", "itrix_product_portfolio_v1_7.md",
+):
+    if _name in SOURCE_MANIFEST:
+        SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], verified_date="2026-11-05", canonical_rule=_ROUND7_RULE)
+for _name in ("astop_store_journey_20261019.md", "astop_store_terms_20261019.md"):
+    SOURCE_MANIFEST[_name] = _replace(SOURCE_MANIFEST[_name], current=False, authority="legacy",
+        superseded_by="astop_availability_20261105.md")
+SOURCE_MANIFEST["astop_availability_20261105.md"] = SourcePolicy(
+    "governing", True, _ROUND7_RULE, (ClaimDomain.COMMERCIALIZATION, ClaimDomain.PUBLIC_EXPLANATION),
+    supersedes=("astop_store_journey_20261019.md", "astop_store_terms_20261019.md"),
+    namespace="astop", verified_date="2026-11-05", canonical_entities=("ASTOP",), permitted_paraphrase="summary")
+SOURCE_MANIFEST["astop_white_paper_v3_0_20261105.md"] = SourcePolicy(
+    "authoritative", True,
+    "White Paper v3.0: observation layer, Acquire/Project/Select/Deliver, bounded 360-episode Qwen panel. "
+    "Probability/entropy explanation is illustrative, not a verified internal implementation. "
+    "Preserve decision correctness; observer overhead and workload fit matter. No launch or universal savings claims.",
+    (ClaimDomain.TECHNICAL, ClaimDomain.RESEARCH, ClaimDomain.PUBLIC_EXPLANATION),
+    namespace="astop", verified_date="2026-11-05", canonical_entities=("ASTOP", "PRISM"), permitted_paraphrase="summary")
+SOURCE_MANIFEST["itrix_introduction_20261105.md"] = SourcePolicy(
+    "authoritative", True, "Public six-slide introduction; portfolio stages remain unchanged. No confidential investor forecasts.",
+    (ClaimDomain.PUBLIC_EXPLANATION, ClaimDomain.TAXONOMY), namespace="company", verified_date="2026-11-05", permitted_paraphrase="summary")
+# Keep predecessor chains pointing to the latest availability summary.
+for _name, _policy in tuple(SOURCE_MANIFEST.items()):
+    if _policy.superseded_by in {"astop_store_journey_20261019.md", "astop_store_terms_20261019.md"}:
+        SOURCE_MANIFEST[_name] = _replace(_policy, superseded_by="astop_availability_20261105.md")

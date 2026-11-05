@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-05",
+  "sources": [
+    {
+      "name": "ASTOP_White_Paper_v3.0.docx",
+      "sha256": "568551aa3a04d0b57379b49f6c77bc0bcb0a02928dd9c62acd6bc4e195e296ac",
+      "bytes": 1908841
+    },
+    {
+      "name": "ASTOP_download.zip",
+      "sha256": "0a30871818e66616d70016e0464df60635637dbe809fd2f1a3fbd12b2ebb77fa",
+      "bytes": 519908
+    },
+    {
+      "name": "itriX Investor Vision IR VER3 2026.11.02_final.pptx",
+      "sha256": "beed6daf5b7656d9fac42a2669819daa3e633ac74ace95338301190542c042d5",
+      "bytes": 6506750
+    },
+    {
+      "name": "itriX Website \u2014 Revision Requests (Round 7).docx",
+      "sha256": "6a2973c874fc90892e9f641a98c3e2b566aeb7bbb54c1f5d5c55d6739e955fa4",
+      "bytes": 7240
+    },
+    {
+      "name": "itriX_Introduction.pptx",
+      "sha256": "7ca23961c232be8b55a05b7c54f9ed71968df83b48539dcd8d2bed4239552f4d",
+      "bytes": 44960
+    }
+  ],
+  "decisions": {
+    "download_zip": "Review only; no installer or final release facts supplied.",
+    "white_paper": "v3.0 public technical source; finite benchmark and scientific limits preserved.",
+    "introduction": "Public summary, unchanged maturity stages.",
+    "investor_deck": "Confidential; private internal-only source. Forecasts and historical benchmarks are not public verified facts."
+  }
+}

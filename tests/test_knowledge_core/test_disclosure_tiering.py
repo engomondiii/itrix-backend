@@ -66,7 +66,7 @@ def test_retired_october_sources_are_physically_absent_and_noncurrent():
     for name in RETIRED_OCTOBER_SOURCES:
         assert name not in present
         assert not policy_for(name).current
-    for name in ("astop_store_terms_20261019.md", "astop_store_journey_20261019.md",
+    for name in ("astop_availability_20261105.md", "astop_white_paper_v3_0_20261105.md",
                  "astop_branch_program_summary_v1_4.md", "astop_comparison_current_20261003.md",
                  "astop_activation_policy_20261004.md", "research_evidence_register_20261003.md",
                  "platform_governance_current_20261003.md"):

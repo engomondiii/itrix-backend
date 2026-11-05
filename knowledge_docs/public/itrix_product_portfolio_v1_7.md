@@ -21,10 +21,11 @@ Judge CIA selects decision agents and uses their correlations to estimate effect
 SPADES is physics-guided probabilistic correction of discretized PDE solutions using residual-based inference. FQNM covers quantised conservative computation for physical and dynamical systems. Productization requires a defined validated offering, customer use case and owner.
 
 
-## Website inquiry routing — October 27, 2026
-
-PoC/public validation applications: https://forms.gle/FoGcs7LHhoTbmhtf8
-General contact: https://forms.gle/PCW2J9SF4wjDcPtA6
-Partnership and large-scale deployment: https://forms.gle/aACxKK1oggHiA8ueA
-
-The Korean and English website pages use the same corresponding Google Forms. Applications are reviewed in Google Forms; the website no longer collects these forms or sends their confirmation emails. Store availability remains separately gated: do not imply ASTOP is commercially available before the relevant listing is confirmed live.
+## Website inquiry routing — November 2, 2026
+Korean PoC: https://forms.gle/KrA7gzeC27V2mYRE9
+English PoC: https://forms.gle/VMm7qx7fbzu1paiG6?hl=en
+Korean general inquiry: https://forms.gle/CFdqPQqv4vrzppED7
+English general inquiry: https://forms.gle/NszSppZycS5NGqyB9?hl=en
+Korean partnership and large-scale adoption: https://forms.gle/Wm8571coNmX6Eyvj7
+English partnership and large-scale adoption: https://forms.gle/wsQEyAVgiNL2a4Hy8?hl=en
+Applications are reviewed in the company Google Forms account. No website submission or acceptance is implied. See astop_availability_20261105.md for confirmed release boundaries.

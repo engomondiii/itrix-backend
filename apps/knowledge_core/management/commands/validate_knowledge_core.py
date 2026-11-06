@@ -176,15 +176,16 @@ class Command(BaseCommand):
                     f"  ! current public conflict ({label}): {chunk.document.file_path} chunk {chunk.chunk_index}"
                 ))
 
-        # ── October 2026 domain authority ─────────────────
-        self.stdout.write(self.style.MIGRATE_HEADING("October 2026 governing sources"))
+        # ── November 2026 domain authority ─────────────────
+        self.stdout.write(self.style.MIGRATE_HEADING("November 2026 governing sources"))
         required_sources = (
             ("itrix_product_portfolio_v1_7.md", "public", "authoritative"),
             ("astop_product_and_access_20261002.md", "public", "authoritative"),
             ("research_portfolio_summary_20261002.md", "public", "governing"),
             ("platform_governance_current_20261003.md", "internal_only", "governing"),
-            ("astop_store_journey_20261019.md", "public", "governing"),
-            ("astop_store_terms_20261019.md", "public", "governing"),
+            ("astop_availability_20261105.md", "public", "governing"),
+            ("astop_white_paper_v3_0_20261105.md", "public", "authoritative"),
+            ("itrix_introduction_20261105.md", "public", "authoritative"),
             ("astop_branch_program_summary_v1_4.md", "public", "governing"),
             ("astop_comparison_current_20261003.md", "public", "authoritative"),
             ("astop_activation_policy_20261004.md", "internal_only", "governing"),

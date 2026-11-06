@@ -43,7 +43,7 @@ def test_import_rejects_checkout_destination_and_incomplete_archive(tmp_path,set
     assert not KnowledgeDocument.objects.exists()
 
 
-def test_validator_requires_october_sources_and_rejects_reactivated_old_canonical(settings):
+def test_validator_requires_current_sources_and_rejects_reactivated_old_canonical(settings):
     from io import StringIO
     from apps.knowledge_core.models import KnowledgeChunk
     settings.ENABLE_AI_ENGINE=False
@@ -53,8 +53,9 @@ def test_validator_requires_october_sources_and_rejects_reactivated_old_canonica
         ('astop_product_and_access_20261002.md','public','authoritative','astop'),
         ('research_portfolio_summary_20261002.md','public','governing','technology'),
         ('platform_governance_current_20261003.md','internal_only','governing','company'),
-        ('astop_store_journey_20261019.md','public','governing','astop'),
-        ('astop_store_terms_20261019.md','public','governing','astop'),
+        ('astop_availability_20261105.md','public','governing','astop'),
+        ('astop_white_paper_v3_0_20261105.md','public','authoritative','astop'),
+        ('itrix_introduction_20261105.md','public','authoritative','company'),
         ('astop_branch_program_summary_v1_4.md','public','governing','astop'),
         ('astop_comparison_current_20261003.md','public','authoritative','astop'),
         ('astop_activation_policy_20261004.md','internal_only','governing','astop'),

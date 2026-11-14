@@ -4,7 +4,7 @@ The active corpus is listed in the disclosure folders. This README is outside th
 
 ## November 5 governing update
 
-Round 7 replaces obsolete Store-only/launch-alert guidance with confirmed availability information and the current Korean/English PoC routes. The download HTML remains a review draft: no release date, installer URL, minimum OS or installation guide is invented. ASTOP White Paper v3.0 is the current technical explanation; the public introduction supplements the unchanged four-product taxonomy. The confidential investor deck is retained in private storage, internal-only, and is not a public claim source.
+Round 7 replaces obsolete Store-only/launch-alert guidance with confirmed availability information and current Korean/English inquiry routes. The public ASTOP PoC campaign closed on November 13, 2026; its application routes are no longer offered. The download HTML remains a review draft: no release date, installer URL, minimum OS or installation guide is invented. ASTOP White Paper v3.0 is the current technical explanation; the public introduction supplements the unchanged four-product taxonomy. The confidential investor deck is retained in private storage, internal-only, and is not a public claim source.
 
 For this update, ingest only changed/new documents and remove the two retired Store summary vector sets before registration deletes their SQL identifiers. Unrelated sources remain unchanged. The dated October rollout instructions below describe earlier migrations, not a requirement to clear the entire index again.
 

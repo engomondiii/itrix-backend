@@ -237,7 +237,8 @@ def test_google_forms_configuration():
     assert data['intake_enabled'] is False
     assert data['captcha_site_key'] == ''
     assert data['intake_provider'] == 'google_forms'
-    assert data['forms']['poc'] == 'https://forms.gle/FoGcs7LHhoTbmhtf8'
+    assert data['forms']['poc'] is None
+    assert data['store']['poc_applications_open'] is False
     from apps.website.services import deliver_outbox
     with patch('apps.website.services.send_mail') as mail, patch('apps.website.services.Outbox.objects.filter') as query:
         deliver_outbox()

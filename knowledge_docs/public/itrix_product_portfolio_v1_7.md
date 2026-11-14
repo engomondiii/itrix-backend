@@ -22,8 +22,7 @@ SPADES is physics-guided probabilistic correction of discretized PDE solutions u
 
 
 ## Website inquiry routing — November 2, 2026
-Korean PoC: https://forms.gle/KrA7gzeC27V2mYRE9
-English PoC: https://forms.gle/VMm7qx7fbzu1paiG6?hl=en
+The public ASTOP PoC application period ended on November 13, 2026. Applications are closed; do not provide expired form links. General and partnership inquiries remain available.
 Korean general inquiry: https://forms.gle/CFdqPQqv4vrzppED7
 English general inquiry: https://forms.gle/NszSppZycS5NGqyB9?hl=en
 Korean partnership and large-scale adoption: https://forms.gle/Wm8571coNmX6Eyvj7

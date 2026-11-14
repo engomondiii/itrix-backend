@@ -53,7 +53,7 @@ class Configuration(PublicView):
                          'notice_ends_at': notice.ends_at if visible else None,
                          'captcha_site_key': settings.WEBSITE_TURNSTILE_SITE_KEY if settings.WEBSITE_NATIVE_OPERATIONS_ENABLED else '',
                          'privacy_version': settings.WEBSITE_PRIVACY_VERSION,
-                         'intake_enabled': settings.WEBSITE_NATIVE_OPERATIONS_ENABLED and settings.WEBSITE_INTAKE_ENABLED, 'intake_provider': 'google_forms', 'forms': {'poc': 'https://forms.gle/FoGcs7LHhoTbmhtf8', 'contact': 'https://forms.gle/PCW2J9SF4wjDcPtA6', 'partnership': 'https://forms.gle/aACxKK1oggHiA8ueA'}})
+                         'intake_enabled': settings.WEBSITE_NATIVE_OPERATIONS_ENABLED and settings.WEBSITE_INTAKE_ENABLED, 'intake_provider': 'google_forms', 'forms': {'poc': None, 'contact': 'https://forms.gle/PCW2J9SF4wjDcPtA6', 'partnership': 'https://forms.gle/aACxKK1oggHiA8ueA'}})
 
 
 class IntakeInput(serializers.Serializer):

@@ -20,5 +20,5 @@ def store_policy():
             'checkout_available': False, 'trial_available': False, 'website_downloads': False,
             'monthly_usd': None, 'annual_usd': None, 'pricing_status': 'unconfirmed',
             'stores': stores, 'interest_path': None, 'enterprise_path': '/astop',
-            'information_path': '/astop', 'download_status': 'awaiting_confirmation',
-            'message': 'ASTOP information and PoC applications are available. Download, installation and system requirements need confirmed release information. Launch-alert registration is not offered.'}
+            'information_path': '/astop', 'poc_applications_open': False, 'download_status': 'awaiting_confirmation',
+            'message': 'ASTOP information is available. The public PoC application period ended on November 13, 2026; applications are closed. Download, installation and system requirements need confirmed release information. Launch-alert registration is not offered.'}

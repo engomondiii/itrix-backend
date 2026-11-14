@@ -497,14 +497,25 @@ class KnowledgeRetriever:
                 query_client = PineconeQueryClient()
                 raw: list[dict] = []
                 per_namespace_k = max(12, top_k * 4)
-                for ns in selected_namespaces:
-                    matches = query_client.query(
+                def query_namespace(ns):
+                    return query_client.query(
                         vector=vector,
                         top_k=per_namespace_k,
                         namespace=ns,
                         metadata_filter=_pinecone_filter(candidate_levels),
                     )
-                    raw.extend(matches)
+
+                # Independent network reads share one initialized connection pool.
+                # Preserve namespace order and apply all DB authorization below.
+                if len(selected_namespaces) > 1 and query_client.enabled:
+                    from concurrent.futures import ThreadPoolExecutor
+                    _ = query_client.index
+                    with ThreadPoolExecutor(max_workers=min(4, len(selected_namespaces))) as pool:
+                        for matches in pool.map(query_namespace, selected_namespaces):
+                            raw.extend(matches)
+                else:
+                    for ns in selected_namespaces:
+                        raw.extend(query_namespace(ns))
 
                 ids = [m.get("id") for m in raw if m.get("id")]
                 by_id = {

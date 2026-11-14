@@ -330,6 +330,8 @@ class ConciergeAgent(BaseAgent):
         question = self._question(ctx)
         retrieval_context = self._retrieval_context(ctx)
         self._last_chunk_ids = []
+        self.stream_failed = False
+        self.stream_stop_reason = ""
         try:
             from apps.ai_engine.services.knowledge_retriever import VISITOR_KNOWLEDGE_NAMESPACES
 
@@ -374,10 +376,15 @@ class ConciergeAgent(BaseAgent):
             if membership_state:
                 system += "\nVERIFIED ACCOUNT ASTOP STATE (do not infer additional rights):\n" + membership_state
             user = self._conversation_user_prompt(ctx, question, _CONCIERGE_STREAM_INSTRUCTION)
-            yield from ClaudeClient().stream(system=system, user=user, max_tokens=_max_tokens())
+            client = ClaudeClient()
+            yield from client.stream(system=system, user=user, max_tokens=_max_tokens())
+            self.stream_failed = getattr(client, "stream_failed", False)
+            self.stream_stop_reason = getattr(client, "stream_stop_reason", "")
         except AIEngineDisabled:
+            self.stream_failed = True
             return
         except Exception:  # noqa: BLE001 - streaming must never propagate
+            self.stream_failed = True
             logger.exception("Concierge stream_reply failed")
             return
 

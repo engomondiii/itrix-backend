@@ -127,6 +127,8 @@ class ClaudeClient:
         """
         if not self.enabled:
             raise AIEngineDisabled("AI engine disabled or ANTHROPIC_API_KEY missing.")
+        self.stream_failed = False
+        self.stream_stop_reason = ""
         try:
             with self.client.messages.stream(
                 model=self.model,
@@ -138,8 +140,10 @@ class ClaudeClient:
                 for text in stream.text_stream:
                     if text:
                         yield text
+                self.stream_stop_reason = str(stream.get_final_message().stop_reason or "")
         except Exception as exc:  # noqa: BLE001
             # If nothing has been yielded yet the caller can still fall back; if we're
             # mid-stream the caller keeps the partial text. Either way, never propagate.
+            self.stream_failed = True
             logger.warning("Claude stream failed (%s); ending stream.", type(exc).__name__)
             return

@@ -363,6 +363,12 @@ class ThreadListCreateView(APIView):
                 from apps.conversations.services import ingest
 
                 ingest.associate_attachments(first, bound_ids)
+            from apps.conversations.services import http_stream
+            if http_stream.requested(request):
+                response = http_stream.response(thread, first, body, _request_id(request))
+                if issued_session:
+                    _set_session_cookie(response, session_id)
+                return response
             # The first sentence deserves an answer in the same response. Waiting
             # for a socket that may never connect is how a visitor concludes the
             # surface is broken.
@@ -573,6 +579,10 @@ class ThreadTurnsView(APIView):
         if bound_ids:
             ingest.associate_attachments(message, bound_ids)
 
+        from apps.conversations.services import http_stream
+        if http_stream.requested(request):
+            return http_stream.response(thread, message, ser.validated_data["body"], _request_id(request))
+
         # Generate the reply here too. The socket streams it when connected; this
         # guarantees an answer when it is not. See _generate_assistant_turn.
         attempt = _attempt_assistant_generation(
@@ -767,7 +777,7 @@ class GenerationAttempt:
     turn: dict | None = None
 
 
-def _attempt_assistant_generation(thread, body: str, *, request_id: str = "") -> GenerationAttempt:
+def _attempt_assistant_generation(thread, body: str, *, request_id: str = "", on_delta=None) -> GenerationAttempt:
     """Idempotent transport-independent generation with an explicit outcome.
 
     HTTP and retry paths share this lock. A retry while the original generation is
@@ -796,7 +806,7 @@ def _attempt_assistant_generation(thread, body: str, *, request_id: str = "") ->
         )
         if existing is not None:
             return GenerationAttempt(state="ready", turn=ThreadTurnSerializer(existing).data)
-        generated = _generate_assistant_turn_impl(thread, body, request_id=request_id)
+        generated = _generate_assistant_turn_impl(thread, body, request_id=request_id, **({"on_delta": on_delta} if on_delta else {}))
         if generated is None:
             return GenerationAttempt(state="failed")
         return GenerationAttempt(state="ready", turn=generated)
@@ -810,7 +820,7 @@ def _generate_assistant_turn(thread, body: str):
     return attempt.turn if attempt.state == "ready" else None
 
 
-def _generate_assistant_turn_impl(thread, body: str, *, request_id: str = ""):
+def _generate_assistant_turn_impl(thread, body: str, *, request_id: str = "", on_delta=None):
     """
     Produce the assistant reply for a turn, governed.
 
@@ -874,11 +884,28 @@ def _generate_assistant_turn_impl(thread, body: str, *, request_id: str = ""):
             from apps.agents.services.concierge import ConciergeAgent
 
             agent = ConciergeAgent()
-            out = agent.run(ctx)
-            payload = out.payload or {}
-            text = (payload.get("reply") or "").strip() or agent.fallback_reply
-            can_continue = bool(payload.get("canContinue", False))
-            cited_chunk_ids = [c for c in (out.chunk_ids or []) if c]
+            if on_delta:
+                from apps.agents.services.governance import is_non_blocking_conversation_context
+                from apps.governance.services import stream_guard
+                guard = stream_guard.new_state()
+                non_blocking = is_non_blocking_conversation_context(ctx.context_label, claim_level=1)
+                pieces = []
+                for token in agent.stream_reply(ctx):
+                    if not non_blocking and stream_guard.inspect(guard, token):
+                        raise RuntimeError("Stream guard stopped generation")
+                    pieces.append(token)
+                    on_delta(token)
+                if getattr(agent, "stream_failed", False):
+                    raise RuntimeError("Provider stream interrupted")
+                text = "".join(pieces).strip()
+                can_continue = getattr(agent, "stream_stop_reason", "") == "max_tokens"
+                cited_chunk_ids = agent.last_chunk_ids
+            else:
+                out = agent.run(ctx)
+                payload = out.payload or {}
+                text = (payload.get("reply") or "").strip() or agent.fallback_reply
+                can_continue = bool(payload.get("canContinue", False))
+                cited_chunk_ids = [c for c in (out.chunk_ids or []) if c]
         except Exception:  # noqa: BLE001
             logger.exception(
                 "assistant.generation_failed request_id=%s thread_id=%s",

@@ -73,10 +73,14 @@ class ClaudeClient:
             from anthropic import Anthropic  # noqa: PLC0415 - lazy
 
             # Bound the client so no single call can hang a web worker.
-            self._client = Anthropic(
-                api_key=settings.ANTHROPIC_API_KEY,
-                timeout=_timeout_seconds(),
-                max_retries=_max_retries(),
+            from .client_pool import reusable_client
+            self._client = reusable_client(
+                "anthropic", (settings.ANTHROPIC_API_KEY, _timeout_seconds(), _max_retries()),
+                lambda: Anthropic(
+                    api_key=settings.ANTHROPIC_API_KEY,
+                    timeout=_timeout_seconds(),
+                    max_retries=_max_retries(),
+                ),
             )
         return self._client
 

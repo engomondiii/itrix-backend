@@ -81,10 +81,14 @@ class Embedder:
             from openai import OpenAI  # noqa: PLC0415 - lazy
 
             # Bound the client so no single embedding call can hang a web worker.
-            self._client = OpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                timeout=_timeout_seconds(),
-                max_retries=0,  # we manage retries explicitly below (offline path only)
+            from apps.ai_engine.services.client_pool import reusable_client
+            self._client = reusable_client(
+                "openai", (settings.OPENAI_API_KEY, _timeout_seconds()),
+                lambda: OpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    timeout=_timeout_seconds(),
+                    max_retries=0,
+                ),
             )
         return self._client
 

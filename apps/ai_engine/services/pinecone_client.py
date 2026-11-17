@@ -38,15 +38,21 @@ class PineconeQueryClient:
         if self._index is None:
             from pinecone import Pinecone  # noqa: PLC0415 - lazy
 
-            # Bound the underlying HTTP pool so a query can't hang indefinitely. The
-            # ``pool_threads`` + ``timeout`` kwargs are accepted by the Pinecone client;
-            # we pass timeout via the index query below as well for belt-and-braces.
-            try:
+            from .client_pool import reusable_client
+
+            def create_index():
                 pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-            except Exception:  # noqa: BLE001
-                logger.exception("Pinecone client init failed")
-                raise
-            self._index = pc.Index(settings.PINECONE_INDEX)
+                try:
+                    return pc.Index(settings.PINECONE_INDEX)
+                finally:
+                    pc.close()
+
+            # Resolving the index name and establishing TLS are paid once per
+            # generation thread, rather than again before every answer.
+            self._index = reusable_client(
+                "pinecone", (settings.PINECONE_API_KEY, settings.PINECONE_INDEX),
+                create_index,
+            )
         return self._index
 
     def query(

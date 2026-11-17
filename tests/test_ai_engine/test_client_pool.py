@@ -64,3 +64,14 @@ def test_provider_wrappers_reuse_connections_without_caching_answers(settings):
         Embedder().embed_one('question one')
         Embedder().embed_one('question two')
         assert openai.return_value.embeddings.create.call_count == 2
+
+
+def test_prompt_cache_preserves_exact_context_and_changed_sources():
+    from apps.ai_engine.services.claude_client import _stream_system_blocks
+    system = "Shared accuracy rules\n\nINTERNAL ORCHESTRATION CONTEXT\nfresh source A"
+    blocks = _stream_system_blocks(system)
+    assert "".join(block["text"] for block in blocks) == system
+    changed = _stream_system_blocks(system.replace("source A", "source B"))
+    assert blocks[0] == changed[0]
+    assert blocks[1] != changed[1]
+    assert _stream_system_blocks("other agent") == "other agent"

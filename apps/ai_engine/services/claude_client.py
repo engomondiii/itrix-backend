@@ -61,6 +61,21 @@ def _max_retries() -> int:
         return 1
 
 
+def _stream_system_blocks(system: str):
+    """Cache exact prompt prefixes; preserve every instruction and fresh source.
+
+    The provider reuses computation only for identical text. Changed knowledge,
+    authorization or account context still produces a different cache prefix.
+    """
+    boundary = system.find("INTERNAL ORCHESTRATION CONTEXT")
+    if boundary <= 0:
+        return system
+    return [
+        {"type": "text", "text": system[:boundary], "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": system[boundary:], "cache_control": {"type": "ephemeral"}},
+    ]
+
+
 class ClaudeClient:
     def __init__(self):
         self.enabled = settings.ENABLE_AI_ENGINE and bool(settings.ANTHROPIC_API_KEY)
@@ -138,13 +153,16 @@ class ClaudeClient:
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                system=system,
+                system=_stream_system_blocks(system),
                 messages=[{"role": "user", "content": user}],
             ) as stream:
                 for text in stream.text_stream:
                     if text:
                         yield text
-                self.stream_stop_reason = str(stream.get_final_message().stop_reason or "")
+                final = stream.get_final_message()
+                self.stream_stop_reason = str(final.stop_reason or "")
+                logger.info("claude.stream prompt_cache_read_tokens=%s",
+                            getattr(getattr(final, "usage", None), "cache_read_input_tokens", 0))
         except Exception as exc:  # noqa: BLE001
             # If nothing has been yielded yet the caller can still fall back; if we're
             # mid-stream the caller keeps the partial text. Either way, never propagate.

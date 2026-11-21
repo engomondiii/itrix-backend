@@ -71,7 +71,7 @@ def _stream_system_blocks(system: str):
     if boundary <= 0:
         return system
     return [
-        {"type": "text", "text": system[:boundary], "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": system[:boundary], "cache_control": {"type": "ephemeral", "ttl": "1h"}},
         {"type": "text", "text": system[boundary:], "cache_control": {"type": "ephemeral"}},
     ]
 

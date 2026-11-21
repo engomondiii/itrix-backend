@@ -23,6 +23,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import struct
+import time
+from collections import OrderedDict
+from threading import Lock
 
 from django.conf import settings
 
@@ -64,6 +67,14 @@ def _deterministic_vector(text: str, dim: int) -> list[float]:
     # Normalise to unit length (cosine-friendly).
     norm = sum(v * v for v in values) ** 0.5 or 1.0
     return [v / norm for v in values]
+
+
+# Only query vectors are cached, never retrieved documents or generated answers.
+# Bounded process-local storage contains hashes and vectors, not question text.
+_QUERY_VECTORS = OrderedDict()
+_QUERY_VECTOR_LOCK = Lock()
+_QUERY_VECTOR_TTL = 600
+_QUERY_VECTOR_LIMIT = 128
 
 
 class EmbeddingUnavailable(RuntimeError):
@@ -147,7 +158,27 @@ class Embedder:
         Failure raises ``EmbeddingUnavailable`` so the retriever uses its deterministic
         keyword fallback rather than sending a pseudo-vector to Pinecone.
         """
-        return self.embed([text], retries=0, backoff=False)[0]
+        if not self.enabled:
+            return self.embed([text], retries=0, backoff=False)[0]
+        key = (
+            hashlib.sha256(settings.OPENAI_API_KEY.encode()).digest(),
+            settings.OPENAI_EMBEDDING_MODEL,
+            hashlib.sha256(text.encode("utf-8")).digest(),
+        )
+        with _QUERY_VECTOR_LOCK:
+            cached = _QUERY_VECTORS.get(key)
+            if cached is not None and time.monotonic() < cached[0]:
+                _QUERY_VECTORS.move_to_end(key)
+                return list(cached[1])
+            _QUERY_VECTORS.pop(key, None)
+        # Network work stays outside the lock so unrelated visitors never wait.
+        vector = self.embed([text], retries=0, backoff=False)[0]
+        with _QUERY_VECTOR_LOCK:
+            _QUERY_VECTORS[key] = (time.monotonic() + _QUERY_VECTOR_TTL, tuple(vector))
+            _QUERY_VECTORS.move_to_end(key)
+            while len(_QUERY_VECTORS) > _QUERY_VECTOR_LIMIT:
+                _QUERY_VECTORS.popitem(last=False)
+        return vector
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:

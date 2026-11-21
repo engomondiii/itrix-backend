@@ -8,6 +8,8 @@ from apps.ai_engine.services import client_pool
 
 @pytest.fixture(autouse=True)
 def clear_pool():
+    from apps.ai_engine.services.pinecone_client import _shared_index
+    _shared_index.cache_clear()
     client_pool._state.clients = {}
     yield
     client_pool._state.clients = {}
@@ -92,3 +94,18 @@ def test_vector_query_omits_duplicate_metadata_but_preserves_access_filter(setti
     assert args['include_metadata'] is False
     assert args['filter'] == access_filter
     assert args['top_k'] == 32
+
+
+def test_search_transport_reused_across_generation_threads(settings):
+    settings.ENABLE_AI_ENGINE = True
+    settings.PINECONE_API_KEY = 'thread-test'
+    from apps.ai_engine.services.pinecone_client import PineconeQueryClient
+    with patch('pinecone.Pinecone') as provider:
+        first = PineconeQueryClient().index
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            second = pool.submit(lambda: PineconeQueryClient().index).result()
+        assert first is second
+        provider.assert_called_once()
+        settings.PINECONE_INDEX = 'different-index'
+        PineconeQueryClient().index
+        assert provider.call_count == 2

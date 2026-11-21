@@ -15,6 +15,8 @@ degrades gracefully.
 from __future__ import annotations
 
 import logging
+import os
+from functools import lru_cache
 
 from django.conf import settings
 
@@ -28,6 +30,22 @@ def _timeout_seconds() -> float:
         return 20.0
 
 
+@lru_cache(maxsize=4)
+def _shared_index(process_id, api_key, index_name):
+    """Share the HTTP pool across generation threads, never across worker forks.
+
+    Query requests already use this same index concurrently across namespaces.
+    Only the connection pool is reused: results and authorization remain per turn.
+    The process/config key isolates forks and credential/index rotations.
+    """
+    from pinecone import Pinecone
+    pc = Pinecone(api_key=api_key)
+    try:
+        return pc.Index(index_name)
+    finally:
+        pc.close()
+
+
 class PineconeQueryClient:
     def __init__(self):
         self.enabled = settings.ENABLE_AI_ENGINE and bool(settings.PINECONE_API_KEY)
@@ -36,22 +54,8 @@ class PineconeQueryClient:
     @property
     def index(self):
         if self._index is None:
-            from pinecone import Pinecone  # noqa: PLC0415 - lazy
-
-            from .client_pool import reusable_client
-
-            def create_index():
-                pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-                try:
-                    return pc.Index(settings.PINECONE_INDEX)
-                finally:
-                    pc.close()
-
-            # Resolving the index name and establishing TLS are paid once per
-            # generation thread, rather than again before every answer.
-            self._index = reusable_client(
-                "pinecone", (settings.PINECONE_API_KEY, settings.PINECONE_INDEX),
-                create_index,
+            self._index = _shared_index(
+                os.getpid(), settings.PINECONE_API_KEY, settings.PINECONE_INDEX,
             )
         return self._index
 

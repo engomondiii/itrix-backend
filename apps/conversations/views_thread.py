@@ -633,6 +633,9 @@ class ThreadRetryView(APIView):
         )
         if existing is not None:
             return Response({"assistantTurn": ThreadTurnSerializer(existing).data, "reused": True}, status=status.HTTP_200_OK)
+        from apps.conversations.services import http_stream
+        if http_stream.requested(request):
+            return http_stream.response(thread, visitor, visitor.body, _request_id(request))
         attempt = _attempt_assistant_generation(thread, visitor.body, request_id=_request_id(request))
         if attempt.state == "pending":
             return Response(

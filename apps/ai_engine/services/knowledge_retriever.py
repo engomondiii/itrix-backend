@@ -510,7 +510,7 @@ class KnowledgeRetriever:
                 if len(selected_namespaces) > 1 and query_client.enabled:
                     from concurrent.futures import ThreadPoolExecutor
                     _ = query_client.index
-                    with ThreadPoolExecutor(max_workers=min(4, len(selected_namespaces))) as pool:
+                    with ThreadPoolExecutor(max_workers=min(8, len(selected_namespaces))) as pool:
                         for matches in pool.map(query_namespace, selected_namespaces):
                             raw.extend(matches)
                 else:

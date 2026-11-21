@@ -23,6 +23,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "itrix.settings.production")
 # Initialise Django (runs django.setup()) before importing anything that touches models.
 django_asgi_app = get_asgi_application()
 
+# Pay SDK import/setup cost during readiness, not while the first visitor waits.
+from apps.ai_engine.services.warmup import preload_ai_runtime
+
+preload_ai_runtime()
+
 try:
     from channels.routing import ProtocolTypeRouter
 

@@ -75,3 +75,20 @@ def test_prompt_cache_preserves_exact_context_and_changed_sources():
     assert blocks[0] == changed[0]
     assert blocks[1] != changed[1]
     assert _stream_system_blocks("other agent") == "other agent"
+
+
+def test_vector_query_omits_duplicate_metadata_but_preserves_access_filter(settings):
+    settings.ENABLE_AI_ENGINE = True
+    settings.PINECONE_API_KEY = 'test-pinecone'
+    from apps.ai_engine.services.pinecone_client import PineconeQueryClient
+    client = PineconeQueryClient()
+    client._index = Mock()
+    client._index.query.return_value = {'matches': [{'id': 'current-chunk', 'score': 0.9}]}
+    access_filter = {'disclosure_level': {'$in': ['public']}}
+    matches = client.query(vector=[0.1], top_k=32, namespace='astop', metadata_filter=access_filter)
+    assert matches[0]['id'] == 'current-chunk'
+    assert matches[0]['score'] == 0.9
+    args = client._index.query.call_args.kwargs
+    assert args['include_metadata'] is False
+    assert args['filter'] == access_filter
+    assert args['top_k'] == 32

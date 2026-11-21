@@ -75,12 +75,14 @@ class PineconeQueryClient:
             # The Pinecone SDK accepts a per-request timeout on ``query``; pass it so a
             # slow index can't stall the request. Older SDKs ignore unknown kwargs, so we
             # attempt with-timeout first and fall back to without if it's rejected.
+            # The retriever loads current text and access rules from PostgreSQL.
+            # Returning duplicate remote metadata only adds transfer/decoding time.
             try:
                 result = self.index.query(
                     vector=vector,
                     top_k=top_k,
                     namespace=namespace or None,
-                    include_metadata=True,
+                    include_metadata=False,
                     filter=metadata_filter or None,
                     timeout=int(_timeout_seconds()),
                 )
@@ -89,7 +91,7 @@ class PineconeQueryClient:
                     vector=vector,
                     top_k=top_k,
                     namespace=namespace or None,
-                    include_metadata=True,
+                    include_metadata=False,
                     filter=metadata_filter or None,
                 )
             matches = getattr(result, "matches", None)
